@@ -1,8 +1,15 @@
 #include <tonc.h>
-#include <gfx_player.h>
-#include <gfx_tileset.h>
+#include <player_gfx.h>
+#include <tileset_gfx.h>
+#include <map_bin.h>
 
 OBJ_ATTR obj_buffer[128];
+
+typedef struct map_header
+{
+    u16 width;
+    u16 height;
+} map_header_s;
 
 int main()
 {
@@ -46,21 +53,33 @@ int main()
     pal_obj_mem[14] = 0x55df;
     pal_obj_mem[15] = 0x573f;
 
-    memcpy32(&tile_mem[0][0], gfx_tilesetTiles, gfx_tilesetTilesLen / sizeof(u32));
-    memcpy32(tile_mem_obj[0][0].data, gfx_playerTiles, 32 * 8);
+    memcpy32(&tile_mem[0][0], tileset_gfxTiles, tileset_gfxTilesLen / sizeof(u32));
+    memcpy32(tile_mem_obj[0][0].data, player_gfxTiles, 32 * 8);
+
+    const map_header_s *header = (const map_header_s *)map_bin;
+    int map_width = (int) header->width;
+    int map_height = (int) header->height;
+
+    const u16 *map_data = (const u16 *)(map_bin + 4);
 
     SCR_ENTRY *se = se_mem[28];
+    
     for (int y = 0; y < 8; ++y)
     {
         for (int x = 0; x < 8; ++x)
         {
-            int i = ((y << 5) | x) << 1;
-            se[i] = 2;
-            se[++i] = 3;
+            int ii = y * map_width + x;
+            int oi = ((y << 5) | x) << 1;
 
-            i += 32;
-            se[i] = 34;
-            se[++i] = 35;
+            int v = map_data[ii] & 0xFF;
+            v <<= 1;
+            se[oi] = (u16) v;
+            se[++oi] = (u16) ++v;
+
+            oi += 31;
+            v += 31;
+            se[oi] = (u16) v;
+            se[++oi] = (u16) ++v;
         }
     }
 

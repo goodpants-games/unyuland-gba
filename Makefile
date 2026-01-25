@@ -29,9 +29,9 @@ TARGET		:= $(notdir $(CURDIR))
 BUILD		:= build
 SOURCES		:= src
 INCLUDES	:= include
-DATA		:=
+DATA		:= data/bin
 MUSIC		:=
-GRAPHICS	:= graphics
+GRAPHICS	:= data/graphics
 
 #---------------------------------------------------------------------------------
 # options for code generation
