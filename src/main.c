@@ -3,6 +3,11 @@
 #include <tileset_gfx.h>
 #include <map_bin.h>
 
+#include "mgba.h"
+
+#define SCRW_T16 (SCREEN_WIDTH / 16)
+#define SCRH_T16 (SCREEN_HEIGHT / 16)
+
 OBJ_ATTR obj_buffer[128];
 
 typedef struct map_header
@@ -11,8 +16,40 @@ typedef struct map_header
     u16 height;
 } map_header_s;
 
+static void write_block(const uint map_entry, u32 *const dest)
+{
+    int gfx_id = map_entry & 0xFF;
+    int v = gfx_id % 16 * 2 + gfx_id / 16 * 64;
+
+    u32 upper = ((v+1) << 16) | v;
+    v += 32;
+    u32 lower = ((v+1) << 16) | v;
+
+    if (map_entry & 0x100) // horiz flip
+    {
+        upper = ((upper & 0xFFFF) << 16) | (upper >> 16);
+        lower = ((lower & 0xFFFF) << 16) | (lower >> 16);
+        upper = upper | SE_HFLIP | (SE_HFLIP << 16);
+        lower = lower | SE_HFLIP | (SE_HFLIP << 16);
+    }
+
+    if (map_entry & 0x200) // vert flip
+    {
+        u32 temp = upper;
+        upper = lower;
+        lower = temp;
+        upper |= SE_VFLIP | (SE_VFLIP << 16);
+        lower |= SE_VFLIP | (SE_VFLIP << 16);
+    }
+
+    *dest = upper;
+    *(dest + 16) = lower;;
+}
+
 int main()
 {
+    mgba_console_open();
+
     irq_init(NULL);
     irq_add(II_VBLANK, NULL);
 
@@ -60,26 +97,21 @@ int main()
     int map_width = (int) header->width;
     int map_height = (int) header->height;
 
+    mgba_printf(MGBA_LOG_INFO, "map size: %d, %d", map_width, map_height);
+
     const u16 *map_data = (const u16 *)(map_bin + 4);
 
-    SCR_ENTRY *se = se_mem[28];
+    u32 *se32 = (u32 *)se_mem[28];
+    // screen size: 15x10 tiles
     
-    for (int y = 0; y < 8; ++y)
+    for (int y = 0; y < 10; ++y)
     {
-        for (int x = 0; x < 8; ++x)
+        for (int x = 0; x < 15; ++x)
         {
-            int ii = y * map_width + x;
-            int oi = ((y << 5) | x) << 1;
-
-            int v = map_data[ii] & 0xFF;
-            v <<= 1;
-            se[oi] = (u16) v;
-            se[++oi] = (u16) ++v;
-
-            oi += 31;
-            v += 31;
-            se[oi] = (u16) v;
-            se[++oi] = (u16) ++v;
+            uint ii = y * map_width + x;
+            uint oi = ((y << 5) | x);
+            uint entry = (uint) map_data[ii];
+            write_block(entry, se32 + oi);
         }
     }
 
@@ -93,30 +125,105 @@ int main()
 
     int x = 96 * 2;
     int y = 32 * 2;
-    int sx = 0;
-    int sy = 0;
+    int cam_x = 0;
+    int cam_y = 0;
+    int prev_cam_x = cam_x;
+    int prev_cam_y = cam_y;
 
     while (true)
     {
         VBlankIntrWait();
-        obj_set_pos(obj, x >> 1, y >> 1);
+
+        int prev_cam_tx = prev_cam_x / 16;
+        int cam_tx = cam_x / 16;
+
+        int prev_cam_ty = prev_cam_y / 16;
+        int cam_ty = cam_y / 16;
+
+        // x scrolling (also handles corners)
+        if (cam_tx != prev_cam_tx)
+        {
+            int sx, ex;
+            if (cam_tx > prev_cam_tx)
+            {
+                sx = prev_cam_tx + SCRW_T16;
+                ex = cam_tx + SCRW_T16;
+            }
+            else
+            {
+                sx = cam_tx;
+                ex = prev_cam_tx;
+            }
+
+            int sy = cam_ty;
+            int ey = cam_ty + SCRH_T16;
+
+            for (int x = sx; x <= ex; ++x)
+            {
+                for (int y = sy; y <= ey; ++y)
+                {
+                    uint ii = y * map_width + x;
+                    uint oi = (y % 16) * 32 + (x % 16);
+                    uint entry = (uint) map_data[ii];
+                    write_block(entry, se32 + oi);
+                }
+            }
+        }
+
+        // y scrolling
+        if (cam_ty != prev_cam_ty)
+        {
+            int sy, ey;
+            if (cam_ty > prev_cam_ty)
+            {
+                sy = prev_cam_ty + SCRH_T16;
+                ey = cam_ty + SCRH_T16;
+            }
+            else
+            {
+                sy = cam_ty - 1;
+                ey = prev_cam_ty - 1;
+            }
+
+            int sx = cam_tx;
+            int ex = cam_tx + SCRW_T16;
+
+            for (int y = sy; y <= ey; ++y)
+            {
+                for (int x = sx; x <= ex; ++x)
+                {
+                    uint ii = y * map_width + x;
+                    uint oi = (y % 16) * 32 + (x % 16);
+                    uint entry = (uint) map_data[ii];
+                    write_block(entry, se32 + oi);
+                }
+            }
+        }
+
+        prev_cam_x = cam_x;
+        prev_cam_y = cam_y;
+
+        obj_set_pos(obj, x / 2, y / 2);
         oam_copy(oam_mem, obj_buffer, 1);
-        REG_BG0HOFS = sx;
-        REG_BG0VOFS = sy;
+        REG_BG0HOFS = cam_x;
+        REG_BG0VOFS = cam_y;
 
         key_poll();
 
         if (key_is_down(KEY_RIGHT))
-            sx += 4;
+            cam_x += 4;
 
         if (key_is_down(KEY_LEFT))
-            sx -= 4;
+            cam_x -= 4;
 
         if (key_is_down(KEY_UP))
-            sy -= 4;
+            cam_y -= 4;
 
         if (key_is_down(KEY_DOWN))
-            sy += 4;
+            cam_y += 4;
+
+        if (cam_x < 0) cam_x = 0;
+        if (cam_y < 0) cam_y = 0;
     }
 
 
