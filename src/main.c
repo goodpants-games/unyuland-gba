@@ -1,20 +1,14 @@
 #include <tonc.h>
 #include <player_gfx.h>
 #include <tileset_gfx.h>
-#include <map_bin.h>
 
+#include "maps.h"
 #include "mgba.h"
 
 #define SCRW_T16 (SCREEN_WIDTH / 16)
 #define SCRH_T16 (SCREEN_HEIGHT / 16)
 
 OBJ_ATTR obj_buffer[128];
-
-typedef struct map_header
-{
-    u16 width;
-    u16 height;
-} map_header_s;
 
 static void write_block(const uint map_entry, u32 *const dest)
 {
@@ -93,13 +87,13 @@ int main()
     memcpy32(&tile_mem[0][0], tileset_gfxTiles, tileset_gfxTilesLen / sizeof(u32));
     memcpy32(tile_mem_obj[0][0].data, player_gfxTiles, 32 * 8);
 
-    const map_header_s *header = (const map_header_s *)map_bin;
-    int map_width = (int) header->width;
-    int map_height = (int) header->height;
+    const map_header_s *map = maps[0];
+    int map_width = (int) map->width;
+    int map_height = (int) map->height;
 
     mgba_printf(MGBA_LOG_INFO, "map size: %d, %d", map_width, map_height);
 
-    const u16 *map_data = (const u16 *)(map_bin + 4);
+    const u16 *map_data = map_graphics_data(map);
 
     u32 *se32 = (u32 *)se_mem[28];
     // screen size: 15x10 tiles

@@ -59,7 +59,6 @@ def main():
     parser.add_argument('output', help='Output bin file. Pass - to read from stdout.')
 
     args = parser.parse_args()
-    print(args.input, args.output)
 
     use_stdin = args.input == '-'
     use_stdout = args.output == '-'
