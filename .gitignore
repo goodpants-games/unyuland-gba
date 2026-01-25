@@ -1,0 +1,6 @@
+*.elf
+*.gba
+*.sav
+
+.clangd
+build
