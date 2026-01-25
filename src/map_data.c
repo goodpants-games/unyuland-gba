@@ -1,4 +1,4 @@
-#include "maps.h"
+#include "map_data.h"
 
 #include <b01_map.h>
 #include <room01_map.h>
