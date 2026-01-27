@@ -37,8 +37,6 @@ INLINE int map_collision_get(const u8 *data, int pitch, int x, int y)
 {
     int i = y * pitch + x;
     int cell = (data[i / 4] >> ((i % 4) * 2)) & 0x3;
-    mgba_printf(MGBA_LOG_DEBUG, "%i %i", i/4, ((i%4) * 2));
-    mgba_printf(MGBA_LOG_DEBUG, "%i", cell);
     return cell;
 }
 
