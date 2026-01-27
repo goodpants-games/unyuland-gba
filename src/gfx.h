@@ -18,7 +18,7 @@ extern const map_header_s *gfx_loaded_map;
 
 void gfx_init(void);
 void gfx_new_frame(void);
-void gfx_load_map(uint map_index);
+void gfx_load_map(const map_header_s *map);
 
 INLINE void gfx_unload_map(void)
 {

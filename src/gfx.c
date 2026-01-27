@@ -190,9 +190,9 @@ void gfx_new_frame(void)
     REG_BG0VOFS = gfx_scroll_y;
 }
 
-void gfx_load_map(uint map_index)
+void gfx_load_map(const map_header_s *map)
 {
-    gfx_loaded_map = maps[map_index];
+    gfx_loaded_map = map;
     gfx_map_width = gfx_loaded_map->width;
     gfx_map_height = gfx_loaded_map->height;
     screen_dirty = true;
