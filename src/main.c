@@ -41,7 +41,6 @@ typedef struct entity {
 
     struct { FIXED x; FIXED y; } pos;
     struct { FIXED x; FIXED y; } vel;
-    struct { FIXED x; FIXED y; } damp;
     u8 gmult; // 0 = no gravity, 255 = full gravity
     u8 mass; // 1 = 0.5 mass, 2 = 1 mass, 3 = 1.5 mass, e.t.c.
     u8 health;
@@ -58,6 +57,7 @@ typedef struct entity {
         u8 jump_trigger;
 
         FIXED move_speed;
+        FIXED move_accel;
         FIXED jump_velocity;
     } actor;
 
@@ -139,8 +139,6 @@ static bool rect_collision(FIXED x0, FIXED y0, FIXED w0, FIXED h0,
 void entity_init(entity_s *self)
 {
     memset32(self, 0, sizeof(entity_s) / 4);
-    self->damp.x = int2fx(1);
-    self->damp.y = int2fx(1);
     self->gmult = 255;
     self->mass = 2;
     self->col.group = COLGROUP_DEFAULT;
@@ -161,8 +159,26 @@ void update_entities(void)
 
         if (entity->flags & ENTITY_FLAG_ACTOR)
         {
-            entity->vel.x += fxmul(entity->actor.move_speed,
-                                   int2fx((int) entity->actor.move_x));
+            if (entity->actor.move_x != 0)
+            {
+                entity->vel.x += fxmul(entity->actor.move_accel,
+                                       int2fx((int) entity->actor.move_x));
+                
+                if (ABS(entity->vel.x) > entity->actor.move_speed)
+                {
+                    entity->vel.x = fxmul(entity->actor.move_speed,
+                                          int2fx(SGN(entity->vel.x)));
+                }
+            }
+            else
+            {
+                int sign = SGN3(entity->vel.x);
+                entity->vel.x += fxmul(entity->actor.move_accel,
+                                       int2fx(-sign));
+                
+                if (SGN3(entity->vel.x) != sign)
+                    entity->vel.x = 0;
+            }
 
             uint jump_trigger = (uint) entity->actor.jump_trigger;
             if (jump_trigger > 0)
@@ -188,9 +204,6 @@ void update_entities(void)
 
             if (entity->vel.y > terminal_vel)
                 entity->vel.y = terminal_vel;
-
-            entity->vel.x = fxmul(entity->vel.x, entity->damp.x);
-            entity->vel.y = fxmul(entity->vel.y, entity->damp.y);
 
             entity->pos.x += entity->vel.x;
             entity->pos.y += entity->vel.y;
@@ -296,8 +309,8 @@ int main()
     player->pos.y = int2fx(16);
     player->col.w = 6;
     player->col.h = 8;
-    player->damp.x = (FIXED)(FIX_SCALE * 0.8);
-    player->actor.move_speed = (FIXED)(FIX_SCALE * 0.25);
+    player->actor.move_speed = (FIXED)(FIX_SCALE * 1);
+    player->actor.move_accel = (FIXED)(FIX_SCALE / 8);
     player->actor.jump_velocity = (FIXED)(FIX_SCALE * 2.0);
     player->sprite.ox = -1;
 
