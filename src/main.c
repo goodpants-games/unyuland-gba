@@ -2,16 +2,16 @@
 #include <player_gfx.h>
 #include <tileset_gfx.h>
 #include <assert.h>
-#include "mgba.h"
 
 #include "map_data.h"
 #include "game.h"
 #include "gfx.h"
+#include "log.h"
 
 int main()
 {
-    mgba_console_open();
-    mgba_printf(MGBA_LOG_DEBUG, "Hello, world!");
+    LOG_INIT();
+    LOG_DBG("Hello, world!");
 
     irq_init(NULL);
     irq_add(II_VBLANK, NULL);

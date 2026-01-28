@@ -4,6 +4,9 @@
 #include <tonc_math.h>
 #include <stdlib.h>
 
+#include "datastruct.h"
+#include "log.h"
+
 #define MAP_COL(x, y)                                                          \
     map_collision_get(game_room_collision, game_room_width, x, y)
 
@@ -155,6 +158,9 @@ static void update_entities(void)
 static void physics_substep(entity_coldata_s *col_ents, int col_ent_count,
                             FIXED vel_mult)
 {
+    size_t contact_queue_size = 0;
+    pqueue_entry_s contact_queue[MAX_CONTACT_COUNT];
+
     // first move all entities
     for (int i = 0; i < col_ent_count; ++i)
     {
@@ -177,7 +183,7 @@ static void physics_substep(entity_coldata_s *col_ents, int col_ent_count,
         {
             if (col_contact_count >= MAX_CONTACT_COUNT)
             {
-                mgba_printf(MGBA_LOG_WARN, "max contacts exceeded!");
+                LOG_WRN("max contacts exceeded!");
                 break;
             }
 
@@ -191,8 +197,6 @@ static void physics_substep(entity_coldata_s *col_ents, int col_ent_count,
             int min_y = entity->pos.y / (WORLD_TILE_SIZE * FIX_SCALE);
             int max_x = (entity->pos.x + col_w) / (WORLD_TILE_SIZE * FIX_SCALE);
             int max_y = (entity->pos.y + col_h) / (WORLD_TILE_SIZE * FIX_SCALE);
-
-            // mgba_printf(MGBA_LOG_DEBUG, "min_x: %i, max_x: %i", min_x, max_x);
 
             bool col_found = false;
             FIXED final_nx = 0, final_ny = 0, final_pd = 0;
@@ -222,6 +226,13 @@ static void physics_substep(entity_coldata_s *col_ents, int col_ent_count,
 
             if (col_found)
             {
+                pqueue_enqueue(contact_queue,
+                               &contact_queue_size, MAX_CONTACT_COUNT,
+                               (pqueue_entry_s) {
+                                   .priority = final_pd,
+                                   .data = col_contacts + col_contact_count
+                               });
+
                 col_contacts[col_contact_count++] = (col_contact_s)
                 {
                     .nx = final_nx,
@@ -239,9 +250,10 @@ static void physics_substep(entity_coldata_s *col_ents, int col_ent_count,
         if (col_contact_count == 0) break;
 
         // resolve contacts
-        for (int i = 0; i < col_contact_count; ++i)
+        for (void *item;
+             (item = pqueue_dequeue(contact_queue, &contact_queue_size));)
         {
-            col_contact_s *const contact = col_contacts + i;
+            col_contact_s *const contact = (col_contact_s *)item;
             FIXED nx = contact->nx;
             FIXED ny = contact->ny;
             FIXED pd = contact->pd;
@@ -304,8 +316,6 @@ static void update_physics(void)
     substeps |= substeps >> 8;
     substeps |= substeps >> 16;
     ++substeps;
-
-    mgba_printf(MGBA_LOG_DEBUG, "substeps: %i", substeps);
 
     FIXED vel_mult = FIX_SCALE / substeps;
     for (int i = 0; i < substeps; ++i)
