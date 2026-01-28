@@ -180,9 +180,6 @@ static bool physics_substep(entity_coldata_s *col_ents, int col_ent_count,
 
         entity->pos.x += fxmul(entity->vel.x, vel_mult);
         entity->pos.y += fxmul(entity->vel.y, vel_mult);
-
-        entity->actor.flags &= ~(ACTOR_FLAG_GROUNDED | ACTOR_FLAG_WALL |
-                                 ACTOR_FLAG_DID_JUMP);
     }
 
     for (int subsubstep = 1;; ++subsubstep)
@@ -378,7 +375,7 @@ static bool physics_substep(entity_coldata_s *col_ents, int col_ent_count,
                     else // if (mdir == mdir2)
                     {
                         FIXED px_scaled = fxmul(px, FIX_ONE / 2);
-                        FIXED py_scaled = fxmul(px, FIX_ONE / 2);
+                        FIXED py_scaled = fxmul(py, FIX_ONE / 2);
                         ent_a->pos.x += px_scaled;
                         ent_a->pos.y += py_scaled;
                         ent_b->pos.x -= px_scaled;
@@ -450,6 +447,10 @@ static void update_physics(void)
     {
         entity_s *entity = game_entities + i;
         if (!(entity->flags & ENTITY_FLAG_ENABLED)) continue;
+
+        if (entity->flags & ENTITY_FLAG_ACTOR)
+            entity->actor.flags &= ~(ACTOR_FLAG_GROUNDED | ACTOR_FLAG_WALL |
+                                    ACTOR_FLAG_DID_JUMP);
 
         col_ents[col_ent_count++] = (entity_coldata_s)
         {

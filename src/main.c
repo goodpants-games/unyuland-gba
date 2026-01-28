@@ -53,7 +53,7 @@ int main()
     testent->actor.move_accel = (FIXED)(FIX_SCALE / 8);
     testent->actor.jump_velocity = (FIXED)(FIX_SCALE * 2.0);
     testent->sprite.ox = -1;
-    testent->mass = 4;
+    // testent->mass = 4;
 
     while (true)
     {
