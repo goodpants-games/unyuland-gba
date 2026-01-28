@@ -72,11 +72,6 @@ typedef struct entity {
     void (*message)(struct entity *self, entity_msgid_e msg, ...);
 } entity_s;
 
-typedef struct col_contact {
-    FIXED px, py, pd;
-    entity_s *ent_a, *ent_b;
-} col_contact_s;
-
 extern entity_s game_entities[MAX_ENTITY_COUNT];
 extern const u8 *game_room_collision;
 extern int game_room_width;

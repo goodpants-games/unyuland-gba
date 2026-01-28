@@ -2,9 +2,19 @@
 
 #include <tonc_core.h>
 #include <tonc_math.h>
+#include <stdlib.h>
 
 #define MAP_COL(x, y)                                                          \
     map_collision_get(game_room_collision, game_room_width, x, y)
+
+typedef struct entity_coldata {
+    entity_s *ent;
+} entity_coldata_s;
+
+typedef struct col_contact {
+    FIXED nx, ny, pd;
+    entity_coldata_s *ent_a, *ent_b;
+} col_contact_s;
 
 entity_s game_entities[MAX_ENTITY_COUNT];
 const u8 *game_room_collision;
@@ -64,14 +74,15 @@ static bool rect_collision(FIXED x0, FIXED y0, FIXED w0, FIXED h0,
 
 void entity_init(entity_s *self)
 {
-    memset32(self, 0, sizeof(entity_s) / 4);
-    self->gmult = 255;
-    self->mass = 2;
-    self->col.group = COLGROUP_DEFAULT;
-    self->col.mask = COLGROUP_ALL;
+    *self = (entity_s) {
+        .gmult = 255,
+        .mass = 2,
+        .col.group = COLGROUP_DEFAULT,
+        .col.mask = COLGROUP_ALL
+    };
 }
 
-void update_entities(void)
+static void update_entities(void)
 {
     const FIXED gravity = float2fx(0.1f);
     const FIXED terminal_vel = int2fx(5);
@@ -131,17 +142,50 @@ void update_entities(void)
             if (entity->vel.y > terminal_vel)
                 entity->vel.y = terminal_vel;
 
-            entity->pos.x += entity->vel.x;
-            entity->pos.y += entity->vel.y;
+            // if this entity can collide, movement is done in update-physics
+            if (!(entity->flags & ENTITY_FLAG_COLLIDE))
+            {
+                entity->pos.x += entity->vel.x;
+                entity->pos.y += entity->vel.y;
+            }
         }
+    }
+}
 
-        if (entity->flags & ENTITY_FLAG_COLLIDE)
+static void physics_substep(entity_coldata_s *col_ents, int col_ent_count,
+                            FIXED vel_mult)
+{
+    // first move all entities
+    for (int i = 0; i < col_ent_count; ++i)
+    {
+        entity_coldata_s *const col_ent = col_ents + i;
+        entity_s *entity = col_ent->ent;
+
+        entity->pos.x += fxmul(entity->vel.x, vel_mult);
+        entity->pos.y += fxmul(entity->vel.y, vel_mult);
+
+        entity->actor.flags &= ~(ACTOR_FLAG_GROUNDED | ACTOR_FLAG_WALL |
+                                 ACTOR_FLAG_DID_JUMP);
+    }
+
+    for (int subsubstep = 1; subsubstep < 4; ++subsubstep)
+    {
+        col_contact_count = 0;
+
+        // collect contacts
+        for (int i = 0; i < col_ent_count; ++i)
         {
+            if (col_contact_count >= MAX_CONTACT_COUNT)
+            {
+                mgba_printf(MGBA_LOG_WARN, "max contacts exceeded!");
+                break;
+            }
+
+            entity_coldata_s *const col_ent = col_ents + i;
+            entity_s *entity = col_ent->ent;
+
             const FIXED col_w = int2fx((int)entity->col.w);
             const FIXED col_h = int2fx((int)entity->col.h);
-
-            u32 actor_flags = entity->flags;
-            actor_flags &= ~(ACTOR_FLAG_GROUNDED | ACTOR_FLAG_DID_JUMP);
 
             int min_x = entity->pos.x / (WORLD_TILE_SIZE * FIX_SCALE);
             int min_y = entity->pos.y / (WORLD_TILE_SIZE * FIX_SCALE);
@@ -160,10 +204,10 @@ void update_entities(void)
                     
                     FIXED nx, ny, pd;
                     if (rect_collision(entity->pos.x, entity->pos.y, col_w,
-                                       col_h, int2fx(x * WORLD_TILE_SIZE),
-                                       int2fx(y * WORLD_TILE_SIZE),
-                                       int2fx(WORLD_TILE_SIZE),
-                                       int2fx(WORLD_TILE_SIZE), &nx, &ny, &pd))
+                                        col_h, int2fx(x * WORLD_TILE_SIZE),
+                                        int2fx(y * WORLD_TILE_SIZE),
+                                        int2fx(WORLD_TILE_SIZE),
+                                        int2fx(WORLD_TILE_SIZE), &nx, &ny, &pd))
                     {
                         if (pd > final_pd)
                         {
@@ -178,27 +222,95 @@ void update_entities(void)
 
             if (col_found)
             {
-                FIXED pdot = fxmul(final_nx, entity->vel.x) +
-                             fxmul(final_ny, entity->vel.y);
-                
-                if (pdot < 0)
+                col_contacts[col_contact_count++] = (col_contact_s)
                 {
-                    FIXED px = fxmul(final_nx, final_pd);
-                    FIXED py = fxmul(final_ny, final_pd);
-                    entity->pos.x += px;
-                    entity->pos.y += py;
+                    .nx = final_nx,
+                    .ny = final_ny,
+                    .pd = final_pd,
+                    .ent_a = col_ent,
+                    .ent_b = NULL
+                };
 
-                                
-                    entity->vel.x -= fxmul(final_nx, pdot);
-                    entity->vel.y -= fxmul(final_ny, pdot);
-
-                    if (py < 0)
-                        actor_flags |= ACTOR_FLAG_GROUNDED;
-                }
+                if (final_ny < 0)
+                    entity->actor.flags |= ACTOR_FLAG_GROUNDED;
             }
-
-            entity->actor.flags = actor_flags;
         }
+
+        if (col_contact_count == 0) break;
+
+        // resolve contacts
+        for (int i = 0; i < col_contact_count; ++i)
+        {
+            col_contact_s *const contact = col_contacts + i;
+            FIXED nx = contact->nx;
+            FIXED ny = contact->ny;
+            FIXED pd = contact->pd;
+
+            entity_coldata_s *const col_ent_a = contact->ent_a;
+            entity_coldata_s *const col_ent_b = contact->ent_b;
+            entity_s *const ent_a = col_ent_a->ent;
+            entity_s *const ent_b = col_ent_b->ent;
+
+            FIXED vdot = fxmul(nx, ent_a->vel.x) +
+                        fxmul(ny, ent_a->vel.y);
+                
+            if (vdot < 0)
+            {
+                FIXED px = fxmul(nx, pd);
+                FIXED py = fxmul(ny, pd);
+                ent_a->pos.x += px;
+                ent_a->pos.y += py;
+                ent_a->vel.x -= fxmul(nx, vdot);
+                ent_a->vel.y -= fxmul(ny, vdot);
+            }
+        }
+    }
+}
+
+INLINE int ceil_div(int a, int b)
+{
+    return (a + b - 1) / b;
+}
+
+static void update_physics(void)
+{
+    static entity_coldata_s col_ents[MAX_ENTITY_COUNT];
+    int col_ent_count = 0;
+    int substeps = 0;
+
+    for (int i = 0; i < MAX_ENTITY_COUNT; ++i)
+    {
+        entity_s *entity = game_entities + i;
+        if (!(entity->flags & ENTITY_FLAG_ENABLED)) continue;
+
+        col_ents[col_ent_count++] = (entity_coldata_s)
+        {
+            .ent = entity
+        };
+
+        int speed = max(abs(entity->vel.x), abs(entity->vel.y));
+        // align is just a ceil division. so just use that lmao.
+        int subst = ceil_div(speed, FIX_SCALE * 2);
+        if (subst > substeps)
+            substeps = subst;
+    }
+
+    // probably good if i snap the substep count to a power of two, so that
+    // division is exact
+    --substeps;
+    substeps |= substeps >> 1;
+    substeps |= substeps >> 2;
+    substeps |= substeps >> 4;
+    substeps |= substeps >> 8;
+    substeps |= substeps >> 16;
+    ++substeps;
+
+    mgba_printf(MGBA_LOG_DEBUG, "substeps: %i", substeps);
+
+    FIXED vel_mult = FIX_SCALE / substeps;
+    for (int i = 0; i < substeps; ++i)
+    {
+        physics_substep(col_ents, col_ent_count, vel_mult);
     }
 }
 
@@ -213,6 +325,7 @@ void game_init(void)
 void game_update(void)
 {
     update_entities();
+    update_physics();
 }
 
 void game_load_room(const map_header_s *map)
