@@ -24,7 +24,7 @@ bool pqueue_enqueue(pqueue_entry_s *queue, size_t *queue_size,
             queue[idx] = temp;
 
             idx = pidx;
-        }
+        } else break;
     }
 
     return true;

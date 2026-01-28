@@ -12,6 +12,7 @@
 
 typedef struct entity_coldata {
     entity_s *ent;
+    bool processed;
 } entity_coldata_s;
 
 typedef struct col_contact {
@@ -178,6 +179,13 @@ static void physics_substep(entity_coldata_s *col_ents, int col_ent_count,
     {
         col_contact_count = 0;
 
+        // reset movement state
+        for (int i = 0; i < col_ent_count; ++i)
+        {
+            entity_coldata_s *const col_ent = col_ents + i;
+            col_ent->processed = false;
+        }
+
         // collect contacts
         for (int i = 0; i < col_ent_count; ++i)
         {
@@ -193,12 +201,46 @@ static void physics_substep(entity_coldata_s *col_ents, int col_ent_count,
             const FIXED col_w = int2fx((int)entity->col.w);
             const FIXED col_h = int2fx((int)entity->col.h);
 
+            // entity contacts
+            for (int j = 0; j < col_ent_count; ++j)
+            {
+                entity_coldata_s *const entc2 = col_ents + j;
+                if (col_ent == entc2) continue;
+
+                entity_s *ent2 = entc2->ent;
+                FIXED nx, ny, pd;
+                const FIXED c2_w = int2fx((int)ent2->col.w);
+                const FIXED c2_h = int2fx((int)ent2->col.h);
+
+                if (rect_collision(entity->pos.x, entity->pos.y, col_w, col_h,
+                                   ent2->pos.x, ent2->pos.y, c2_w, c2_h,
+                                   &nx, &ny, &pd))
+                {
+                    pqueue_enqueue(contact_queue,
+                                   &contact_queue_size, MAX_CONTACT_COUNT,
+                                   (pqueue_entry_s) {
+                                       .priority = pd,
+                                       .data = col_contacts + col_contact_count
+                                   });
+
+                    col_contacts[col_contact_count++] = (col_contact_s)
+                    {
+                        .nx = nx,
+                        .ny = ny,
+                        .pd = pd,
+                        .ent_a = col_ent,
+                        .ent_b = entc2
+                    };
+                }
+            }
+
+            // tile contacts
             int min_x = entity->pos.x / (WORLD_TILE_SIZE * FIX_SCALE);
             int min_y = entity->pos.y / (WORLD_TILE_SIZE * FIX_SCALE);
             int max_x = (entity->pos.x + col_w) / (WORLD_TILE_SIZE * FIX_SCALE);
             int max_y = (entity->pos.y + col_h) / (WORLD_TILE_SIZE * FIX_SCALE);
 
-            bool col_found = false;
+            bool tile_col_found = false;
             FIXED final_nx = 0, final_ny = 0, final_pd = 0;
             for (int y = min_y; y <= max_y; ++y)
             {
@@ -218,13 +260,13 @@ static void physics_substep(entity_coldata_s *col_ents, int col_ent_count,
                             final_pd = pd;
                             final_nx = nx;
                             final_ny = ny;
-                            col_found = true;
+                            tile_col_found = true;
                         }
                     }
                 }
             }
 
-            if (col_found)
+            if (tile_col_found)
             {
                 pqueue_enqueue(contact_queue,
                                &contact_queue_size, MAX_CONTACT_COUNT,
@@ -241,39 +283,66 @@ static void physics_substep(entity_coldata_s *col_ents, int col_ent_count,
                     .ent_a = col_ent,
                     .ent_b = NULL
                 };
-
-                if (final_ny < 0)
-                    entity->actor.flags |= ACTOR_FLAG_GROUNDED;
             }
         }
 
         if (col_contact_count == 0) break;
 
-        // resolve contacts
         for (void *item;
              (item = pqueue_dequeue(contact_queue, &contact_queue_size));)
         {
             col_contact_s *const contact = (col_contact_s *)item;
+            entity_coldata_s *const col_ent_a = contact->ent_a;
+            entity_coldata_s *const col_ent_b = contact->ent_b;
+
+            if (col_ent_a->processed || (col_ent_b && col_ent_b->processed))
+                continue;
+            
+            col_ent_a->processed = true;
+            if (col_ent_b)
+                col_ent_b->processed = true;
+            
             FIXED nx = contact->nx;
             FIXED ny = contact->ny;
             FIXED pd = contact->pd;
 
-            entity_coldata_s *const col_ent_a = contact->ent_a;
-            entity_coldata_s *const col_ent_b = contact->ent_b;
             entity_s *const ent_a = col_ent_a->ent;
-            entity_s *const ent_b = col_ent_b->ent;
+            entity_s *const ent_b = col_ent_b ? col_ent_b->ent : NULL;
 
             FIXED vdot = fxmul(nx, ent_a->vel.x) +
                         fxmul(ny, ent_a->vel.y);
                 
             if (vdot < 0)
             {
-                FIXED px = fxmul(nx, pd);
-                FIXED py = fxmul(ny, pd);
-                ent_a->pos.x += px;
-                ent_a->pos.y += py;
-                ent_a->vel.x -= fxmul(nx, vdot);
-                ent_a->vel.y -= fxmul(ny, vdot);
+                if (col_ent_b)
+                {
+                    nx = fxmul(nx, FIX_SCALE / 2);
+                    ny = fxmul(ny, FIX_SCALE / 2);
+                    FIXED px = fxmul(nx, pd);
+                    FIXED py = fxmul(ny, pd);
+
+                    ent_a->pos.x += px;
+                    ent_a->pos.y += py;
+                    ent_a->vel.x -= fxmul(nx, vdot);
+                    ent_a->vel.y -= fxmul(ny, vdot);
+
+                    ent_b->pos.x -= px;
+                    ent_b->pos.y -= py;
+                    ent_b->vel.x += fxmul(nx, vdot);
+                    ent_b->vel.y += fxmul(ny, vdot);
+                }
+                else
+                {
+                    FIXED px = fxmul(nx, pd);
+                    FIXED py = fxmul(ny, pd);
+                    ent_a->pos.x += px;
+                    ent_a->pos.y += py;
+                    ent_a->vel.x -= fxmul(nx, vdot);
+                    ent_a->vel.y -= fxmul(ny, vdot);
+
+                    if (py < 0)
+                        ent_a->actor.flags |= ACTOR_FLAG_GROUNDED;
+                }
             }
         }
     }

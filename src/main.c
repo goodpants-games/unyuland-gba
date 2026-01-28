@@ -25,12 +25,14 @@ int main()
     game_init();
     game_load_room(map);
 
-    OBJ_ATTR *obj = &gfx_oam_buffer[0];
-    obj_set_attr(obj, ATTR0_SQUARE, ATTR1_SIZE_16, ATTR2_PALBANK(0));
+    obj_set_attr(&gfx_oam_buffer[0], ATTR0_SQUARE, ATTR1_SIZE_16,
+                 ATTR2_PALBANK(0));
+    obj_set_attr(&gfx_oam_buffer[1], ATTR0_SQUARE, ATTR1_SIZE_16,
+                 ATTR2_PALBANK(0));
     int cam_x = 0;
     int cam_y = 0;
 
-    entity_s *player = &game_entities[0];
+    entity_s *player = &game_entities[1];
     player->flags |= ENTITY_FLAG_ENABLED | ENTITY_FLAG_MOVING | ENTITY_FLAG_COLLIDE | ENTITY_FLAG_ACTOR;
     player->pos.x = int2fx(16);
     player->pos.y = int2fx(16);
@@ -41,9 +43,23 @@ int main()
     player->actor.jump_velocity = (FIXED)(FIX_SCALE * 2.0);
     player->sprite.ox = -1;
 
+    entity_s *testent = &game_entities[0];
+    testent->flags |= ENTITY_FLAG_ENABLED | ENTITY_FLAG_COLLIDE | ENTITY_FLAG_MOVING | ENTITY_FLAG_ACTOR;
+    testent->pos.x = int2fx(32);
+    testent->pos.y = int2fx(32);
+    testent->col.w = 6;
+    testent->col.h = 8;
+    testent->actor.move_speed = (FIXED)(FIX_SCALE * 1);
+    testent->actor.move_accel = (FIXED)(FIX_SCALE / 8);
+    testent->actor.jump_velocity = (FIXED)(FIX_SCALE * 2.0);
+    testent->sprite.ox = -1;
+
     while (true)
     {
         VBlankIntrWait();
+
+        int vcount_start = (int) REG_VCOUNT;
+
         gfx_new_frame();
         key_poll();
 
@@ -68,8 +84,12 @@ int main()
 
         game_update();
 
-        int px = player->pos.x / FIX_SCALE + player->sprite.ox;
-        int py = player->pos.y / FIX_SCALE + player->sprite.oy;
+        int px = (player->pos.x >> FIX_SHIFT) + player->sprite.ox;
+        int py = (player->pos.y >> FIX_SHIFT) + player->sprite.oy;
+
+        int oent_x = (testent->pos.x >> FIX_SHIFT) + testent->sprite.ox;
+        int oent_y = (testent->pos.y >> FIX_SHIFT) + testent->sprite.oy;
+
         cam_x = px - SCREEN_WIDTH / 4;
         cam_y = py - SCREEN_HEIGHT / 4;
 
@@ -84,7 +104,13 @@ int main()
         gfx_scroll_x = cam_x * 2;
         gfx_scroll_y = cam_y * 2;
 
-        obj_set_pos(obj, (px - cam_x) * 2, (py - cam_y) * 2);
+        obj_set_pos(&gfx_oam_buffer[0], (px - cam_x) * 2, (py - cam_y) * 2);
+        obj_set_pos(&gfx_oam_buffer[1], (oent_x - cam_x) * 2, (oent_y - cam_y) * 2);
+
+        int vcount_end = (int) REG_VCOUNT;
+
+        (void)vcount_start, (void)vcount_end;
+        // LOG_DBG("frame usage: %.1f%%", (float)(vcount_end - vcount_start) / 227.f * 100.f);
     }
 
 
