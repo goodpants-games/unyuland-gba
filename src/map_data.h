@@ -1,5 +1,5 @@
-#ifndef __map_data_h__
-#define __map_data_h__
+#ifndef MAP_DATA_H
+#define MAP_DATA_H
 
 #include <tonc_core.h>
 #include <tonc_types.h>

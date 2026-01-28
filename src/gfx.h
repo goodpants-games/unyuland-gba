@@ -1,5 +1,5 @@
-#ifndef __gfx_h__
-#define __gfx_h__
+#ifndef GFX_H
+#define GFX_H
 
 #include <tonc_core.h>
 #include "map_data.h"

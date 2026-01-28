@@ -1,5 +1,5 @@
-#ifndef __game_h__
-#define __game_h__
+#ifndef GAME_H
+#define GAME_H
 
 #include <tonc_types.h>
 #include "map_data.h"
