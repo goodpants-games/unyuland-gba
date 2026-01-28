@@ -104,8 +104,8 @@ void gfx_new_frame(void)
         if (screen_dirty)
         {
             screen_dirty = false;
-            int ey = cam_ty + SCRH_T16;
-            int ex = cam_tx + SCRW_T16;
+            int ey = cam_ty + SCRH_T16 + 1;
+            int ex = cam_tx + SCRW_T16 + 1;
 
             for (int y = cam_ty; y < ey; ++y)
             {
@@ -126,7 +126,7 @@ void gfx_new_frame(void)
                 int sx, ex;
                 if (cam_tx > prev_cam_tx)
                 {
-                    sx = prev_cam_tx + SCRW_T16;
+                    sx = prev_cam_tx + SCRW_T16 + 1;
                     ex = cam_tx + SCRW_T16;
                 }
                 else
@@ -156,7 +156,7 @@ void gfx_new_frame(void)
                 int sy, ey;
                 if (cam_ty > prev_cam_ty)
                 {
-                    sy = prev_cam_ty + SCRH_T16;
+                    sy = prev_cam_ty + SCRH_T16 + 1;
                     ey = cam_ty + SCRH_T16;
                 }
                 else
