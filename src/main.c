@@ -32,7 +32,7 @@ int main()
     int cam_x = 0;
     int cam_y = 0;
 
-    entity_s *player = &game_entities[1];
+    entity_s *player = &game_entities[0];
     player->flags |= ENTITY_FLAG_ENABLED | ENTITY_FLAG_MOVING | ENTITY_FLAG_COLLIDE | ENTITY_FLAG_ACTOR;
     player->pos.x = int2fx(16);
     player->pos.y = int2fx(16);
@@ -43,8 +43,8 @@ int main()
     player->actor.jump_velocity = (FIXED)(FIX_SCALE * 2.0);
     player->sprite.ox = -1;
 
-    entity_s *testent = &game_entities[0];
-    testent->flags |= ENTITY_FLAG_ENABLED | ENTITY_FLAG_COLLIDE | ENTITY_FLAG_MOVING | ENTITY_FLAG_ACTOR;
+    entity_s *testent = &game_entities[1];
+    testent->flags |= ENTITY_FLAG_ENABLED | ENTITY_FLAG_COLLIDE | ENTITY_FLAG_MOVING;
     testent->pos.x = int2fx(32);
     testent->pos.y = int2fx(32);
     testent->col.w = 6;
@@ -53,6 +53,7 @@ int main()
     testent->actor.move_accel = (FIXED)(FIX_SCALE / 8);
     testent->actor.jump_velocity = (FIXED)(FIX_SCALE * 2.0);
     testent->sprite.ox = -1;
+    testent->mass = 4;
 
     while (true)
     {

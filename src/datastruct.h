@@ -17,7 +17,7 @@ typedef struct pqueue_entry
 // max priority queue
 
 bool pqueue_enqueue(pqueue_entry_s *queue, size_t *queue_size,
-                    size_t queue_capacity, pqueue_entry_s new_entry);
+                    size_t queue_capacity, void *data, int priority);
 void* pqueue_dequeue(pqueue_entry_s *queue, size_t *queue_size);
 
 #endif

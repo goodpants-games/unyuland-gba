@@ -2,7 +2,7 @@
 #include "log.h"
 
 bool pqueue_enqueue(pqueue_entry_s *queue, size_t *queue_size,
-                    size_t queue_capacity, pqueue_entry_s new_entry)
+                    size_t queue_capacity, void *data, int priority)
 {
     if (*queue_size == queue_capacity)
     {
@@ -11,7 +11,10 @@ bool pqueue_enqueue(pqueue_entry_s *queue, size_t *queue_size,
     }
 
     size_t idx = *queue_size;
-    queue[(*queue_size)++] = new_entry;
+    queue[(*queue_size)++] = (pqueue_entry_s) {
+        .priority = priority,
+        .data = data
+    };
 
     // heap shift up
     while (idx > 0)
@@ -65,13 +68,13 @@ void* pqueue_dequeue(pqueue_entry_s *queue, size_t *queue_size)
         }
 
         // both left and right child nodes
-        if (queue[idx].priority < queue[ci1].priority &&
-            queue[idx].priority < queue[ci2].priority)
+        if (queue[idx].priority > queue[ci1].priority &&
+            queue[idx].priority > queue[ci2].priority)
         {
             break;
         }
 
-        if (queue[ci1].priority < queue[ci2].priority)
+        if (queue[ci1].priority > queue[ci2].priority)
         {
             // swap with left
             pqueue_entry_s temp = queue[idx];

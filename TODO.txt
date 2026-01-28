@@ -1,0 +1,5 @@
+- if i get a certain subpixel too close to a wall, it starts printing out
+  exceeded max iterations? go up to the right wall/corner, jump until you're not
+  touching the wall anymore, press right for exactly one frame, and once you're
+  touching the wall again it will start happening.
+  i guess it's because it detects an intersection but does not resolve it b

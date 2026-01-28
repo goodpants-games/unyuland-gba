@@ -85,11 +85,13 @@ void gfx_init(void)
     REG_BG0CNT = BG_CBB(0) | BG_SBB(GFX_BG0_INDEX) | BG_4BPP | BG_REG_32x32;
     REG_BG0HOFS = 0;
     REG_BG0VOFS = 0;
-    REG_DISPCNT = DCNT_OBJ | DCNT_OBJ_1D | DCNT_BG0;
+    REG_DISPCNT = DCNT_OBJ_1D;
 }
 
 void gfx_new_frame(void)
-{   
+{
+    REG_DISPCNT |= DCNT_OBJ | DCNT_BG0;
+
     if (gfx_loaded_map)
     {
         const u16 *map_data = map_graphics_data(gfx_loaded_map);
