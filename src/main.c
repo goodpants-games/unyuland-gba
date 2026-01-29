@@ -1,5 +1,5 @@
 #include <tonc.h>
-#include <player_gfx.h>
+#include <game_sprites_gfx.h>
 #include <tileset_gfx.h>
 #include <assert.h>
 
@@ -18,17 +18,13 @@ int main()
 
     gfx_init();
     memcpy32(&tile_mem[0][0], tileset_gfxTiles, tileset_gfxTilesLen / sizeof(u32));
-    memcpy32(tile_mem_obj[0][0].data, player_gfxTiles, 32 * 8);
+    memcpy32(tile_mem_obj[0][0].data, game_sprites_gfxTiles, game_sprites_gfxTilesLen / sizeof(u32));
 
     const map_header_s *map = maps[1];
     gfx_load_map(map);
     game_init();
     game_load_room(map);
 
-    obj_set_attr(&gfx_oam_buffer[0], ATTR0_SQUARE, ATTR1_SIZE_16,
-                 ATTR2_PALBANK(0));
-    obj_set_attr(&gfx_oam_buffer[1], ATTR0_SQUARE, ATTR1_SIZE_16,
-                 ATTR2_PALBANK(0));
     int cam_x = 0;
     int cam_y = 0;
 
@@ -43,23 +39,39 @@ int main()
     player->actor.jump_velocity = (FIXED)(FIX_SCALE * 2.0);
     player->sprite.ox = -1;
 
-    entity_s *testent = &game_entities[1];
-    testent->flags |= ENTITY_FLAG_ENABLED | ENTITY_FLAG_COLLIDE | ENTITY_FLAG_MOVING;
-    testent->pos.x = int2fx(32);
-    testent->pos.y = int2fx(32);
-    testent->col.w = 6;
-    testent->col.h = 8;
-    testent->actor.move_speed = (FIXED)(FIX_SCALE * 1);
-    testent->actor.move_accel = (FIXED)(FIX_SCALE / 8);
-    testent->actor.jump_velocity = (FIXED)(FIX_SCALE * 2.0);
-    testent->sprite.ox = -1;
-    testent->mass = 2;
+    {
+        entity_s *e = &game_entities[1];
+        e->flags |= ENTITY_FLAG_ENABLED | ENTITY_FLAG_COLLIDE | ENTITY_FLAG_MOVING;
+        e->pos.x = int2fx(32);
+        e->pos.y = int2fx(32);
+        e->col.w = 6;
+        e->col.h = 8;
+        e->actor.move_speed = (FIXED)(FIX_SCALE * 1);
+        e->actor.move_accel = (FIXED)(FIX_SCALE / 8);
+        e->actor.jump_velocity = (FIXED)(FIX_SCALE * 2.0);
+        e->sprite.ox = -1;
+        e->mass = 2;
+    }
+
+    {
+        entity_s *e = &game_entities[2];
+        e->flags |= ENTITY_FLAG_ENABLED | ENTITY_FLAG_COLLIDE | ENTITY_FLAG_MOVING;
+        e->pos.x = int2fx(32);
+        e->pos.y = int2fx(64);
+        e->col.w = 6;
+        e->col.h = 8;
+        e->actor.move_speed = (FIXED)(FIX_SCALE * 1);
+        e->actor.move_accel = (FIXED)(FIX_SCALE / 8);
+        e->actor.jump_velocity = (FIXED)(FIX_SCALE * 2.0);
+        e->sprite.ox = -1;
+        e->mass = 4;
+    }
 
     while (true)
     {
         VBlankIntrWait();
 
-        int vcount_start = (int) REG_VCOUNT;
+        profile_start();
 
         gfx_new_frame();
         key_poll();
@@ -85,14 +97,8 @@ int main()
 
         game_update();
 
-        int px = (player->pos.x >> FIX_SHIFT) + player->sprite.ox;
-        int py = (player->pos.y >> FIX_SHIFT) + player->sprite.oy;
-
-        int oent_x = (testent->pos.x >> FIX_SHIFT) + testent->sprite.ox;
-        int oent_y = (testent->pos.y >> FIX_SHIFT) + testent->sprite.oy;
-
-        cam_x = px - SCREEN_WIDTH / 4;
-        cam_y = py - SCREEN_HEIGHT / 4;
+        cam_x = (player->pos.x >> FIX_SHIFT) - SCREEN_WIDTH / 4;
+        cam_y = (player->pos.y >> FIX_SHIFT) - SCREEN_HEIGHT / 4;
 
         int x_max = gfx_map_width * 8 - SCREEN_WIDTH / 2;
         int y_max = gfx_map_height * 8 - SCREEN_HEIGHT / 2;
@@ -105,13 +111,25 @@ int main()
         gfx_scroll_x = cam_x * 2;
         gfx_scroll_y = cam_y * 2;
 
-        obj_set_pos(&gfx_oam_buffer[0], (px - cam_x) * 2, (py - cam_y) * 2);
-        obj_set_pos(&gfx_oam_buffer[1], (oent_x - cam_x) * 2, (oent_y - cam_y) * 2);
+        int obj_index = 0;
+        for (int i = 0; i < MAX_ENTITY_COUNT; ++i)
+        {
+            const entity_s *ent = &game_entities[i];
+            if (!(ent->flags & ENTITY_FLAG_ENABLED)) continue;
 
-        int vcount_end = (int) REG_VCOUNT;
+            int draw_x = (ent->pos.x >> FIX_SHIFT) + ent->sprite.ox;
+            int draw_y = (ent->pos.y >> FIX_SHIFT) + ent->sprite.oy;
 
-        (void)vcount_start, (void)vcount_end;
-        // LOG_DBG("frame usage: %.1f%%", (float)(vcount_end - vcount_start) / 227.f * 100.f);
+            obj_set_attr(&gfx_oam_buffer[obj_index], ATTR0_SQUARE,
+                         ATTR1_SIZE_16, ATTR2_PALBANK(0));
+            obj_set_pos(&gfx_oam_buffer[obj_index], (draw_x - cam_x) * 2,
+                        (draw_y - cam_y) * 2);
+            if (++obj_index >= 64) break;
+        }
+
+        uint frame_len = profile_stop();
+
+        LOG_DBG("frame usage: %.1f%%", (float)frame_len / 280896.f * 100.f);
     }
 
 

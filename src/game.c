@@ -14,11 +14,7 @@
 
 typedef struct entity_coldata {
     entity_s *ent;
-    bool processed; // true if this already moved in the current step iteration
-    bool inf_mass;  // true if this collided with an immovable object
-    int mvx, mvy;   // movement within step, accounting for mass of touched
-                    // objects. used for (more) proper resolution of multiple
-                    // collisions.
+    FIXED inv_mass;
 } entity_coldata_s;
 
 typedef struct col_contact {
@@ -78,8 +74,22 @@ static bool rect_collision(FIXED x0, FIXED y0, FIXED w0, FIXED h0,
     }
     else return false;
 
-    *pd = mp;
+    *pd = -mp;
     return true;
+}
+
+// x always has to be greater than y
+#define UPAIR2U(x, y) ((((x) * (x) + (x)) >> 1) + (y))
+#define CEIL_DIV(x, width) (((x) + (width) - 1) / (width))
+#define IALIGN(x, width) (((x) + (width) - 1) / (width) * (width))
+
+// unordered pairing function of two unsigned integers
+static inline uint upair2u(uint a, uint b)
+{
+    uint x, y;
+    if (a < b) x = a, y = b;
+    else       x = b, y = a;
+    return ((x * x + x) >> 1) + y;
 }
 
 void entity_init(entity_s *self)
@@ -162,11 +172,16 @@ static void update_entities(void)
     }
 }
 
+// #define CONTACT_PAIR_SIZE
+//       align(upair2u(MAX_ENTITY_COUNT - 1, MAX_ENTITY_COUNT - 1), sizeof(u32))
+#define CONTACT_PAIR_SIZE IALIGN(CEIL_DIV(UPAIR2U(MAX_ENTITY_COUNT - 1, MAX_ENTITY_COUNT - 1), 8), 4)
+
 static bool physics_substep(entity_coldata_s *col_ents, int col_ent_count,
                             FIXED vel_mult)
 {
     size_t contact_queue_size = 0;
     pqueue_entry_s contact_queue[MAX_CONTACT_COUNT];
+    u8 contact_pairs[CONTACT_PAIR_SIZE / 4];
 
     // first move all entities
     for (int i = 0; i < col_ent_count; ++i)
@@ -176,11 +191,6 @@ static bool physics_substep(entity_coldata_s *col_ents, int col_ent_count,
 
         FIXED s_vx = fxmul(entity->vel.x, vel_mult);
         FIXED s_vy = fxmul(entity->vel.y, vel_mult);
-
-        col_ent->inf_mass = false;
-        col_ent->mvx = s_vx;
-        col_ent->mvy = s_vy;
-
         entity->pos.x += s_vx;
         entity->pos.y += s_vy;
     }
@@ -189,18 +199,14 @@ static bool physics_substep(entity_coldata_s *col_ents, int col_ent_count,
     {
         if (subsubstep >= 8)
         {
-            LOG_WRN("exceeded max iterations");
+            // LOG_WRN("exceeded max iterations");
             break;
         }
 
         col_contact_count = 0;
 
-        // reset movement state
-        for (int i = 0; i < col_ent_count; ++i)
-        {
-            entity_coldata_s *const col_ent = col_ents + i;
-            col_ent->processed = false;
-        }
+        // clear contact pair flags
+        memset32(contact_pairs, 0, sizeof(contact_pairs) / 4);
 
         // collect contacts
         for (int i = 0; i < col_ent_count; ++i)
@@ -223,6 +229,13 @@ static bool physics_substep(entity_coldata_s *col_ents, int col_ent_count,
                 entity_coldata_s *const entc2 = col_ents + j;
                 if (col_ent == entc2) continue;
 
+                uint pkey = upair2u(i, j);
+                uint byte_index = pkey >> 3;
+                uint bit_index = pkey & 0x7;
+                
+                if ((contact_pairs[byte_index] >> bit_index) & 1)
+                    continue;
+
                 entity_s *ent2 = entc2->ent;
                 FIXED nx, ny, pd;
                 const FIXED c2_w = int2fx((int)ent2->col.w);
@@ -232,6 +245,7 @@ static bool physics_substep(entity_coldata_s *col_ents, int col_ent_count,
                                    ent2->pos.x, ent2->pos.y, c2_w, c2_h,
                                    &nx, &ny, &pd))
                 {
+                    contact_pairs[byte_index] |= (1 << bit_index);
                     pqueue_enqueue(contact_queue,
                                    &contact_queue_size, MAX_CONTACT_COUNT,
                                    col_contacts + col_contact_count, pd);
@@ -269,7 +283,7 @@ static bool physics_substep(entity_coldata_s *col_ents, int col_ent_count,
                                         int2fx(WORLD_TILE_SIZE),
                                         int2fx(WORLD_TILE_SIZE), &nx, &ny, &pd))
                     {
-                        if (pd > final_pd)
+                        if (pd < final_pd)
                         {
                             final_pd = pd;
                             final_nx = nx;
@@ -298,7 +312,10 @@ static bool physics_substep(entity_coldata_s *col_ents, int col_ent_count,
             }
         }
 
-        if (col_contact_count == 0) break;
+        if (col_contact_count == 0)
+        {
+            break;
+        }
 
         // resolve contacts
         for (void *item;
@@ -307,9 +324,6 @@ static bool physics_substep(entity_coldata_s *col_ents, int col_ent_count,
             col_contact_s *const contact = (col_contact_s *)item;
             entity_coldata_s *const col_ent_a = contact->ent_a;
             entity_coldata_s *const col_ent_b = contact->ent_b;
-
-            if (col_ent_a->processed || (col_ent_b && col_ent_b->processed))
-                continue;
             
             FIXED nx = contact->nx;
             FIXED ny = contact->ny;
@@ -318,116 +332,63 @@ static bool physics_substep(entity_coldata_s *col_ents, int col_ent_count,
             entity_s *const ent_a = col_ent_a->ent;
             entity_s *const ent_b = col_ent_b ? col_ent_b->ent : NULL;
 
-            FIXED vdot = fxmul(nx, ent_a->vel.x) +
-                         fxmul(ny, ent_a->vel.y);
+            FIXED rel_vx, rel_vy;
+            if (ent_b)
+            {
+                rel_vx = ent_a->vel.x - ent_b->vel.x;
+                rel_vy = ent_a->vel.y - ent_b->vel.y;
+            }
+            else
+            {
+                rel_vx = ent_a->vel.x;
+                rel_vy = ent_a->vel.y;
+            }
+
+            FIXED vdot = fxmul(nx, rel_vx) +
+                         fxmul(ny, rel_vy);
                 
             if (vdot <= 0)
             {
-                col_ent_a->processed = true;
-                if (col_ent_b)
-                    col_ent_b->processed = true;
-
                 if (col_ent_b && ent_b->flags & ENTITY_FLAG_MOVING)
                 {
-                    FIXED px = fxmul(nx, pd);
-                    FIXED py = fxmul(ny, pd);
+                    FIXED inv_mass1 = col_ent_a->inv_mass;
+                    FIXED inv_mass2 = col_ent_b->inv_mass;
 
-                    FIXED mass1 = int2fx((int) ent_a->mass);
-                    FIXED mass2 = int2fx((int) ent_b->mass);
+                    FIXED total_inv_mass = inv_mass1 + inv_mass2;
+                    if (total_inv_mass == 0) continue;
+                    FIXED inv_total_inv_mass = fxdiv(FIX_ONE, total_inv_mass);
 
-                    if (mass1 == 0)
-                    {
-                        LOG_ERR("mass of object was 0!");
-                        continue;
-                    }
+                    FIXED restitution = (FIXED)(FIX_ONE * (1 + 0.5));
+                    FIXED move_x = fxmul(fxmul(nx, pd), inv_total_inv_mass);
+                    FIXED move_y = fxmul(fxmul(ny, pd), inv_total_inv_mass);
+                    FIXED impulse_fac = fxmul(fxmul(restitution, vdot), inv_total_inv_mass);
 
-                    if (mass2 == 0)
-                    {
-                        LOG_ERR("mass of object was 0!");
-                        continue;
-                    }
+                    ent_a->pos.x -= fxmul(move_x, inv_mass1);
+                    ent_a->pos.y -= fxmul(move_y, inv_mass1);
+                    ent_b->pos.x += fxmul(move_x, inv_mass2);
+                    ent_b->pos.y += fxmul(move_y, inv_mass2);
 
-                    FIXED mdir1 =
-                        fxmul((fxmul(col_ent_a->mvx, -nx) + fxmul(col_ent_a->mvy, -ny)), mass1) + mass1;
-                    
-                    FIXED mdir2 =
-                        fxmul((fxmul(col_ent_b->mvx, nx) + fxmul(col_ent_b->mvy, ny)), mass2) + mass2;
+                    ent_a->vel.x -= fxmul(fxmul(nx, impulse_fac), inv_mass1);
+                    ent_a->vel.y -= fxmul(fxmul(ny, impulse_fac), inv_mass1);
+                    ent_b->vel.x += fxmul(fxmul(nx, impulse_fac), inv_mass2);
+                    ent_b->vel.y += fxmul(fxmul(ny, impulse_fac), inv_mass2);
 
-                    if (mdir1 < mdir2 || col_ent_b->inf_mass)
-                    {
-                        ent_a->pos.x += px;
-                        ent_a->pos.y += py;
-
-                        col_ent_a->mvx += fxmul(nx, mdir1);
-                        col_ent_a->mvy += fxmul(ny, mdir1);
-
-                        if (col_ent_b->inf_mass)
-                            col_ent_a->inf_mass = true;
-                    }
-                    else if (mdir1 > mdir2 || col_ent_a->inf_mass)
-                    {
-                        ent_b->pos.x -= px;
-                        ent_b->pos.y -= py;
-
-                        col_ent_b->mvx -= fxmul(nx, mdir1);
-                        col_ent_b->mvy -= fxmul(ny, mdir1);
-
-                        if (col_ent_a->inf_mass)
-                            col_ent_b->inf_mass = true;
-                    }
-                    else // if (mdir == mdir2)
-                    {
-                        FIXED px_scaled = fxmul(px, FIX_ONE / 2);
-                        FIXED py_scaled = fxmul(py, FIX_ONE / 2);
-                        ent_a->pos.x += px_scaled;
-                        ent_a->pos.y += py_scaled;
-                        ent_b->pos.x -= px_scaled;
-                        ent_b->pos.y -= py_scaled;
-                    }
-
-                    FIXED vdot2 = fxmul(nx, ent_b->vel.x) +
-                                  fxmul(ny, ent_b->vel.y);
-
-                    FIXED mto1, mto2;
-                    if (col_ent_a->inf_mass)
-                    {
-                        mto1 = 0;
-                        mto2 = vdot2;
-                    }
-                    else if (col_ent_b->inf_mass)
-                    {
-                        mto1 = vdot;
-                        mto2 = 0;
-                    }
-                    else
-                    {
-                        mto1 = fxdiv((fxmul(vdot2, mdir2) - fxmul(vdot, mdir1)), mdir1);
-                        mto2 = fxdiv((fxmul(vdot, mdir1) - fxmul(vdot2, mdir2)), mdir2);
-                    }
-
-                    if (mto1 < 0) mto1 = 0;
-                    if (mto2 > 0) mto2 = 0;
-                    ent_a->vel.x += fxmul(nx, mto1);
-                    ent_a->vel.y += fxmul(ny, mto1);
-                    ent_b->vel.x += fxmul(nx, mto2);
-                    ent_b->vel.y += fxmul(ny, mto2);
-
-                    if (py < 0)
+                    if (ny < 0)
                         ent_a->actor.flags |= ACTOR_FLAG_GROUNDED;
-                    else if (py > 0)
+                    else if (ny > 0)
                         ent_b->actor.flags |= ACTOR_FLAG_GROUNDED;
                 }
                 else
                 {   
                     FIXED px = fxmul(nx, pd);
                     FIXED py = fxmul(ny, pd);
-                    ent_a->pos.x += px;
-                    ent_a->pos.y += py;
-                    ent_a->vel.x -= fxmul(nx, vdot);
-                    ent_a->vel.y -= fxmul(ny, vdot);
-                    col_ent_a->inf_mass = true;
 
-                    if (py < 0)
+                    ent_a->pos.x = ent_a->pos.x - px;
+                    ent_a->pos.y = ent_a->pos.y - py;
+                    ent_a->vel.x = ent_a->vel.x - fxmul(nx, vdot);
+                    ent_a->vel.y = ent_a->vel.y - fxmul(ny, vdot);
+
+                    if (ny < 0)
                         ent_a->actor.flags |= ACTOR_FLAG_GROUNDED;
                 }
             }
@@ -471,12 +432,12 @@ static void update_physics(void)
 
         col_ents[col_ent_count++] = (entity_coldata_s)
         {
-            .ent = entity
+            .ent = entity,
+            .inv_mass = fxdiv(FIX_ONE * 2, int2fx((int)entity->mass))
         };
 
         int speed = max(abs(entity->vel.x), abs(entity->vel.y));
-        // align is just a ceil division. so just use that lmao.
-        int subst = ceil_div(speed, FIX_SCALE * 2);
+        int subst = ceil_div(speed, FIX_ONE * 2);
         if (subst > substeps)
             substeps = subst;
     }
@@ -491,7 +452,7 @@ static void update_physics(void)
     substeps |= substeps >> 16;
     ++substeps;
 
-    FIXED vel_mult = FIX_SCALE / substeps;
+    FIXED vel_mult = FIX_ONE / substeps;
     for (int i = 0; i < substeps; ++i)
     {
         if (physics_substep(col_ents, col_ent_count, vel_mult)) break;

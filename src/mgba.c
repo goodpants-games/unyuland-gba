@@ -20,17 +20,19 @@
  EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include <sys/iosupport.h>
+#include <sys/types.h>
 #include <tonc_types.h>
 
 #include <stdarg.h>
-#include <stdio.h>
 #include <string.h>
+#include "printf.h"
 #include "mgba.h"
 
 #define REG_DEBUG_ENABLE (vu16*) 0x4FFF780
 #define REG_DEBUG_FLAGS (vu16*) 0x4FFF700
 #define REG_DEBUG_STRING (char*) 0x4FFF600
+
+void _putchar(char character) {}
 
 ssize_t mgba_stdout_write(struct _reent* r __attribute__((unused)), void* fd __attribute__((unused)), const char* ptr, size_t len) {
 	if (len > 0x100) {
@@ -59,28 +61,28 @@ void mgba_printf(int level, const char* ptr, ...) {
 	*REG_DEBUG_FLAGS = level | 0x100;
 }
 
-static const devoptab_t dotab_mgba_stdout = {
-	"mgba_stdout",
-	0,
-	NULL,
-	NULL,
-	mgba_stdout_write
-};
+// static const devoptab_t dotab_mgba_stdout = {
+// 	"mgba_stdout",
+// 	0,
+// 	NULL,
+// 	NULL,
+// 	mgba_stdout_write
+// };
 
-static const devoptab_t dotab_mgba_stderr = {
-	"mgba_stderr",
-	0,
-	NULL,
-	NULL,
-	mgba_stderr_write
-};
+// static const devoptab_t dotab_mgba_stderr = {
+// 	"mgba_stderr",
+// 	0,
+// 	NULL,
+// 	NULL,
+// 	mgba_stderr_write
+// };
 
 bool mgba_console_open(void) {
 	if (!mgba_open()) {
 		return false;
 	}
-	devoptab_list[STD_OUT] = &dotab_mgba_stdout;
-	devoptab_list[STD_ERR] = &dotab_mgba_stderr;
+	// devoptab_list[STD_OUT] = &dotab_mgba_stdout;
+	// devoptab_list[STD_ERR] = &dotab_mgba_stderr;
 	return true;
 }
 
