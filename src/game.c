@@ -174,12 +174,15 @@ static bool physics_substep(entity_coldata_s *col_ents, int col_ent_count,
         entity_coldata_s *const col_ent = col_ents + i;
         entity_s *entity = col_ent->ent;
 
-        col_ent->inf_mass = false;
-        col_ent->mvx = 0;
-        col_ent->mvy = 0;
+        FIXED s_vx = fxmul(entity->vel.x, vel_mult);
+        FIXED s_vy = fxmul(entity->vel.y, vel_mult);
 
-        entity->pos.x += fxmul(entity->vel.x, vel_mult);
-        entity->pos.y += fxmul(entity->vel.y, vel_mult);
+        col_ent->inf_mass = false;
+        col_ent->mvx = s_vx;
+        col_ent->mvy = s_vy;
+
+        entity->pos.x += s_vx;
+        entity->pos.y += s_vy;
     }
 
     for (int subsubstep = 1;; ++subsubstep)
@@ -385,11 +388,25 @@ static bool physics_substep(entity_coldata_s *col_ents, int col_ent_count,
                     FIXED vdot2 = fxmul(nx, ent_b->vel.x) +
                                   fxmul(ny, ent_b->vel.y);
 
-                    FIXED mto1 = fxdiv((fxmul(vdot2, mass2) - fxmul(vdot, mass1)), mass1);
-                    FIXED mto2 = fxdiv((fxmul(vdot, mass1) - fxmul(vdot2, mass2)), mass2);
+                    FIXED mto1, mto2;
+                    if (col_ent_a->inf_mass)
+                    {
+                        mto1 = 0;
+                        mto2 = vdot2;
+                    }
+                    else if (col_ent_b->inf_mass)
+                    {
+                        mto1 = vdot;
+                        mto2 = 0;
+                    }
+                    else
+                    {
+                        mto1 = fxdiv((fxmul(vdot2, mdir2) - fxmul(vdot, mdir1)), mdir1);
+                        mto2 = fxdiv((fxmul(vdot, mdir1) - fxmul(vdot2, mdir2)), mdir2);
+                    }
+
                     if (mto1 < 0) mto1 = 0;
                     if (mto2 > 0) mto2 = 0;
-
                     ent_a->vel.x += fxmul(nx, mto1);
                     ent_a->vel.y += fxmul(ny, mto1);
                     ent_b->vel.x += fxmul(nx, mto2);
