@@ -184,7 +184,7 @@ entity_s* entity_alloc(void)
 
         *ent = (entity_s) {
             .flags = ENTITY_FLAG_ENABLED,
-            .gmult = 255,
+            .gmult = FIX_ONE,
             .mass = 2,
             .col.group = COLGROUP_DEFAULT,
             .col.mask = COLGROUP_ALL
@@ -213,12 +213,20 @@ static void update_entities(void)
         entity_s *entity = game_entities + i;
         if (!(entity->flags & ENTITY_FLAG_ENABLED)) continue;
 
+        if (entity->behavior && entity->behavior->update)
+        {
+            entity->behavior->update(entity);
+        }
+
         if (entity->flags & ENTITY_FLAG_ACTOR)
         {
-            if (entity->actor.move_x != 0)
+            int move_x = (int) entity->actor.move_x;
+
+            if (move_x != 0)
             {
+                entity->actor.face_dir = (s8) sgn(move_x);
                 entity->vel.x += fxmul(entity->actor.move_accel,
-                                       int2fx((int) entity->actor.move_x));
+                                       int2fx(move_x));
                 
                 if (ABS(entity->vel.x) > entity->actor.move_speed)
                 {
@@ -255,7 +263,7 @@ static void update_entities(void)
 
         if (entity->flags & ENTITY_FLAG_MOVING)
         {
-            FIXED g = fxmul(gravity, entity->gmult * (FIX_SCALE / 256));
+            FIXED g = fxmul(gravity, entity->gmult);
             entity->vel.y += g;
 
             if (entity->vel.y > terminal_vel)

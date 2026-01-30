@@ -1,0 +1,193 @@
+[
+    // GFXID_PLAYER_IDLE
+    {
+        "width": 2,
+        "height": 2,
+        "frames": [0]
+    },
+
+    // GFXID_PLAYER_WALK
+    {
+        "width": 2,
+        "height": 2,
+        "frameLen": 2,
+        "frames": [0, 2, 2, 4, 6, 8, 10, 12, 14],
+        "loop": true
+    },
+
+    // GFXID_PLAYER_SPIT
+    {
+        "width": 2,
+        "height": 2,
+        "frameLen": 2,
+        "frames": [16, 16, 16, 18, 18, 20, 22, 24, 24, 24, 26, 0]
+    },
+
+    // GFXID_PLAYER_FROZEN
+    {
+        "width": 2,
+        "height": 2,
+        "frames": [28]
+    },
+    
+    // GFXID_PLAYER_GOOPED
+    {
+        "width": 2,
+        "height": 2,
+        "frames": [30]
+    },
+
+    // GFXID_BULLET
+    {
+        "width": 2,
+        "height": 2,
+        "frames": [48]
+    },
+
+    // GFXID_PLAYER_BULLET
+    {
+        "width": 2,
+        "height": 2,
+        "frames": [50]
+    },
+
+    // GFXID_ICE_BLOCK
+    {
+        "width": 2,
+        "height": 2,
+        "frames": [52]
+    },
+
+    // GFXID_SPRING
+    {
+        "width": 2,
+        "height": 2,
+        "frames": [54]
+    },
+
+    // GFXID_SUPER_SPRING
+    // Why tf did i do it like this?? Am i stupid??
+    {
+        "width": 2,
+        "height": 2,
+        "frames": [{
+            "objs": [
+                {"width": 2, "height": 1, "char": 112, "x": 0, "y": 0},
+                {"width": 2, "height": 1, "char": 110, "x": 0, "y": 8}
+            ]
+        }]
+    },
+
+    // GFXID_SIGN
+    {
+        "width": 2,
+        "height": 2,
+        "frames": [57]
+    },
+
+    // GFXID_HINT_SIGN
+    {
+        "width": 2,
+        "height": 2,
+        "frames": [59]
+    },
+
+    // GFXID_UNYUHOME
+    {
+        "width": 4,
+        "height": 5,
+        "frames": [61]
+    },
+
+    // GFXID_CRAWLER
+    {
+        "width": 2,
+        "height": 2,
+        "frameLen": 16,
+        "frames": [71, 73],
+        "loop": true
+    },
+
+    // GFXID_CRAWLER_DEAD
+    {
+        "width": 2,
+        "height": 2,
+        "frames": [75]
+    },
+
+    // GFXID_GUN_BLUX
+    {
+        "width": 2,
+        "height": 3,
+        "frames": [77]
+    },
+
+    // GFXID_GUN_BLUX_SHOOT
+    {
+        "width": 2,
+        "height": 3,
+        "frames": [81,81, 84,84,84, 87]
+    },
+
+    // GFXID_GUN_BLUX_DEAD
+    {
+        "width": 2,
+        "height": 3,
+        "frames": [89]
+    },
+
+    // GFXID_WATER_TANK_OFF
+    {
+        "width": 2,
+        "height": 4,
+        "frames": [92]
+    },
+
+    // GFXID_WATER_TANK_ON
+    {
+        "width": 2,
+        "height": 4,
+        "frames": [96]
+    },
+
+    // GFXID_RED_FIRE_ORB
+    {
+        "width": 2,
+        "height": 2,
+        "frameLen": 10,
+        "frames": [100, 102, 104],
+        "loop": true
+    },
+
+    // GFXID_BLUE_FIRE_ORB,
+    {
+        "width": 2,
+        "height": 2,
+        "frameLen": 10,
+        "frames": [106, 108, 110],
+        "loop": true
+    },
+
+    // GFXID_FRAGILE_WHITE
+    {
+        "width": 2,
+        "height": 2,
+        "frames": [112, 114, 116],
+        "loop": true
+    },
+
+    // GFXID_FRAGILE_RED
+    {
+        "width": 2,
+        "height": 2,
+        "frames": [118, 120, 122],
+        "loop": true
+    },
+
+    // GFXID_ICE_PLATFORM
+    {
+        "width": 1,
+        "height": 1,
+        "frames": [124]
+    }
+]

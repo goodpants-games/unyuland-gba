@@ -28,6 +28,10 @@
 // to be 8x8.
 #define WORLD_TILE_SIZE 8
 
+#define PLAYER_DROPLET_TYPE_SIDE      0
+#define PLAYER_DROPLET_TYPE_SIDE_SLOW 1
+#define PLAYER_DROPLET_TYPE_UP        2
+
 typedef enum gfx_id
 {
     GFXID_PLAYER_IDLE, GFXID_PLAYER_WALK, GFXID_PLAYER_SPIT,
@@ -41,6 +45,7 @@ typedef enum gfx_id
     GFXID_WATER_TANK_OFF, GFXID_WATER_TANK_ON,
     GFXID_RED_FIRE_ORB, GFXID_BLUE_FIRE_ORB, 
     GFXID_FRAGILE_WHITE, GFXID_FRAGILE_RED,
+    GFXID_ICE_PLATFORM,
 
     GFXID_COUNT
 } gfx_id_e;
@@ -64,7 +69,7 @@ typedef struct entity {
 
     struct { FIXED x; FIXED y; } pos;
     struct { FIXED x; FIXED y; } vel;
-    u8 gmult; // 0 = no gravity, 255 = full gravity
+    FIXED gmult;
     u8 mass; // 1 = 0.5 mass, 2 = 1 mass, 3 = 1.5 mass, e.t.c.
     u8 health;
 
@@ -88,7 +93,6 @@ typedef struct entity {
         u8 graphic_id;
         u8 frame;
         u8 accum;
-        u8 _;
         
         s16 ox;
         s16 oy;
@@ -110,7 +114,8 @@ void game_init(void);
 void game_update(void);
 void game_load_room(const map_header_s *map);
 
-void behavior_player_droplet_init(entity_s *self);
+void entity_player_droplet_init(entity_s *self, FIXED px, FIXED py,
+                                int type, int dir);
 extern const behavior_def_s behavior_player_droplet;
 
 #endif

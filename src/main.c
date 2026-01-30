@@ -29,6 +29,7 @@ int main()
 
     int cam_x = 0;
     int cam_y = 0;
+    int last_obj_index = 0;
 
     entity_s *player = entity_alloc();
     player->flags |= ENTITY_FLAG_ENABLED | ENTITY_FLAG_MOVING | ENTITY_FLAG_COLLIDE | ENTITY_FLAG_ACTOR;
@@ -98,10 +99,10 @@ int main()
             entity_s *droplet = entity_alloc();
             if (droplet)
             {
-                droplet->flags |= ENTITY_FLAG_MOVING;
-                droplet->pos = player->pos;
-                droplet->gmult = 127;
-                behavior_player_droplet_init(droplet);
+                int dir = (int) player->actor.face_dir;
+                entity_player_droplet_init(droplet,
+                                           player->pos.x, player->pos.y,
+                                           PLAYER_DROPLET_TYPE_SIDE, dir);
             }
         }
 
@@ -142,6 +143,13 @@ int main()
                         (draw_y - cam_y) * 2);
             if (++obj_index >= 64) break;
         }
+
+        for (int i = obj_index + 1; i <= last_obj_index; ++i)
+        {
+            obj_hide(&gfx_oam_buffer[obj_index]);
+        }
+
+        last_obj_index = obj_index;
 
         #ifdef MAIN_PROFILE
         uint frame_len = profile_stop();
