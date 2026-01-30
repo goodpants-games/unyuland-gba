@@ -8,6 +8,8 @@
 #include "gfx.h"
 #include "log.h"
 
+// #define MAIN_PROFILE
+
 int main()
 {
     LOG_INIT();
@@ -28,7 +30,7 @@ int main()
     int cam_x = 0;
     int cam_y = 0;
 
-    entity_s *player = &game_entities[0];
+    entity_s *player = entity_alloc();
     player->flags |= ENTITY_FLAG_ENABLED | ENTITY_FLAG_MOVING | ENTITY_FLAG_COLLIDE | ENTITY_FLAG_ACTOR;
     player->pos.x = int2fx(16);
     player->pos.y = int2fx(16);
@@ -40,7 +42,7 @@ int main()
     player->sprite.ox = -1;
 
     {
-        entity_s *e = &game_entities[1];
+        entity_s *e = entity_alloc();
         e->flags |= ENTITY_FLAG_ENABLED | ENTITY_FLAG_COLLIDE | ENTITY_FLAG_MOVING;
         e->pos.x = int2fx(32);
         e->pos.y = int2fx(32);
@@ -54,7 +56,7 @@ int main()
     }
 
     {
-        entity_s *e = &game_entities[2];
+        entity_s *e = entity_alloc();
         e->flags |= ENTITY_FLAG_ENABLED | ENTITY_FLAG_COLLIDE | ENTITY_FLAG_MOVING;
         e->pos.x = int2fx(32);
         e->pos.y = int2fx(64);
@@ -71,7 +73,9 @@ int main()
     {
         VBlankIntrWait();
 
-        // profile_start();
+        #ifdef MAIN_PROFILE
+        profile_start();
+        #endif
 
         gfx_new_frame();
         key_poll();
@@ -88,6 +92,18 @@ int main()
 
         if (key_hit(KEY_B))
             player->actor.jump_trigger = 8;
+
+        if (key_hit(KEY_A))
+        {
+            entity_s *droplet = entity_alloc();
+            if (droplet)
+            {
+                droplet->flags |= ENTITY_FLAG_MOVING;
+                droplet->pos = player->pos;
+                droplet->gmult = 127;
+                behavior_player_droplet_init(droplet);
+            }
+        }
 
         // if (key_is_down(KEY_UP))
         //     player->pos.y -= int2fx(1);
@@ -127,8 +143,10 @@ int main()
             if (++obj_index >= 64) break;
         }
 
-        // uint frame_len = profile_stop();
-        // LOG_DBG("frame usage: %.1f%%", (float)frame_len / 280896.f * 100.f);
+        #ifdef MAIN_PROFILE
+        uint frame_len = profile_stop();
+        LOG_DBG("frame usage: %.1f%%", (float)frame_len / 280896.f * 100.f);
+        #endif
     }
 
 

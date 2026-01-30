@@ -17,7 +17,8 @@
 #define ACTOR_FLAG_DID_JUMP   4
 
 #define COLGROUP_DEFAULT 1
-#define COLGROUP_ALL UINT16_MAX
+#define COLGROUP_ENTITY  2
+#define COLGROUP_ALL     UINT16_MAX
 
 #define MAX_ENTITY_COUNT 32
 #define MAX_PROJECTILE_COUNT 128
@@ -49,6 +50,14 @@ typedef enum entity_msgid
     ENTITY_MSG_INTERACT,
     ENTITY_MSG_ATTACKED
 } entity_msgid_e;
+
+struct entity;
+
+typedef struct behavior_def
+{
+    void (*update)(struct entity *self);
+    void (*message)(struct entity *self, entity_msgid_e msg, ...);
+} behavior_def_s;
 
 typedef struct entity {
     u32 flags;
@@ -85,9 +94,8 @@ typedef struct entity {
         s16 oy;
     } sprite;
 
-    s32 internal[4];
-    void (*update)(struct entity *self);
-    void (*message)(struct entity *self, entity_msgid_e msg, ...);
+    s32 userdata[4];
+    const behavior_def_s *behavior;
 } entity_s;
 
 extern entity_s game_entities[MAX_ENTITY_COUNT];
@@ -95,10 +103,14 @@ extern const u8 *game_room_collision;
 extern int game_room_width;
 extern int game_room_height;
 
-void entity_init(entity_s *self);
+entity_s* entity_alloc(void);
+void entity_free(entity_s *entity);
 
 void game_init(void);
 void game_update(void);
 void game_load_room(const map_header_s *map);
+
+void behavior_player_droplet_init(entity_s *self);
+extern const behavior_def_s behavior_player_droplet;
 
 #endif

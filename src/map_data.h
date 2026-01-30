@@ -33,10 +33,11 @@ INLINE const u16* map_graphics_data(const map_header_s *header)
     return (const u16 *)(uintptr_t)align(ptr, sizeof(uintptr_t));
 }
 
-INLINE int map_collision_get(const u8 *data, int pitch, int x, int y)
+INLINE int map_collision_get(const u8 *data, uint pitch, uint x, uint y)
 {
-    int i = y * pitch + x;
-    int cell = (data[i / 4] >> ((i % 4) * 2)) & 0x3;
+    uint i = y * pitch + x;
+    int cell = (data[i >> 2] >> ((i & 0x3) << 1)) & 0x3;
+    // int cell = (data[i / 4] >> ((i % 4) * 2)) & 0x3;
     return cell;
 }
 
