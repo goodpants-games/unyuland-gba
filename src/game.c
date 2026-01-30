@@ -180,8 +180,9 @@ static bool physics_substep(entity_coldata_s *col_ents, int col_ent_count,
                             FIXED vel_mult)
 {
     size_t contact_queue_size = 0;
-    pqueue_entry_s contact_queue[MAX_CONTACT_COUNT];
-    u8 contact_pairs[CONTACT_PAIR_SIZE / 4];
+
+    static pqueue_entry_s contact_queue[MAX_CONTACT_COUNT];
+    static u8 contact_pairs[CONTACT_PAIR_SIZE];
 
     // first move all entities
     for (int i = 0; i < col_ent_count; ++i)
@@ -195,6 +196,9 @@ static bool physics_substep(entity_coldata_s *col_ents, int col_ent_count,
         entity->pos.y += s_vy;
     }
 
+    u32 detection_time = 0;
+    u32 resolution_time = 0;
+
     for (int subsubstep = 1;; ++subsubstep)
     {
         if (subsubstep >= 8)
@@ -202,6 +206,8 @@ static bool physics_substep(entity_coldata_s *col_ents, int col_ent_count,
             // LOG_WRN("exceeded max iterations");
             break;
         }
+
+        profile_start();
 
         col_contact_count = 0;
 
@@ -312,10 +318,14 @@ static bool physics_substep(entity_coldata_s *col_ents, int col_ent_count,
             }
         }
 
+        detection_time += profile_stop();
+
         if (col_contact_count == 0)
         {
             break;
         }
+
+        profile_start();
 
         // resolve contacts
         for (void *item;
@@ -393,7 +403,12 @@ static bool physics_substep(entity_coldata_s *col_ents, int col_ent_count,
                 }
             }
         }
+
+        resolution_time += profile_stop();
     }
+
+    LOG_DBG("detection time: %.2f%%", (float)detection_time / 280896.f * 100.f);
+    LOG_DBG("resolution time: %.2f%%", (float)resolution_time / 280896.f * 100.f);
 
     bool no_movement = true;
 

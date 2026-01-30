@@ -71,7 +71,7 @@ int main()
     {
         VBlankIntrWait();
 
-        profile_start();
+        // profile_start();
 
         gfx_new_frame();
         key_poll();
@@ -127,9 +127,8 @@ int main()
             if (++obj_index >= 64) break;
         }
 
-        uint frame_len = profile_stop();
-
-        LOG_DBG("frame usage: %.1f%%", (float)frame_len / 280896.f * 100.f);
+        // uint frame_len = profile_stop();
+        // LOG_DBG("frame usage: %.1f%%", (float)frame_len / 280896.f * 100.f);
     }
 
 

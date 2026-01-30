@@ -27,6 +27,23 @@
 // to be 8x8.
 #define WORLD_TILE_SIZE 8
 
+typedef enum gfx_id
+{
+    GFXID_PLAYER_IDLE, GFXID_PLAYER_WALK, GFXID_PLAYER_SPIT,
+    GFXID_PLAYER_FROZEN, GFXID_PLAYER_GOOPED,
+
+    GFXID_BULLET, GFXID_PLAYER_BULLET, GFXID_ICE_BLOCK, GFXID_SPRING,
+    GFXID_SUPER_SPRING, GFXID_SIGN, GFXID_HINT_SIGN, GFXID_UNYUHOME,
+
+    GFXID_CRAWLER, GFXID_CRAWLER_DEAD,
+    GFXID_GUN_BLUX, GFXID_GUN_BLUX_SHOOT, GFXID_GUN_BLUX_DEAD,
+    GFXID_WATER_TANK_OFF, GFXID_WATER_TANK_ON,
+    GFXID_RED_FIRE_ORB, GFXID_BLUE_FIRE_ORB, 
+    GFXID_FRAGILE_WHITE, GFXID_FRAGILE_RED,
+
+    GFXID_COUNT
+} gfx_id_e;
+
 typedef enum entity_msgid
 {
     ENTITY_MSG_INTERACT,
@@ -59,12 +76,13 @@ typedef struct entity {
     } actor;
 
     struct {
-        u8 sprite_id;
-        u8 anim_id;
+        u8 graphic_id;
         u8 frame;
         u8 accum;
-        s8 ox;
-        s8 oy;
+        u8 _;
+        
+        s16 ox;
+        s16 oy;
     } sprite;
 
     s32 internal[4];
