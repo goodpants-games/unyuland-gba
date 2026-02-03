@@ -1,0 +1,356 @@
+--[[
+// pointers are relative to gfx_data_root
+// native alignment is 4 bytes
+
+struct gfx_data_root {
+    gfx_frame *frame_pool;
+    gfx_frame *obj_pool;
+    
+    gfx_data  gfx[?];
+    gfx_frame frame_pool_data[?];
+    gfx_obj   obj_pool_data[?];
+};
+
+struct gfx_data {
+    u8 frame_count;
+    u8 loop; // bool
+    u16 frame_pool_idx;
+};
+
+struct gfx_frame {
+    u16 obj_pool_index;
+    u8 frame_len;
+    u8 obj_count;
+};
+
+struct gfx_obj {
+    u16 a0; // contains only config for the sprite shape
+    u16 a1; // contains only config for the sprite size
+    u16 a2; // contains only config for the character index
+    s8 ox;
+    s8 oy;
+};
+--]]
+
+local OUTPUT_WIDTH = 128
+local OUTPUT_HEIGHT = 64
+
+local ATTR0_SQUARE  = 0
+local ATTR0_WIDE    = 0x4000
+local ATTR0_TALL    = 0x8000
+local ATTR1_SIZE_8  = 0
+local ATTR1_SIZE_16 = 0x4000
+local ATTR1_SIZE_32 = 0x8000
+local ATTR1_SIZE_64 = 0xC000
+
+local input_file_list = {}
+local pico8_pal = Palette { fromResource = "PICO-8" }
+
+local output_sprite = Sprite(OUTPUT_WIDTH, OUTPUT_HEIGHT, ColorMode.INDEXED)
+output_sprite:setPalette(pico8_pal)
+
+local output = Image(OUTPUT_WIDTH, OUTPUT_HEIGHT, ColorMode.INDEXED)
+local out_idx = 0
+local output_x = 0
+local output_y = 0
+
+local output_data = {}
+
+local tinsert = table.insert
+
+local function tappend(t, ...)
+    local tinsert = table.insert
+    for i=1, select("#", ...) do
+        local v = select(i, ...)
+        tinsert(t, v)
+    end
+end
+
+local function img_blit(dst, src, p_dx, p_dy, p_sx, p_sy, p_sw, p_sh)
+    local draw_pixel = dst.drawPixel
+    local get_pixel = src.getPixel
+
+    assert(p_dx >= 0)
+    assert(p_dy >= 0)
+    assert(p_sx >= 0)
+    assert(p_sy >= 0)
+    assert(p_sw >= 0)
+    assert(p_sh >= 0)
+
+    local sy = p_sy
+    for dy=p_dy, p_dy + p_sh - 1 do
+        local sx = p_sx
+        for dx=p_dx, p_dx + p_sw - 1 do
+            draw_pixel(dst, dx, dy, get_pixel(src, sx, sy))
+            sx = sx + 1
+        end
+        sy = sy + 1
+    end
+end
+
+local function process_sprite(spr)
+    local filename = string.match(spr.filename, "([^/\\]*)%..-$")
+    assert(filename, "could not extract path filename")
+
+    local prefix = "GFXID_" .. string.upper(filename)
+    local frame_data = {}
+
+    -- write frame data
+    for fi=1, #spr.frames do
+        local cel = spr.cels[fi]
+
+        -- if this frame is a duplicate, continue
+        local dup_of_frame = nil
+        for fj=1, fi-1 do
+            local cel2 = spr.cels[fj]
+            if cel.bounds == cel2.bounds and
+               (cel.image == cel2.image or cel.image:isEqual(cel2.image))
+            then
+                dup_of_frame = fj
+                break
+            end
+        end
+
+        if dup_of_frame then
+            frame_data[fi] = frame_data[dup_of_frame]
+            goto continue
+        end
+        
+        local bounds = cel.bounds
+        local bx, by = bounds.x, bounds.y
+        local bw, bh = bounds.width, bounds.height
+        local src = cel.image
+        local sc = math.floor(bx / 4)
+        local sr = math.floor(by / 4)
+        local ec = math.ceil((bx + bw) / 4) - 1
+        local er = math.ceil((by + bh) / 4) - 1
+
+        frame_data[fi] = {
+            idx = out_idx,
+            sx = sc,
+            sy = sr,
+            w = er - sr + 1,
+            h = ec - sc + 1
+        }
+
+        local sy = 0
+        for row=sr, er do
+            local oy = math.min(0, row * 4 - by)
+            local sh = math.min(bh, sy + 4 + oy) - sy
+
+            local sx = 0
+            for col=sc, ec do
+                local ox = math.min(0, col * 4 - bx)
+                local sw = math.min(bw, sx + 4 + ox) - sx
+
+                img_blit(output, src, output_x - ox, output_y - oy, sx, sy, sw,
+                         sh)
+                
+                sx = sx + sw
+
+                out_idx = out_idx + 1
+                output_x = output_x + 4
+                if output_x >= OUTPUT_WIDTH then
+                    output_x = 0
+                    output_y = output_y + 4
+                end
+            end
+
+            sy = sy + sh
+        end
+
+        ::continue::
+    end
+
+    local function insert_frame(frame_list, f)
+        local fdat = frame_data[f]
+        table.insert(frame_list, {
+            idx = fdat.idx,
+            w = fdat.w,
+            h = fdat.h,
+            len = math.floor(spr.frames[f].duration * 60.0 + 0.5),
+            ox = -fdat.sx * 8,
+            oy = -fdat.sy * 8
+        })
+    end
+
+    -- write animation data
+    if spr.tags[1] then
+        for _, tag in ipairs(spr.tags) do
+            local gfx_name = prefix .. "_" .. string.upper(tag.name)
+            if string.match(gfx_name, "[^A-Z_]") then
+                error("invalid name " .. gfx_name)
+            end
+
+            local anim = {}
+            anim.name = gfx_name
+            anim.loop = tag.repeats == 0
+            anim.frames = {}
+
+            for f=tag.fromFrame.frameNumber, tag.toFrame.frameNumber do
+                insert_frame(anim.frames, f)
+            end
+
+            table.insert(output_data, anim)
+        end
+    else
+        local anim = {}
+        anim.name = prefix
+        anim.loop = false
+        anim.frames = {}
+
+        for i=1, #spr.frames do
+            insert_frame(anim.frames, i)
+        end
+
+        table.insert(output_data, anim)
+    end
+end
+
+local function process_file(file_name)
+    local s, err = pcall
+    local spr = app.open("work/gfx/" .. file_name)
+    if not spr then
+        error("error opening " .. file_name)
+    end
+
+    spr:setPalette(pico8_pal)
+    app.command.ChangePixelFormat { format = "indexed" }
+    app.command.FlattenLayers { visibleOnly = true }
+    process_sprite(spr)
+    spr:close()
+end
+
+local SPRITE_SIZES = {
+    {8, 8, ATTR0_SQUARE, ATTR1_SIZE_64},
+    {8, 4, ATTR0_WIDE,   ATTR1_SIZE_64},
+    {4, 8, ATTR0_TALL,   ATTR1_SIZE_64},
+
+    {4, 4, ATTR0_SQUARE, ATTR1_SIZE_32},
+    {4, 2, ATTR0_WIDE,   ATTR1_SIZE_32},
+    {2, 4, ATTR0_TALL,   ATTR1_SIZE_32},
+
+    {4, 1, ATTR0_WIDE,   ATTR1_SIZE_16},
+    {1, 4, ATTR0_TALL,   ATTR1_SIZE_16},
+    {2, 2, ATTR0_SQUARE, ATTR1_SIZE_16},
+
+    {2, 1, ATTR0_WIDE,   ATTR1_SIZE_8 },
+    {1, 2, ATTR0_TALL,   ATTR1_SIZE_8 },
+    {1, 1, ATTR0_SQUARE, ATTR1_SIZE_8 },
+}
+
+local function objdef(out, frame, x, y, w, h)
+    if w == 0 or h == 0 then return 0 end
+    
+    for _, size in ipairs(SPRITE_SIZES) do
+        local sw, sh, a0, a1 = size[1], size[2], size[3], size[4]
+        if sw <= w and sh <= h then
+            local ox = x * 8 + frame.ox
+            local oy = y * 8 + frame.oy
+            local data = string.pack("<!4 I2 I2 I2 i1 i1",
+                                     a0, a1, frame.idx & 0x1FF,
+                                     ox, oy)
+            table.insert(out, data)
+
+            return objdef(out, frame, x, y + sh, w, h - sh) +
+                   objdef(out, frame, x + sw, y, w - sw, h) +
+                   1
+        end
+    end
+
+    error(("objdef error %f %f"):format(w, h))
+end
+
+do
+    if not app.params.input then
+        error("expected 'input' parameter")
+    end
+
+    if not app.params.output_img then
+        error("expected 'output_img' parameter")
+    end
+
+    if not app.params.output_dat then
+        error("expected 'output_dat' parameter")
+    end
+
+    if not app.params.output_h then
+        error("expected 'output_h' parameter")
+    end
+
+    for fn in string.gmatch(app.params.input, "([^:]+)") do
+        table.insert(input_file_list, fn)
+    end
+
+    for _, file_name in ipairs(input_file_list) do
+        process_file(file_name)
+    end
+    
+    output_sprite.cels[1].image = output
+    app.sprite = output_sprite
+    app.command.SpriteSize { ui = false, scale = 2.0 }
+    output_sprite:saveAs(app.params.output_img)
+
+    local output_dat_f <close>, err = io.open(app.params.output_dat, "wb")
+    if not output_dat_f then
+        error(("could not open '%s': %s"):format(app.params.output_dat, err))
+    end
+
+    local output_h_f <close>, err = io.open(app.params.output_h, "w")
+    if not output_h_f then
+        error(("could not open '%s': %s"):format(app.params.output_h, err))
+    end
+
+    local spack = string.pack
+
+    local names = {}
+
+    local frame_pool_buf = {}
+    local obj_pool_buf = {}
+    local gfx_data_buf = {}
+
+    for _, anim in ipairs(output_data) do
+        tinsert(names, anim.name)
+        tinsert(gfx_data_buf, spack("<!4 I1 I1 I2", #anim.frames, anim.loops and 1 or 0, #frame_pool_buf))
+
+        for _, frame in ipairs(anim.frames) do
+            local obji = #obj_pool_buf
+            local objc = objdef(obj_pool_buf, frame, 0, 0, frame.w, frame.h)
+
+            tinsert(frame_pool_buf,
+                    spack("<!4 I2 I1 I1", obji, frame.len, objc))
+        end
+    end
+
+    local gfx_data = table.concat(gfx_data_buf)
+    local frame_pool = table.concat(frame_pool_buf)
+    local obj_pool = table.concat(obj_pool_buf)
+
+    local sizeof_gfx_data = string.len(gfx_data)
+    local sizeof_frame_pool = string.len(frame_pool)
+    local sizeof_obj_pool = string.len(obj_pool)
+
+    assert(sizeof_gfx_data % 4 == 0)
+    assert(sizeof_frame_pool % 4 == 0)
+    assert(sizeof_obj_pool % 4 == 0)
+    
+    local data = {}
+    tinsert(data, spack("<!4 I4 I4", 8 + sizeof_gfx_data, 8 + 8 + sizeof_gfx_data + sizeof_frame_pool))
+    tinsert(data, gfx_data)
+    tinsert(data, frame_pool)
+    tinsert(data, obj_pool)
+
+    output_dat_f:write(table.concat(data))
+    -- print(json.encode(output_data))
+
+    output_h_f:write("typedef enum gfx_id\n{\n")
+
+    for _, name in ipairs(names) do
+        output_h_f:write("    ")
+        output_h_f:write(name)
+        output_h_f:write(",\n")
+    end
+
+    output_h_f:write("    GFXID_COUNT\n")
+    output_h_f:write("} gfx_id_e;\n")
+end
