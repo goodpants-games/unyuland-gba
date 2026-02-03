@@ -90,7 +90,7 @@ local function process_sprite(spr)
     local filename = string.match(spr.filename, "([^/\\]*)%..-$")
     assert(filename, "could not extract path filename")
 
-    local prefix = "GFXID_" .. string.upper(filename)
+    local prefix = string.upper(filename)
     local frame_data = {}
 
     -- write frame data
@@ -292,44 +292,43 @@ local function create_objs(out, frame)
     return count
 end
 
-do
-    if not app.params.input then
-        error("expected 'input' parameter")
+local function parse_sprdb(path)
+    local sprdb
+    do
+        local f <close>, err = io.open(path, "r")
+        if not f then
+            error(("could not open '%s': %s"):format(path, err))
+        end
+
+        sprdb = json.decode(f:read("a"))
     end
 
-    if not app.params.output_img then
-        error("expected 'output_img' parameter")
+    local files = {}
+    for _, f in ipairs(sprdb.sprites) do
+        table.insert(files, app.fs.normalizePath(app.fs.joinPath(app.fs.currentPath, sprdb.dir, f)))
     end
 
-    if not app.params.output_dat then
-        error("expected 'output_dat' parameter")
-    end
+    return files
+end
 
-    if not app.params.output_h then
-        error("expected 'output_h' parameter")
-    end
-
-    for fn in string.gmatch(app.params.input, "([^ ]+)") do
-        table.insert(input_file_list, fn)
-    end
-
+local function process_sprdb(output_img, output_dat, output_h)
     for _, file_name in ipairs(input_file_list) do
         process_file(file_name)
     end
-    
+
     output_sprite.cels[1].image = output
     app.sprite = output_sprite
     app.command.SpriteSize { ui = false, scale = 2.0 }
-    output_sprite:saveAs(app.params.output_img)
+    output_sprite:saveAs(output_img)
 
-    local output_dat_f <close>, err = io.open(app.params.output_dat, "wb")
+    local output_dat_f <close>, err = io.open(output_dat, "wb")
     if not output_dat_f then
         error(("could not open '%s': %s"):format(app.params.output_dat, err))
     end
 
-    local output_h_f <close>, err = io.open(app.params.output_h, "w")
+    local output_h_f <close>, err = io.open(output_h, "w")
     if not output_h_f then
-        error(("could not open '%s': %s"):format(app.params.output_h, err))
+        error(("could not open '%s': %s"):format(output_h, err))
     end
 
     local spack = string.pack
@@ -374,14 +373,82 @@ do
     output_dat_f:write(table.concat(data))
     -- print(json.encode(output_data))
 
-    output_h_f:write("typedef enum gfx_id\n{\n")
+    local h_name = string.match(output_h, "([^/\\]+)%..-$")
+    assert(h_name)
+
+    local sprdb_ident = string.gsub(string.match(h_name, "(.*)_sprdb$"), "[^A-Za-z_]", "_")
+    assert(sprdb_ident)
+
+    local inc_guard_name = string.upper(h_name) .. "_H"
+
+    output_h_f:write("#ifndef ", inc_guard_name, "\n")
+    output_h_f:write("#define ", inc_guard_name, "\n\n")
+
+    output_h_f:write("#include <", h_name, "_data.h", ">\n")
+    output_h_f:write("#include <", h_name, "_gfx.h", ">\n\n")
+
+    output_h_f:write("typedef enum sprid_", sprdb_ident, "\n{\n")
 
     for _, name in ipairs(names) do
         output_h_f:write("    ")
-        output_h_f:write(name)
+        output_h_f:write("SPRID_" .. string.upper(sprdb_ident) .. "_" .. name)
         output_h_f:write(",\n")
     end
 
     output_h_f:write("    GFXID_COUNT\n")
-    output_h_f:write("} gfx_id_e;\n")
+    output_h_f:write("} sprid_", sprdb_ident, "_e;\n")
+
+    output_h_f:write("\n#endif\n")
+end
+
+do
+    if not app.params.sprdb then
+        error("expected 'sprdb' parameter")
+    end
+
+    local sprdb_file = app.fs.normalizePath(app.params.sprdb)
+
+    input_file_list = parse_sprdb(sprdb_file)
+
+    if app.params.out_dep then
+        if not app.params.artifact_name then
+            error("expected 'artifact_name' parameter")
+        end
+
+        local f <close>, err = io.open(app.params.out_dep, "w")
+        if not f then
+            error(("could not open '%s': %s"):format(f, err))
+        end
+
+        f:write(app.params.artifact_name)
+        f:write(": ")
+        f:write(sprdb_file)
+
+        for i, path in ipairs(input_file_list) do
+            f:write(" \\\n ")
+            f:write((string.gsub(path, "\\", "/")))
+        end
+
+        f:write("\n")
+
+        for _, path in ipairs(input_file_list) do
+            f:write((string.gsub(path, "\\", "/")))
+            f:write(":\n")
+        end
+    end
+
+    if not app.params.output_img then
+        error("expected 'output_img' parameter")
+    end
+
+    if not app.params.output_dat then
+        error("expected 'output_dat' parameter")
+    end
+
+    if not app.params.output_h then
+        error("expected 'output_h' parameter")
+    end
+
+    process_sprdb(app.params.output_img, app.params.output_dat,
+                    app.params.output_h)
 end

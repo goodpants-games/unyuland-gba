@@ -1,0 +1,19 @@
+{
+    "dir": "../work/gfx",
+    "sprites": [
+        "player.ase",
+        "crawler.ase",
+        "fire_orb.ase",
+        "fragile_block.ase",
+        "gun_enemy.ase",
+        "water_tank.ase",
+        "bullet.png",
+        "water_droplet.png",
+        "ice_block.png",
+        "sign.png",
+        "hint_sign.png",
+        "spring.png",
+        "super_spring.png",
+        "home.png"
+    ]
+}

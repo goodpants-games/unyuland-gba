@@ -5,12 +5,10 @@
 #include <tonc_math.h>
 #include <tonc_bios.h>
 #include <tonc_oam.h>
-#include <game_sprites_gfx.h>
 
 #include "datastruct.h"
 #include "log.h"
 #include "gfx.h"
-#include <game_sprites_bin.h>
 
 #define MAP_COL(x, y)                                                          \
     map_collision_get(game_room_collision, game_room_width, x, y)
@@ -663,7 +661,7 @@ void game_render(int *p_last_obj_index)
     gfx_scroll_y = game_cam_y * 2;
 
     const gfx_root_header_s *gfx_root_header =
-        (const gfx_root_header_s *)game_sprites_bin;
+        (const gfx_root_header_s *)game_sprdb_data;
     
     const gfx_sprite_s *gfx_sprites =
         (const gfx_sprite_s *)&gfx_root_header->sprite0;

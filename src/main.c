@@ -1,5 +1,5 @@
 #include <tonc.h>
-#include <game_sprites_gfx.h>
+#include <game_sprdb.h>
 #include <tileset_gfx.h>
 #include <assert.h>
 
@@ -20,7 +20,7 @@ int main()
 
     gfx_init();
     memcpy32(&tile_mem[0][0], tileset_gfxTiles, tileset_gfxTilesLen / sizeof(u32));
-    memcpy32(tile_mem_obj[0][0].data, game_sprites_gfxTiles, game_sprites_gfxTilesLen / sizeof(u32));
+    memcpy32(tile_mem_obj[0][0].data, game_sprdb_gfxTiles, game_sprdb_gfxTilesLen / sizeof(u32));
 
     const map_header_s *map = maps[1];
     gfx_load_map(map);
@@ -40,7 +40,7 @@ int main()
     player->actor.jump_velocity = (FIXED)(FIX_SCALE * 2.0);
     player->sprite.ox = -1;
     player->sprite.oy = -8;
-    player->sprite.graphic_id = GFXID_PLAYER_WALK;
+    player->sprite.graphic_id = SPRID_GAME_PLAYER_WALK;
 
     // {
     //     entity_s *e = entity_alloc();

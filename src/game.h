@@ -3,7 +3,7 @@
 
 #include <tonc_types.h>
 #include "map_data.h"
-#include "game_sprite_ids.h"
+#include <game_sprdb.h>
 
 #define WORLD_SUBPX_SHIFT 4
 #define WORLD_SUBPX_SCALE 16
