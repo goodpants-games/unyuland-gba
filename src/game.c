@@ -1,17 +1,14 @@
 #include "game.h"
 
 #include <stdlib.h>
-#include <tonc_core.h>
-#include <tonc_math.h>
-#include <tonc_bios.h>
-#include <tonc_oam.h>
+#include <tonc.h>
 
 #include "datastruct.h"
 #include "log.h"
 #include "gfx.h"
 
 #define MAP_COL(x, y)                                                          \
-    map_collision_get(game_room_collision, game_room_width, x, y)
+    map_collision_get(g_game.room_collision, g_game.room_width, x, y)
 
 // x always has to be greater than y
 #define UPAIR2U(x, y) ((((x) * (x) + (x)) >> 1) + (y))
@@ -133,12 +130,7 @@ typedef struct col_bp_edge {
     int pos;
 } col_bp_edge_s;
 
-entity_s game_entities[MAX_ENTITY_COUNT];
-const u8 *game_room_collision;
-int game_room_width;
-int game_room_height;
-int game_cam_x;
-int game_cam_y;
+game_s g_game;
 
 static uint col_contact_count = 0;
 static col_contact_s col_contacts[MAX_CONTACT_COUNT];
@@ -215,13 +207,14 @@ entity_s* entity_alloc(void)
 {
     for (int i = 0; i < MAX_ENTITY_COUNT; ++i)
     {
-        entity_s *ent = game_entities + i;
+        entity_s *ent = g_game.entities + i;
         if (ent->flags & ENTITY_FLAG_ENABLED) continue;
 
         *ent = (entity_s) {
             .flags = ENTITY_FLAG_ENABLED,
             .gmult = FIX_ONE,
             .mass = 2,
+            .actor.face_dir = 1,
             .col.group = COLGROUP_DEFAULT,
             .col.mask = COLGROUP_ALL
         };
@@ -246,7 +239,7 @@ static void update_entities(void)
 
     for (int i = 0; i < MAX_ENTITY_COUNT; ++i)
     {
-        entity_s *entity = game_entities + i;
+        entity_s *entity = g_game.entities + i;
         if (!(entity->flags & ENTITY_FLAG_ENABLED)) continue;
 
         if (entity->behavior && entity->behavior->update)
@@ -593,7 +586,7 @@ static void update_physics(void)
 
     for (int i = 0; i < MAX_ENTITY_COUNT; ++i)
     {
-        entity_s *entity = game_entities + i;
+        entity_s *entity = g_game.entities + i;
         if (!(entity->flags & ENTITY_FLAG_ENABLED)) continue;
 
         if (entity->flags & ENTITY_FLAG_ACTOR)
@@ -633,12 +626,13 @@ static void update_physics(void)
 
 void game_init(void)
 {
-    game_cam_x = 0;
-    game_cam_y = 0;
+    g_game.cam_x = 0;
+    g_game.cam_y = 0;
+    g_game.input_enabled = true;
     
     for (int i = 0; i < MAX_ENTITY_COUNT; ++i)
     {
-        game_entities[i].flags = 0;
+        g_game.entities[i].flags = 0;
     }
 }
 
@@ -650,15 +644,15 @@ void game_update(void)
 
 void game_load_room(const map_header_s *map)
 {
-    game_room_collision = map_collision_data(map);
-    game_room_width = (int) map->width;
-    game_room_height = (int) map->height;
+    g_game.room_collision = map_collision_data(map);
+    g_game.room_width = (int) map->width;
+    g_game.room_height = (int) map->height;
 }
 
 void game_render(int *p_last_obj_index)
 {
-    gfx_scroll_x = game_cam_x * 2;
-    gfx_scroll_y = game_cam_y * 2;
+    gfx_scroll_x = g_game.cam_x * 2;
+    gfx_scroll_y = g_game.cam_y * 2;
 
     const gfx_root_header_s *gfx_root_header =
         (const gfx_root_header_s *)game_sprdb_data;
@@ -673,11 +667,23 @@ void game_render(int *p_last_obj_index)
     int obj_index = 0;
     for (int i = 0; i < MAX_ENTITY_COUNT; ++i)
     {
-        entity_s *ent = &game_entities[i];
+        entity_s *ent = &g_game.entities[i];
         if (!(ent->flags & ENTITY_FLAG_ENABLED)) continue;
 
         int draw_x = (ent->pos.x >> FIX_SHIFT) + ent->sprite.ox;
         int draw_y = (ent->pos.y >> FIX_SHIFT) + ent->sprite.oy;
+        int draw_cam_x = (draw_x - g_game.cam_x) * 2;
+        int draw_cam_y = (draw_y - g_game.cam_y) * 2;
+
+        // frustum culling. needed so sprites don't wrap around the screen.
+        // and also obviously the performance benefit.
+        if (draw_cam_x < -32 ||
+            draw_cam_y < -32 ||
+            draw_cam_x > SCREEN_WIDTH + 32 ||
+            draw_cam_y > SCREEN_HEIGHT + 32)
+        {
+            continue;
+        }
 
         int sprite_frame = ent->sprite.frame;
         int sprite_time_accum = ent->sprite.accum;
@@ -690,6 +696,7 @@ void game_render(int *p_last_obj_index)
         int frame_len = frame->frame_len;
         int frame_obj_count = frame->obj_count;
 
+        // draw object assembly
         for (int j = 0; j < frame_obj_count; ++j)
         {
             const gfx_obj_s *obj_src = &objs[j];
@@ -697,17 +704,27 @@ void game_render(int *p_last_obj_index)
 
             obj_set_attr(obj_dst, obj_src->a0, obj_src->a1,
                          obj_src->a2 | ATTR2_PALBANK(0));
-            obj_set_pos(obj_dst,
-                        (draw_x - game_cam_x) * 2 + obj_src->ox,
-                        (draw_y - game_cam_y) * 2 + obj_src->oy);
+            obj_set_pos(obj_dst, draw_cam_x + obj_src->ox,
+                        draw_cam_y + obj_src->oy);
             
             if (++obj_index >= 64) goto exit_entity_loop;
         }
 
-        if (++sprite_time_accum >= frame_len)
+        // update sprite animation
+        if ((ent->sprite.flags & SPRITE_FLAG_PLAYING) && ++sprite_time_accum >= frame_len)
         {
             sprite_time_accum = 0;
-            sprite_frame = (sprite_frame + 1) % frame_count;
+            if (sprite_frame == frame_count - 1)
+            {
+                if (spr->loop)
+                    sprite_frame = 0;
+                else
+                    ent->sprite.flags &= ~SPRITE_FLAG_PLAYING;
+            }
+            else
+            {
+                ++sprite_frame;
+            }
         }
 
         ent->sprite.frame = sprite_frame;

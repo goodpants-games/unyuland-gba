@@ -17,6 +17,10 @@
 #define ACTOR_FLAG_WALL       2
 #define ACTOR_FLAG_DID_JUMP   4
 
+#define SPRITE_FLAG_PLAYING   1
+#define SPRITE_FLAG_FLIP_X    2
+#define SPRITE_FLAG_FLIP_Y    4
+
 #define COLGROUP_DEFAULT 1
 #define COLGROUP_ENTITY  2
 #define COLGROUP_ALL     UINT16_MAX
@@ -73,10 +77,10 @@ typedef struct entity {
     } actor;
 
     struct {
+        u8 flags;
         u8 graphic_id;
         u8 frame;
         u8 accum;
-        u8 play;
         
         s16 ox;
         s16 oy;
@@ -86,13 +90,19 @@ typedef struct entity {
     const behavior_def_s *behavior;
 } entity_s;
 
-extern entity_s game_entities[MAX_ENTITY_COUNT];
-extern const u8 *game_room_collision;
-extern int game_room_width;
-extern int game_room_height;
+typedef struct game {
+    entity_s entities[MAX_ENTITY_COUNT];
+    const u8 *room_collision;
+    int room_width;
+    int room_height;
+    
+    int cam_x;
+    int cam_y;
 
-extern int game_cam_x;
-extern int game_cam_y;
+    bool input_enabled;
+} game_s;
+
+extern game_s g_game;
 
 entity_s* entity_alloc(void);
 void entity_free(entity_s *entity);
@@ -102,6 +112,9 @@ void game_update(void);
 void game_load_room(const map_header_s *map);
 
 void game_render(int *last_obj_index);
+
+void entity_player_init(entity_s *self);
+extern const behavior_def_s behavior_player;
 
 void entity_player_droplet_init(entity_s *self, FIXED px, FIXED py,
                                 int type, int dir);

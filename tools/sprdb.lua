@@ -341,7 +341,7 @@ local function process_sprdb(output_img, output_dat, output_h)
 
     for _, anim in ipairs(output_data) do
         tinsert(names, anim.name)
-        tinsert(gfx_data_buf, spack("<!4 I1 I1 I2", #anim.frames, anim.loops and 1 or 0, #frame_pool_buf))
+        tinsert(gfx_data_buf, spack("<!4 I1 I1 I2", #anim.frames, anim.loop and 1 or 0, #frame_pool_buf))
 
         for _, frame in ipairs(anim.frames) do
             local obji = #obj_pool_buf
