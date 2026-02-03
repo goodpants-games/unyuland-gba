@@ -3,6 +3,7 @@
 
 #include <tonc_types.h>
 #include "map_data.h"
+#include "game_sprite_ids.h"
 
 #define WORLD_SUBPX_SHIFT 4
 #define WORLD_SUBPX_SCALE 16
@@ -31,24 +32,6 @@
 #define PLAYER_DROPLET_TYPE_SIDE      0
 #define PLAYER_DROPLET_TYPE_SIDE_SLOW 1
 #define PLAYER_DROPLET_TYPE_UP        2
-
-typedef enum gfx_id
-{
-    GFXID_PLAYER_IDLE, GFXID_PLAYER_WALK, GFXID_PLAYER_SPIT,
-    GFXID_PLAYER_FROZEN, GFXID_PLAYER_GOOPED,
-
-    GFXID_BULLET, GFXID_PLAYER_BULLET, GFXID_ICE_BLOCK, GFXID_SPRING,
-    GFXID_SUPER_SPRING, GFXID_SIGN, GFXID_HINT_SIGN, GFXID_UNYUHOME,
-
-    GFXID_CRAWLER, GFXID_CRAWLER_DEAD,
-    GFXID_GUN_BLUX, GFXID_GUN_BLUX_SHOOT, GFXID_GUN_BLUX_DEAD,
-    GFXID_WATER_TANK_OFF, GFXID_WATER_TANK_ON,
-    GFXID_RED_FIRE_ORB, GFXID_BLUE_FIRE_ORB, 
-    GFXID_FRAGILE_WHITE, GFXID_FRAGILE_RED,
-    GFXID_ICE_PLATFORM,
-
-    GFXID_COUNT
-} gfx_id_e;
 
 typedef enum entity_msgid
 {
@@ -93,6 +76,7 @@ typedef struct entity {
         u8 graphic_id;
         u8 frame;
         u8 accum;
+        u8 play;
         
         s16 ox;
         s16 oy;
@@ -107,12 +91,17 @@ extern const u8 *game_room_collision;
 extern int game_room_width;
 extern int game_room_height;
 
+extern int game_cam_x;
+extern int game_cam_y;
+
 entity_s* entity_alloc(void);
 void entity_free(entity_s *entity);
 
 void game_init(void);
 void game_update(void);
 void game_load_room(const map_header_s *map);
+
+void game_render(int *last_obj_index);
 
 void entity_player_droplet_init(entity_s *self, FIXED px, FIXED py,
                                 int type, int dir);

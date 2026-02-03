@@ -1,13 +1,16 @@
 #include "game.h"
 
+#include <stdlib.h>
 #include <tonc_core.h>
 #include <tonc_math.h>
-#include <stdlib.h>
-
 #include <tonc_bios.h>
+#include <tonc_oam.h>
+#include <game_sprites_gfx.h>
 
 #include "datastruct.h"
 #include "log.h"
+#include "gfx.h"
+#include <game_sprites_bin.h>
 
 #define MAP_COL(x, y)                                                          \
     map_collision_get(game_room_collision, game_room_width, x, y)
@@ -26,15 +29,48 @@
 #define ENTITY_PAIR_CLEAR(pairs, pkey) \
     (pairs[(pkey) >> 3] &= ~(1 << ((pkey) & 0x7)))
 
-typedef struct entity_coldata {
+typedef struct gfx_frame
+{
+    u16 obj_pool_index;
+    u8 frame_len;
+    u8 obj_count;
+} gfx_frame_s;
+
+typedef struct gfx_sprite
+{
+    u8 frame_count;
+    u8 loop; // bool
+    u16 frame_pool_idx;
+} gfx_sprite_s;
+
+typedef struct gfx_obj {
+    u16 a0; // contains only config for the sprite shape
+    u16 a1; // contains only config for the sprite size
+    u16 a2; // contains only config for the character index
+    s8 ox;
+    s8 oy;
+} gfx_obj_s;
+
+typedef struct gfx_root_header {
+    uintptr_t  frame_pool;
+    uintptr_t  obj_pool;
+    
+    gfx_sprite_s sprite0;
+} gfx_root_header_s;
+
+typedef struct entity_coldata
+{
     entity_s *ent;
     FIXED inv_mass;
-} entity_coldata_s;
+}
+entity_coldata_s;
 
-typedef struct col_contact {
+typedef struct col_contact
+{
     FIXED nx, ny, pd;
     entity_coldata_s *ent_a, *ent_b;
-} col_contact_s;
+}
+col_contact_s;
 
 //                    entity broadphase: sweep and prune
 // - for the X and Y axes, store a sorted edge list containing the edges of each
@@ -103,6 +139,8 @@ entity_s game_entities[MAX_ENTITY_COUNT];
 const u8 *game_room_collision;
 int game_room_width;
 int game_room_height;
+int game_cam_x;
+int game_cam_y;
 
 static uint col_contact_count = 0;
 static col_contact_s col_contacts[MAX_CONTACT_COUNT];
@@ -597,6 +635,9 @@ static void update_physics(void)
 
 void game_init(void)
 {
+    game_cam_x = 0;
+    game_cam_y = 0;
+    
     for (int i = 0; i < MAX_ENTITY_COUNT; ++i)
     {
         game_entities[i].flags = 0;
@@ -614,4 +655,74 @@ void game_load_room(const map_header_s *map)
     game_room_collision = map_collision_data(map);
     game_room_width = (int) map->width;
     game_room_height = (int) map->height;
+}
+
+void game_render(int *p_last_obj_index)
+{
+    gfx_scroll_x = game_cam_x * 2;
+    gfx_scroll_y = game_cam_y * 2;
+
+    const gfx_root_header_s *gfx_root_header =
+        (const gfx_root_header_s *)game_sprites_bin;
+    
+    const gfx_sprite_s *gfx_sprites =
+        (const gfx_sprite_s *)&gfx_root_header->sprite0;
+    const gfx_frame_s *frame_pool =
+        (const gfx_frame_s *)((uintptr_t)gfx_root_header + gfx_root_header->frame_pool);
+    const gfx_obj_s *obj_pool =
+        (const gfx_obj_s *)((uintptr_t)gfx_root_header + gfx_root_header->obj_pool);
+
+    int obj_index = 0;
+    for (int i = 0; i < MAX_ENTITY_COUNT; ++i)
+    {
+        entity_s *ent = &game_entities[i];
+        if (!(ent->flags & ENTITY_FLAG_ENABLED)) continue;
+
+        int draw_x = (ent->pos.x >> FIX_SHIFT) + ent->sprite.ox;
+        int draw_y = (ent->pos.y >> FIX_SHIFT) + ent->sprite.oy;
+
+        int sprite_frame = ent->sprite.frame;
+        int sprite_time_accum = ent->sprite.accum;
+
+        const gfx_sprite_s *spr = &gfx_sprites[ent->sprite.graphic_id];
+        const gfx_frame_s *frame = frame_pool + spr->frame_pool_idx + sprite_frame;
+        const gfx_obj_s *objs = obj_pool + frame->obj_pool_index;
+
+        int frame_count = spr->frame_count;
+        int frame_len = frame->frame_len;
+        int frame_obj_count = frame->obj_count;
+
+        for (int j = 0; j < frame_obj_count; ++j)
+        {
+            const gfx_obj_s *obj_src = &objs[j];
+            OBJ_ATTR *obj_dst = &gfx_oam_buffer[obj_index];
+
+            obj_set_attr(obj_dst, obj_src->a0, obj_src->a1,
+                         obj_src->a2 | ATTR2_PALBANK(0));
+            obj_set_pos(obj_dst,
+                        (draw_x - game_cam_x) * 2 + obj_src->ox,
+                        (draw_y - game_cam_y) * 2 + obj_src->oy);
+            
+            if (++obj_index >= 64) goto exit_entity_loop;
+        }
+
+        if (++sprite_time_accum >= frame_len)
+        {
+            sprite_time_accum = 0;
+            sprite_frame = (sprite_frame + 1) % frame_count;
+        }
+
+        ent->sprite.frame = sprite_frame;
+        ent->sprite.accum = sprite_time_accum;
+    }
+
+    exit_entity_loop:;
+
+    int last_obj_index = *p_last_obj_index;
+    for (int i = obj_index; i < last_obj_index; ++i)
+    {
+        obj_hide(&gfx_oam_buffer[i]);
+    }
+
+    *p_last_obj_index = obj_index;
 }

@@ -8,7 +8,8 @@ endif
 
 include $(DEVKITARM)/gba_rules
 
-PYTHON := python
+PYTHON ?= python
+ASEPRITE ?= aseprite
 
 #---------------------------------------------------------------------------------
 # the LIBGBA path is defined in gba_rules, but we have to define LIBTONC ourselves
@@ -35,6 +36,11 @@ DATA		:= data/bin
 MUSIC		:=
 GRAPHICS	:= data/graphics
 MAPS        := data/maps
+
+GAME_SPRITES := player.ase crawler.ase fire_orb.ase fragile_block.ase \
+                gun_enemy.ase water_tank.ase bullet.png water_droplet.png \
+				ice_block.png sign.png hint_sign.png spring.png \
+				super_spring.png home.png
 
 #---------------------------------------------------------------------------------
 # options for code generation
@@ -130,7 +136,7 @@ export INCLUDE	:=	$(foreach dir,$(INCLUDES),-iquote $(CURDIR)/$(dir)) \
 
 export LIBPATHS	:=	$(foreach dir,$(LIBDIRS),-L$(dir)/lib)
 
-.PHONY: $(BUILD) clean
+.PHONY: $(BUILD) clean sprites
 
 #---------------------------------------------------------------------------------
 $(BUILD):
@@ -142,6 +148,15 @@ clean:
 	@echo clean ...
 	@rm -fr $(BUILD) $(TARGET).elf $(TARGET).gba
 
+#---------------------------------------------------------------------------------
+sprites:
+	$(ASEPRITE) --batch \
+                --script-param input="$(addprefix work/gfx/,$(GAME_SPRITES))" \
+                --script-param output_img="$(GRAPHICS)/game_sprites.png" \
+                --script-param output_dat="$(DATA)/game_sprites.bin" \
+                --script-param output_h="$(SOURCES)/game_sprite_ids.h" \
+                --script       tools/gfx_export.lua
+	echo "-gB 4 -p! -ab 72" > "$(GRAPHICS)/game_sprites.grit"
 
 #---------------------------------------------------------------------------------
 else
@@ -188,10 +203,14 @@ soundbank.bin soundbank.h : $(AUDIOFILES)
 	@grit $< -fts -o$*_gfx
 
 
+#---------------------------------------------------------------------------------
+# These rules convert Tiled level files to a more efficient format readable by
+# the game.
+#---------------------------------------------------------------------------------
 %.map.o %_map.h: %.map
+#---------------------------------------------------------------------------------
 	@echo $(notdir $<)
 	@$(bin2o)
-
 %.map: %.tmx
 	@$(PYTHON) ../tools/mapconv.py $< $@
 

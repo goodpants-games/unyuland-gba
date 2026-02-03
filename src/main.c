@@ -27,8 +27,6 @@ int main()
     game_init();
     game_load_room(map);
 
-    int cam_x = 0;
-    int cam_y = 0;
     int last_obj_index = 0;
 
     entity_s *player = entity_alloc();
@@ -41,34 +39,38 @@ int main()
     player->actor.move_accel = (FIXED)(FIX_SCALE / 8);
     player->actor.jump_velocity = (FIXED)(FIX_SCALE * 2.0);
     player->sprite.ox = -1;
+    player->sprite.oy = -8;
+    player->sprite.graphic_id = GFXID_PLAYER_WALK;
 
-    {
-        entity_s *e = entity_alloc();
-        e->flags |= ENTITY_FLAG_ENABLED | ENTITY_FLAG_COLLIDE | ENTITY_FLAG_MOVING;
-        e->pos.x = int2fx(32);
-        e->pos.y = int2fx(32);
-        e->col.w = 6;
-        e->col.h = 8;
-        e->actor.move_speed = (FIXED)(FIX_SCALE * 1);
-        e->actor.move_accel = (FIXED)(FIX_SCALE / 8);
-        e->actor.jump_velocity = (FIXED)(FIX_SCALE * 2.0);
-        e->sprite.ox = -1;
-        e->mass = 2;
-    }
+    // {
+    //     entity_s *e = entity_alloc();
+    //     e->flags |= ENTITY_FLAG_ENABLED | ENTITY_FLAG_COLLIDE | ENTITY_FLAG_MOVING;
+    //     e->pos.x = int2fx(32);
+    //     e->pos.y = int2fx(32);
+    //     e->col.w = 6;
+    //     e->col.h = 8;
+    //     e->actor.move_speed = (FIXED)(FIX_SCALE * 1);
+    //     e->actor.move_accel = (FIXED)(FIX_SCALE / 8);
+    //     e->actor.jump_velocity = (FIXED)(FIX_SCALE * 2.0);
+    //     e->sprite.ox = -1;
+    //     e->sprite.oy = -8;
+    //     e->mass = 2;
+    // }
 
-    {
-        entity_s *e = entity_alloc();
-        e->flags |= ENTITY_FLAG_ENABLED | ENTITY_FLAG_COLLIDE | ENTITY_FLAG_MOVING;
-        e->pos.x = int2fx(32);
-        e->pos.y = int2fx(64);
-        e->col.w = 6;
-        e->col.h = 8;
-        e->actor.move_speed = (FIXED)(FIX_SCALE * 1);
-        e->actor.move_accel = (FIXED)(FIX_SCALE / 8);
-        e->actor.jump_velocity = (FIXED)(FIX_SCALE * 2.0);
-        e->sprite.ox = -1;
-        e->mass = 4;
-    }
+    // {
+    //     entity_s *e = entity_alloc();
+    //     e->flags |= ENTITY_FLAG_ENABLED | ENTITY_FLAG_COLLIDE | ENTITY_FLAG_MOVING;
+    //     e->pos.x = int2fx(32);
+    //     e->pos.y = int2fx(64);
+    //     e->col.w = 6;
+    //     e->col.h = 8;
+    //     e->actor.move_speed = (FIXED)(FIX_SCALE * 1);
+    //     e->actor.move_accel = (FIXED)(FIX_SCALE / 8);
+    //     e->actor.jump_velocity = (FIXED)(FIX_SCALE * 2.0);
+    //     e->sprite.ox = -1;
+    //     e->sprite.oy = -8;
+    //     e->mass = 4;
+    // }
 
     while (true)
     {
@@ -114,42 +116,18 @@ int main()
 
         game_update();
 
-        cam_x = (player->pos.x >> FIX_SHIFT) - SCREEN_WIDTH / 4;
-        cam_y = (player->pos.y >> FIX_SHIFT) - SCREEN_HEIGHT / 4;
+        game_cam_x = (player->pos.x >> FIX_SHIFT) - SCREEN_WIDTH / 4;
+        game_cam_y = (player->pos.y >> FIX_SHIFT) - SCREEN_HEIGHT / 4;
 
         int x_max = gfx_map_width * 8 - SCREEN_WIDTH / 2;
         int y_max = gfx_map_height * 8 - SCREEN_HEIGHT / 2;
 
-        if (cam_x < 0)     cam_x = 0;
-        if (cam_y < 0)     cam_y = 0;
-        if (cam_x > x_max) cam_x = x_max;
-        if (cam_y > y_max) cam_y = y_max;
+        if (game_cam_x < 0)     game_cam_x = 0;
+        if (game_cam_y < 0)     game_cam_y = 0;
+        if (game_cam_x > x_max) game_cam_x = x_max;
+        if (game_cam_y > y_max) game_cam_y = y_max;
 
-        gfx_scroll_x = cam_x * 2;
-        gfx_scroll_y = cam_y * 2;
-
-        int obj_index = 0;
-        for (int i = 0; i < MAX_ENTITY_COUNT; ++i)
-        {
-            const entity_s *ent = &game_entities[i];
-            if (!(ent->flags & ENTITY_FLAG_ENABLED)) continue;
-
-            int draw_x = (ent->pos.x >> FIX_SHIFT) + ent->sprite.ox;
-            int draw_y = (ent->pos.y >> FIX_SHIFT) + ent->sprite.oy;
-
-            obj_set_attr(&gfx_oam_buffer[obj_index], ATTR0_SQUARE,
-                         ATTR1_SIZE_16, ATTR2_PALBANK(0));
-            obj_set_pos(&gfx_oam_buffer[obj_index], (draw_x - cam_x) * 2,
-                        (draw_y - cam_y) * 2);
-            if (++obj_index >= 64) break;
-        }
-
-        for (int i = obj_index + 1; i <= last_obj_index; ++i)
-        {
-            obj_hide(&gfx_oam_buffer[obj_index]);
-        }
-
-        last_obj_index = obj_index;
+        game_render(&last_obj_index);
 
         #ifdef MAIN_PROFILE
         uint frame_len = profile_stop();

@@ -28,7 +28,7 @@ void entity_player_droplet_init(entity_s *self, FIXED px, FIXED py, int type,
     self->gmult = PLAYER_SPIT_G_MULT;
     self->pos.x = px;
     self->pos.y = py;
-    self->sprite.graphic_id = GFXID_PLAYER_BULLET;
+    self->sprite.graphic_id = GFXID_HOME;
 
     if (type == PLAYER_DROPLET_TYPE_SIDE)
     {

@@ -51,8 +51,6 @@ output_sprite:setPalette(pico8_pal)
 
 local output = Image(OUTPUT_WIDTH, OUTPUT_HEIGHT, ColorMode.INDEXED)
 local out_idx = 0
-local output_x = 0
-local output_y = 0
 
 local output_data = {}
 
@@ -129,8 +127,8 @@ local function process_sprite(spr)
             idx = out_idx,
             sx = sc,
             sy = sr,
-            w = er - sr + 1,
-            h = ec - sc + 1
+            w = ec - sc + 1,
+            h = er - sr + 1
         }
 
         local sy = 0
@@ -143,17 +141,15 @@ local function process_sprite(spr)
                 local ox = math.min(0, col * 4 - bx)
                 local sw = math.min(bw, sx + 4 + ox) - sx
 
+                local output_x = (out_idx % 32) * 4
+                local output_y = (out_idx // 32) * 4
+
                 img_blit(output, src, output_x - ox, output_y - oy, sx, sy, sw,
                          sh)
                 
                 sx = sx + sw
 
                 out_idx = out_idx + 1
-                output_x = output_x + 4
-                if output_x >= OUTPUT_WIDTH then
-                    output_x = 0
-                    output_y = output_y + 4
-                end
             end
 
             sy = sy + sh
@@ -169,8 +165,8 @@ local function process_sprite(spr)
             w = fdat.w,
             h = fdat.h,
             len = math.floor(spr.frames[f].duration * 60.0 + 0.5),
-            ox = -fdat.sx * 8,
-            oy = -fdat.sy * 8
+            ox = fdat.sx * 8,
+            oy = fdat.sy * 8
         })
     end
 
@@ -209,7 +205,7 @@ end
 
 local function process_file(file_name)
     local s, err = pcall
-    local spr = app.open("work/gfx/" .. file_name)
+    local spr = app.open(file_name)
     if not spr then
         error("error opening " .. file_name)
     end
@@ -221,6 +217,7 @@ local function process_file(file_name)
     spr:close()
 end
 
+-- sorted greedily
 local SPRITE_SIZES = {
     {8, 8, ATTR0_SQUARE, ATTR1_SIZE_64},
     {8, 4, ATTR0_WIDE,   ATTR1_SIZE_64},
@@ -239,26 +236,60 @@ local SPRITE_SIZES = {
     {1, 1, ATTR0_SQUARE, ATTR1_SIZE_8 },
 }
 
-local function objdef(out, frame, x, y, w, h)
-    if w == 0 or h == 0 then return 0 end
-    
-    for _, size in ipairs(SPRITE_SIZES) do
-        local sw, sh, a0, a1 = size[1], size[2], size[3], size[4]
-        if sw <= w and sh <= h then
-            local ox = x * 8 + frame.ox
-            local oy = y * 8 + frame.oy
-            local data = string.pack("<!4 I2 I2 I2 i1 i1",
-                                     a0, a1, frame.idx & 0x1FF,
-                                     ox, oy)
-            table.insert(out, data)
+local function objdef(a0, a1, char, ox, oy)
+    return string.pack("<!4 I2 I2 I2 i1 i1", a0, a1, char & 0x1FF, ox, oy)
+end
 
-            return objdef(out, frame, x, y + sh, w, h - sh) +
-                   objdef(out, frame, x + sw, y, w - sw, h) +
-                   1
+local function create_objs(out, frame)
+    local w, h = frame.w, frame.h
+    local count = 0
+    local char_ofs = 0
+
+    for suby=0, h-1 do
+        for _, size in ipairs(SPRITE_SIZES) do
+            local sw, sh, a0, a1 = size[1], size[2], size[3], size[4]
+            if sw == w and sh == h - suby then
+                local ox = frame.ox
+                local oy = frame.oy + suby * 8
+                local data = objdef(a0, a1, frame.idx + char_ofs, ox, oy)
+                table.insert(out, data)
+                count = count + 1
+                goto done
+            end
+        end
+
+        local subx = 0
+        while subx < w do
+            local ox = frame.ox + subx * 8
+            local oy = frame.oy + suby * 8
+            local sw = w - subx
+
+            local a0, a1, size
+            if sw >= 4 then
+                a0 = ATTR0_WIDE
+                a1 = ATTR1_SIZE_16
+                size = 4
+            elseif sw >= 2 then
+                a0 = ATTR0_WIDE
+                a1 = ATTR1_SIZE_8
+                size = 2
+            else
+                a0 = ATTR0_SQUARE
+                a1 = ATTR1_SIZE_8
+                size = 1
+            end
+
+            local obj = objdef(a0, a1, frame.idx + char_ofs, ox, oy)
+            table.insert(out, obj)
+
+            count = count + 1
+            char_ofs = char_ofs + size
+            subx = subx + size
         end
     end
 
-    error(("objdef error %f %f"):format(w, h))
+    ::done::
+    return count
 end
 
 do
@@ -278,7 +309,7 @@ do
         error("expected 'output_h' parameter")
     end
 
-    for fn in string.gmatch(app.params.input, "([^:]+)") do
+    for fn in string.gmatch(app.params.input, "([^ ]+)") do
         table.insert(input_file_list, fn)
     end
 
@@ -315,7 +346,7 @@ do
 
         for _, frame in ipairs(anim.frames) do
             local obji = #obj_pool_buf
-            local objc = objdef(obj_pool_buf, frame, 0, 0, frame.w, frame.h)
+            local objc = create_objs(obj_pool_buf, frame)
 
             tinsert(frame_pool_buf,
                     spack("<!4 I2 I1 I1", obji, frame.len, objc))
@@ -335,7 +366,7 @@ do
     assert(sizeof_obj_pool % 4 == 0)
     
     local data = {}
-    tinsert(data, spack("<!4 I4 I4", 8 + sizeof_gfx_data, 8 + 8 + sizeof_gfx_data + sizeof_frame_pool))
+    tinsert(data, spack("<!4 I4 I4", 8 + sizeof_gfx_data, 8 + sizeof_gfx_data + sizeof_frame_pool))
     tinsert(data, gfx_data)
     tinsert(data, frame_pool)
     tinsert(data, obj_pool)
