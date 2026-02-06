@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "name": "(gdb) Launch",
+            "type": "cppdbg",
+            "request": "launch",
+            "targetArchitecture": "arm",
+            "program": "${workspaceFolder}/unyuland-gba.elf",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${fileDirname}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerServerAddress": "localhost:2345",
+            "miDebuggerPath": "C:/msys64/opt/devkitpro/devkitARM/bin/arm-none-eabi-gdb.exe",
+            "setupCommands": [
+                {
+                    "text": "shell start /b \"\" \"${env:ProgramFiles}/mGBA/mGBA.exe\" -g \"${workspaceFolder}/unyuland-gba.elf\""
+                }
+            ]
+        }
+    ]
+}

@@ -200,13 +200,17 @@ soundbank.bin soundbank.h : $(AUDIOFILES)
 # the game.
 #---------------------------------------------------------------------------------
 %.map.o %_map.h: %.map
-#---------------------------------------------------------------------------------
 	@echo $(notdir $<)
 	@$(bin2o)
 %.map: %.tmx
 	@$(PYTHON) ../tools/mapconv.py $< $@
 
+#---------------------------------------------------------------------------------
+# This rule compiles .sprdb files to a sprdb binary data and image file, using
+# Aseprite with the sprdb.lua script. The image file is then compiled with grit.
+#---------------------------------------------------------------------------------
 %_sprdb_data.o %_sprdb.h %_sprdb_data.h %_sprdb_gfx.h: %.sprdb
+#---------------------------------------------------------------------------------
 	@echo $(notdir $<)
 	
 	$(eval _tmpdir = $(shell mktemp -d))
