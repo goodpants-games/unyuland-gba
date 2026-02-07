@@ -44,7 +44,7 @@ static void behavior_player_update(entity_s *self)
         if (key_hit(KEY_B))
             self->actor.jump_trigger = 8;
 
-        if (key_hit(KEY_A))
+        if (key_hit(KEY_A) && self->actor.flags & ACTOR_FLAG_GROUNDED)
         {
             entity_s *droplet = entity_alloc();
             if (droplet)

@@ -197,15 +197,6 @@ static col_overlap_res_s rect_collision(FIXED x0, FIXED y0, FIXED w0, FIXED h0,
     return res;
 }
 
-// unordered pairing function of two unsigned integers
-static inline uint upair2u(uint a, uint b)
-{
-    uint x, y;
-    if (a < b) x = a, y = b;
-    else       x = b, y = a;
-    return ((x * x + x) >> 1) + y;
-}
-
 entity_s* entity_alloc(void)
 {
     for (int i = 0; i < MAX_ENTITY_COUNT; ++i)
