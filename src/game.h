@@ -8,10 +8,11 @@
 #define WORLD_SUBPX_SHIFT 4
 #define WORLD_SUBPX_SCALE 16
 
-#define ENTITY_FLAG_ENABLED  1
-#define ENTITY_FLAG_MOVING   2
-#define ENTITY_FLAG_ACTOR    4
-#define ENTITY_FLAG_COLLIDE  8
+#define ENTITY_FLAG_ENABLED              1
+#define ENTITY_FLAG_MOVING               2
+#define ENTITY_FLAG_ACTOR                4
+#define ENTITY_FLAG_COLLIDE              8
+#define ENTITY_FLAG_REMOVE_ON_CHECKPOINT 16
 
 #define ACTOR_FLAG_GROUNDED   1
 #define ACTOR_FLAG_WALL       2
@@ -20,6 +21,8 @@
 #define SPRITE_FLAG_PLAYING   1
 #define SPRITE_FLAG_FLIP_X    2
 #define SPRITE_FLAG_FLIP_Y    4
+
+#define COL_FLAG_FLOOR_ONLY 1
 
 #define COLGROUP_DEFAULT 1
 #define COLGROUP_ENTITY  2
@@ -61,6 +64,7 @@ typedef struct entity {
     u8 health;
 
     struct {
+        u16 flags;
         u8 w; u8 h; // in world pixels
         u16 group; u16 mask;
     } col;

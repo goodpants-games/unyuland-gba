@@ -11,7 +11,7 @@ struct gfx_data_root {
     gfx_obj   obj_pool_data[?];
 };
 
-struct gfx_data {
+struct gfx_sprite {
     u8 frame_count;
     u8 loop; // bool
     u16 frame_pool_idx;
@@ -19,6 +19,8 @@ struct gfx_data {
 
 struct gfx_frame {
     u16 obj_pool_index;
+    u8 width; // in tiles
+    u8 height; // in tiles
     u8 frame_len;
     u8 obj_count;
 };
@@ -29,6 +31,8 @@ struct gfx_obj {
     u16 a2; // contains only config for the character index
     s8 ox;
     s8 oy;
+    s8 flipped_ox;
+    s8 flipped_oy;
 };
 --]]
 
@@ -181,6 +185,8 @@ local function process_sprite(spr)
             local anim = {}
             anim.name = gfx_name
             anim.loop = tag.repeats == 0
+            anim.src_w = spr.width * 2
+            anim.src_h = spr.height * 2
             anim.frames = {}
 
             for f=tag.fromFrame.frameNumber, tag.toFrame.frameNumber do
@@ -193,6 +199,8 @@ local function process_sprite(spr)
         local anim = {}
         anim.name = prefix
         anim.loop = false
+        anim.src_w = spr.width * 2
+        anim.src_h = spr.height * 2
         anim.frames = {}
 
         for i=1, #spr.frames do
@@ -236,11 +244,12 @@ local SPRITE_SIZES = {
     {1, 1, ATTR0_SQUARE, ATTR1_SIZE_8 },
 }
 
-local function objdef(a0, a1, char, ox, oy)
-    return string.pack("<!4 I2 I2 I2 i1 i1", a0, a1, char & 0x1FF, ox, oy)
+local function objdef(a0, a1, char, ox, oy, fox, foy)
+    return string.pack("<!4 I2 I2 I2 i1 i1 i1 i1", a0, a1, char & 0x1FF, ox, oy,
+                       fox, foy)
 end
 
-local function create_objs(out, frame)
+local function create_objs(out, frame, src_w, src_h)
     local w, h = frame.w, frame.h
     local count = 0
     local char_ofs = 0
@@ -251,7 +260,12 @@ local function create_objs(out, frame)
             if sw == w and sh == h - suby then
                 local ox = frame.ox
                 local oy = frame.oy + suby * 8
-                local data = objdef(a0, a1, frame.idx + char_ofs, ox, oy)
+                local fox = src_w - sw * 8 - ox
+                local foy = src_h - sh * 8 - oy
+
+                local data = objdef(a0, a1, frame.idx + char_ofs,
+                                    ox, oy,
+                                    fox, foy)
                 table.insert(out, data)
                 count = count + 1
                 goto done
@@ -279,7 +293,11 @@ local function create_objs(out, frame)
                 size = 1
             end
 
-            local obj = objdef(a0, a1, frame.idx + char_ofs, ox, oy)
+            local fox = src_w - sw * 8 - ox
+            local foy = src_h - 8 - oy
+            local obj = objdef(a0, a1, frame.idx + char_ofs,
+                               ox,  oy,
+                               fox, foy)
             table.insert(out, obj)
 
             count = count + 1
@@ -345,10 +363,11 @@ local function process_sprdb(output_img, output_dat, output_h)
 
         for _, frame in ipairs(anim.frames) do
             local obji = #obj_pool_buf
-            local objc = create_objs(obj_pool_buf, frame)
+            local objc = create_objs(obj_pool_buf, frame, anim.src_w, anim.src_h)
 
             tinsert(frame_pool_buf,
-                    spack("<!4 I2 I1 I1", obji, frame.len, objc))
+                    spack("<!4 I2 I1 I1 I1 I1", obji, frame.w, frame.h,
+                          frame.len, objc))
         end
     end
 

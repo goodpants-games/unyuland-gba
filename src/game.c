@@ -6,14 +6,10 @@
 #include "datastruct.h"
 #include "log.h"
 #include "gfx.h"
+#include "math_util.h"
 
 #define MAP_COL(x, y)                                                          \
     map_collision_get(g_game.room_collision, g_game.room_width, x, y)
-
-// x always has to be greater than y
-#define UPAIR2U(x, y) ((((x) * (x) + (x)) >> 1) + (y))
-#define CEIL_DIV(x, width) (((x) + (width) - 1) / (width))
-#define IALIGN(x, width) (((x) + (width) - 1) / (width) * (width))
 
 #define ENTITY_PAIR_SIZE \
     IALIGN(CEIL_DIV(UPAIR2U(MAX_ENTITY_COUNT - 1, MAX_ENTITY_COUNT - 1), 8), 4)
@@ -27,6 +23,8 @@
 typedef struct gfx_frame
 {
     u16 obj_pool_index;
+    u8 width; // in tiles
+    u8 height; // in tiles
     u8 frame_len;
     u8 obj_count;
 } gfx_frame_s;
@@ -44,6 +42,8 @@ typedef struct gfx_obj {
     u16 a2; // contains only config for the character index
     s8 ox;
     s8 oy;
+    s8 flipped_ox;
+    s8 flipped_oy;
 } gfx_obj_s;
 
 typedef struct gfx_root_header {
@@ -362,6 +362,8 @@ static bool physics_substep(entity_coldata_s *col_ents, int col_ent_count,
             entity_coldata_s *const col_ent = col_ents + i;
             entity_s *entity = col_ent->ent;
 
+            if (!(entity->flags & ENTITY_FLAG_MOVING)) continue;
+
             const FIXED col_w = int2fx((int)entity->col.w);
             const FIXED col_h = int2fx((int)entity->col.h);
             // const uint col_group = (uint)entity->col.group;
@@ -386,23 +388,26 @@ static bool physics_substep(entity_coldata_s *col_ents, int col_ent_count,
                     rect_collision(entity->pos.x, entity->pos.y, col_w, col_h,
                                    ent2->pos.x, ent2->pos.y, c2_w, c2_h);
 
-                if (overlap_res.overlap)
-                {
-                    ENTITY_PAIR_SET(contact_pairs, pkey);
-                    // pqueue_enqueue(contact_queue,
-                    //                &contact_queue_size, MAX_CONTACT_COUNT,
-                    //                col_contacts + col_contact_count, pd);
+                if (!overlap_res.overlap) continue;
+                if (overlap_res.ny >= 0 && ent2->col.flags & COL_FLAG_FLOOR_ONLY)
+                    continue;
+                if (overlap_res.ny <= 0 && entity->col.flags & COL_FLAG_FLOOR_ONLY)
+                    continue;
 
-                    col_contacts[col_contact_count] = (col_contact_s)
-                    {
-                        .nx = overlap_res.nx,
-                        .ny = overlap_res.ny,
-                        .pd = overlap_res.pd,
-                        .ent_a = col_ent,
-                        .ent_b = entc2
-                    };
-                    ++col_contact_count;
-                }
+                ENTITY_PAIR_SET(contact_pairs, pkey);
+                // pqueue_enqueue(contact_queue,
+                //                &contact_queue_size, MAX_CONTACT_COUNT,
+                //                col_contacts + col_contact_count, pd);
+
+                col_contacts[col_contact_count] = (col_contact_s)
+                {
+                    .nx = overlap_res.nx,
+                    .ny = overlap_res.ny,
+                    .pd = overlap_res.pd,
+                    .ent_a = col_ent,
+                    .ent_b = entc2
+                };
+                ++col_contact_count;
             }
 
             // tile contacts
@@ -512,7 +517,7 @@ static bool physics_substep(entity_coldata_s *col_ents, int col_ent_count,
                     if (total_inv_mass == 0) continue;
                     FIXED inv_total_inv_mass = fxdiv(FIX_ONE, total_inv_mass);
 
-                    FIXED restitution = (FIXED)(FIX_ONE * (1 + 0.5));
+                    FIXED restitution = TO_FIXED(1.0 + 0.5);
                     FIXED move_x = fxmul(fxmul(nx, pd), inv_total_inv_mass);
                     FIXED move_y = fxmul(fxmul(ny, pd), inv_total_inv_mass);
                     FIXED impulse_fac = fxmul(fxmul(restitution, vdot), inv_total_inv_mass);
@@ -571,11 +576,6 @@ static bool physics_substep(entity_coldata_s *col_ents, int col_ent_count,
     }
 
     return no_movement;
-}
-
-INLINE int ceil_div(int a, int b)
-{
-    return (a + b - 1) / b;
 }
 
 static void update_physics(void)
@@ -687,6 +687,8 @@ void game_render(int *p_last_obj_index)
 
         int sprite_frame = ent->sprite.frame;
         int sprite_time_accum = ent->sprite.accum;
+        bool sprite_hflip = ent->sprite.flags & SPRITE_FLAG_FLIP_X;
+        bool sprite_vflip = ent->sprite.flags & SPRITE_FLAG_FLIP_Y;
 
         const gfx_sprite_s *spr = &gfx_sprites[ent->sprite.graphic_id];
         const gfx_frame_s *frame = frame_pool + spr->frame_pool_idx + sprite_frame;
@@ -702,10 +704,32 @@ void game_render(int *p_last_obj_index)
             const gfx_obj_s *obj_src = &objs[j];
             OBJ_ATTR *obj_dst = &gfx_oam_buffer[obj_index];
 
-            obj_set_attr(obj_dst, obj_src->a0, obj_src->a1,
+            int ox, oy;
+
+            int flip_flags = 0;
+            if (sprite_hflip)
+            {
+                flip_flags |= ATTR1_HFLIP;
+                ox = obj_src->flipped_ox;
+            }
+            else
+            {
+                ox = obj_src->ox;
+            }
+
+            if (sprite_vflip)
+            {
+                flip_flags |= ATTR1_VFLIP;
+                oy = obj_src->flipped_oy;
+            }
+            else
+            {
+                oy = obj_src->oy;
+            }
+
+            obj_set_attr(obj_dst, obj_src->a0, obj_src->a1 | (u16)flip_flags,
                          obj_src->a2 | ATTR2_PALBANK(0));
-            obj_set_pos(obj_dst, draw_cam_x + obj_src->ox,
-                        draw_cam_y + obj_src->oy);
+            obj_set_pos(obj_dst, draw_cam_x + ox, draw_cam_y + oy);
             
             if (++obj_index >= 64) goto exit_entity_loop;
         }
