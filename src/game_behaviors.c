@@ -50,7 +50,7 @@ static void behavior_player_update(entity_s *self)
             if (droplet)
             {
                 int type, dir;
-                FIXED x = self->pos.x + int2fx(4);
+                FIXED x = self->pos.x + int2fx(3);
                 FIXED y = self->pos.y + int2fx(4);
                 
                 if (key_is_down(KEY_UP))
@@ -140,6 +140,7 @@ void entity_player_droplet_init(entity_s *self, FIXED px, FIXED py, int type,
     self->pos.x = px - int2fx(4);
     self->pos.y = py - int2fx(4);
     self->sprite.graphic_id = SPRID_GAME_WATER_DROPLET;
+    self->sprite.zidx = -10;
 
     FIXED target_y = 0;
 
@@ -212,6 +213,7 @@ static void behavior_player_droplet_update(entity_s *self)
         platf->col.flags |= COL_FLAG_FLOOR_ONLY;
         platf->sprite.graphic_id = SPRID_GAME_ICE_PLATFORM;
         platf->sprite.ox = -1;
+        platf->sprite.zidx = -10;
 
         return;
     }

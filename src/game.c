@@ -135,6 +135,9 @@ game_s g_game;
 static uint col_contact_count = 0;
 static col_contact_s col_contacts[MAX_CONTACT_COUNT];
 
+static uint sprite_render_arr_size = 0;
+static entity_s *sprite_render_arr[MAX_ENTITY_COUNT];
+
 // static u8 x_overlap_pairs[ENTITY_PAIR_SIZE];
 // static u8 y_overlap_pairs[ENTITY_PAIR_SIZE];
 
@@ -218,6 +221,8 @@ entity_s* entity_alloc(void)
             .col.group = COLGROUP_DEFAULT,
             .col.mask = COLGROUP_ALL
         };
+
+        sprite_render_arr[sprite_render_arr_size++] = ent;
         return ent;
     }
 
@@ -228,6 +233,23 @@ entity_s* entity_alloc(void)
 void entity_free(entity_s *entity)
 {
     entity->flags = 0;
+
+    // remove from render list
+    for (int i = 0; i < sprite_render_arr_size; ++i)
+    {
+        if (sprite_render_arr[i] == entity)
+        {
+            int end = sprite_render_arr_size - 1;
+            for (int j = i; j < end; ++j)
+            {
+                sprite_render_arr[j] = sprite_render_arr[j+1];
+            }
+            --sprite_render_arr_size;
+            return;
+        }
+    }
+
+    LOG_ERR("entity_free: could not find entity in render list");
 }
 
 static void update_entities(void)
@@ -651,6 +673,20 @@ void game_load_room(const map_header_s *map)
 
 void game_render(int *p_last_obj_index)
 {
+    // sort render list by z index
+    for (int i = 1; i < sprite_render_arr_size; ++i)
+    {
+        for (int j = i; j > 0; --j)
+        {
+            if (sprite_render_arr[j]->sprite.zidx > sprite_render_arr[j-1]->sprite.zidx)
+            {
+                entity_s *temp = sprite_render_arr[j];
+                sprite_render_arr[j] = sprite_render_arr[j-1];
+                sprite_render_arr[j-1] = temp;
+            }
+        }
+    }
+
     gfx_scroll_x = g_game.cam_x * 2;
     gfx_scroll_y = g_game.cam_y * 2;
 
@@ -665,9 +701,9 @@ void game_render(int *p_last_obj_index)
         (const gfx_obj_s *)((uintptr_t)gfx_root_header + gfx_root_header->obj_pool);
 
     int obj_index = 0;
-    for (int i = 0; i < MAX_ENTITY_COUNT; ++i)
+    for (int i = 0; i < sprite_render_arr_size; ++i)
     {
-        entity_s *ent = &g_game.entities[i];
+        entity_s *ent = sprite_render_arr[i];
         if (!(ent->flags & ENTITY_FLAG_ENABLED)) continue;
 
         int draw_x = (ent->pos.x >> FIX_SHIFT) + ent->sprite.ox;

@@ -86,6 +86,7 @@ typedef struct entity {
         u8 frame;
         u8 accum;
         
+        s16 zidx;
         s16 ox;
         s16 oy;
     } sprite;
