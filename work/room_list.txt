@@ -1,0 +1,10 @@
+# this file defines the order of the room files. this is important because the
+# game references room by index, not name.
+# the first room listed will be the start room.
+b01
+b02
+b04
+d01
+room01
+room10
+room11

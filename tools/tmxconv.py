@@ -61,6 +61,7 @@ id_map: dict[int, int] = dict([
     (20, 21),
     (34, 22),
     (36, 23),
+    (36 | HFLIP_FLAG | VFLIP_FLAG, 23), # ???why did i do this
     (50, 24),
     (51, 25),
     (52, 26),

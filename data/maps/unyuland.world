@@ -1,0 +1,55 @@
+{
+    "maps": [
+        {
+            "fileName": "b01.tmx",
+            "height": 88,
+            "width": 360,
+            "x": 0,
+            "y": 0
+        },
+        {
+            "fileName": "b02.tmx",
+            "height": 88,
+            "width": 240,
+            "x": 360,
+            "y": 0
+        },
+        {
+            "fileName": "room10.tmx",
+            "height": 88,
+            "width": 360,
+            "x": 240,
+            "y": -88
+        },
+        {
+            "fileName": "room11.tmx",
+            "height": 176,
+            "width": 240,
+            "x": 0,
+            "y": -176
+        },
+        {
+            "fileName": "b04.tmx",
+            "height": 88,
+            "width": 360,
+            "x": 360,
+            "y": -176
+        },
+        {
+            "fileName": "d01.tmx",
+            "height": 440,
+            "width": 240,
+            "x": 480,
+            "y": -616
+        },
+        {
+            "fileName": "room01.tmx",
+            "height": 264,
+            "width": 360,
+            "x": 120,
+            "y": -616
+        }
+    ],
+    "onlyShowAdjacentMaps": false,
+    "type": "world"
+}
