@@ -13,6 +13,25 @@ static uint old_scroll_x = 0;
 static uint old_scroll_y = 0;
 static bool screen_dirty = false;
 
+u16 gfx_palette[16] = {
+    0x0000,
+    0x28a3,
+    0x288f,
+    0x2a00,
+    0x1955,
+    0x254b,
+    0x6318,
+    0x77df,
+    0x241f,
+    0x029f,
+    0x13bf,
+    0x1b80,
+    0x7ea5,
+    0x4dd0,
+    0x55df,
+    0x573f,
+};
+
 static void write_scr_block(const uint map_entry, u32 *const dest)
 {
     int gfx_id = map_entry & 0xFF;
@@ -48,41 +67,16 @@ void gfx_init(void)
 {
     oam_init(gfx_oam_buffer, 128);
 
-    pal_bg_mem[ 0] = 0x0000;
-    pal_bg_mem[ 1] = 0x28a3;
-    pal_bg_mem[ 2] = 0x288f;
-    pal_bg_mem[ 3] = 0x2a00;
-    pal_bg_mem[ 4] = 0x1955;
-    pal_bg_mem[ 5] = 0x254b;
-    pal_bg_mem[ 6] = 0x6318;
-    pal_bg_mem[ 7] = 0x77df;
-    pal_bg_mem[ 8] = 0x241f;
-    pal_bg_mem[ 9] = 0x029f;
-    pal_bg_mem[10] = 0x13bf;
-    pal_bg_mem[11] = 0x1b80;
-    pal_bg_mem[12] = 0x7ea5;
-    pal_bg_mem[13] = 0x4dd0;
-    pal_bg_mem[14] = 0x55df;
-    pal_bg_mem[15] = 0x573f;
+    for (int i = 0; i < 16; ++i)
+        pal_bg_mem[i] = gfx_palette[i];
+    pal_bg_mem[16] = gfx_palette[0];
 
-    pal_obj_mem[ 0] = 0x0000;
-    pal_obj_mem[ 1] = 0x28a3;
-    pal_obj_mem[ 2] = 0x288f;
-    pal_obj_mem[ 3] = 0x2a00;
-    pal_obj_mem[ 4] = 0x1955;
-    pal_obj_mem[ 5] = 0x254b;
-    pal_obj_mem[ 6] = 0x6318;
-    pal_obj_mem[ 7] = 0x77df;
-    pal_obj_mem[ 8] = 0x241f;
-    pal_obj_mem[ 9] = 0x029f;
-    pal_obj_mem[10] = 0x13bf;
-    pal_obj_mem[11] = 0x1b80;
-    pal_obj_mem[12] = 0x7ea5;
-    pal_obj_mem[13] = 0x4dd0;
-    pal_obj_mem[14] = 0x55df;
-    pal_obj_mem[15] = 0x573f;
+    // pal bank 0: default palette
+    // pal bank 1: dynamically changing rainbow palette (TODO)
+    for (int i = 0; i < 16; ++i)
+        pal_obj_bank[0][i] = gfx_palette[i];
 
-    REG_BG0CNT = BG_CBB(0) | BG_SBB(GFX_BG0_INDEX) | BG_4BPP | BG_REG_32x32;
+    REG_BG0CNT = BG_CBB(0) | BG_SBB(GFX_BG0_INDEX) | BG_8BPP | BG_REG_32x32;
     REG_BG0HOFS = 0;
     REG_BG0VOFS = 0;
     REG_DISPCNT = DCNT_OBJ_1D;

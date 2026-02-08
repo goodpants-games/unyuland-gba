@@ -16,6 +16,8 @@ extern uint gfx_map_width;
 extern uint gfx_map_height;
 extern const map_header_s *gfx_loaded_map;
 
+extern u16 gfx_palette[16];
+
 void gfx_init(void);
 void gfx_new_frame(void);
 void gfx_load_map(const map_header_s *map);
