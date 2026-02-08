@@ -8,9 +8,6 @@
 #include "gfx.h"
 #include "math_util.h"
 
-#define MAP_COL(x, y)                                                          \
-    map_collision_get(g_game.room_collision, g_game.room_width, x, y)
-
 #define ENTITY_PAIR_SIZE \
     IALIGN(CEIL_DIV(UPAIR2U(MAX_ENTITY_COUNT - 1, MAX_ENTITY_COUNT - 1), 8), 4)
 #define ENTITY_PAIR_GET(pairs, pkey) \
@@ -145,6 +142,21 @@ typedef struct col_overlap_res {
     bool overlap;
     FIXED nx, ny, pd;
 } col_overlap_res_s;
+
+static inline int map_col_get_bounded(int x, int y)
+{
+    if (x < 0)
+        x = 0;
+    else if (x >= g_game.room_width)
+        x = g_game.room_width - 1;
+
+    if (y < 0)
+        y = 0;
+    else if (y >= g_game.room_width)
+        y = g_game.room_height - 1;
+
+    return map_collision_get(g_game.room_collision, g_game.room_width, x, y);
+}
 
 static col_overlap_res_s rect_collision(FIXED x0, FIXED y0, FIXED w0, FIXED h0,
                                         FIXED x1, FIXED y1, FIXED w1, FIXED h1)
@@ -437,7 +449,7 @@ static bool physics_substep(entity_coldata_s *col_ents, int col_ent_count,
                 {
                     for (int x = min_x; x <= max_x; ++x)
                     {
-                        if (MAP_COL((uint) x, (uint)y) != 1) continue;
+                        if (map_col_get_bounded(x, y) != 1) continue;
                         
                         col_overlap_res_s overlap_res = 
                             rect_collision(entity->pos.x, entity->pos.y, col_w,
