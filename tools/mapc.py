@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# script to compile tiled maps to the binary format used in the game.
 import xml.etree.ElementTree as xml
 import base64
 import struct
@@ -125,7 +126,7 @@ def parse(input_file: TextIO, output_file: BinaryIO, tileset: Tileset):
         output_file.write(struct.pack('<H', out_int))
 
 def main():
-    parser = argparse.ArgumentParser(prog='tmx')
+    parser = argparse.ArgumentParser(prog='mapc')
     parser.add_argument('input', help='Input tmx file. Pass - to read from stdin.')
     parser.add_argument('output', help='Output bin file. Pass - to read from stdout.')
 

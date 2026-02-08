@@ -203,7 +203,7 @@ soundbank.bin soundbank.h : $(AUDIOFILES)
 	@echo $(notdir $<)
 	@$(bin2o)
 %.map: %.tmx
-	@$(PYTHON) ../tools/mapconv.py $< $@
+	@$(PYTHON) ../tools/mapc.py $< $@
 
 #---------------------------------------------------------------------------------
 # This rule compiles .sprdb files to a sprdb binary data and image file, using
