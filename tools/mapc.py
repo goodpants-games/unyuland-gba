@@ -107,15 +107,16 @@ def parse(input_file: TextIO, output_file: BinaryIO, tileset: Tileset):
     # write graphics data
     for i in range(0, map_width * map_height * 4, 4):
         tile_int = (data[i] | (data[i+1] << 8) |
-                    (data[i+2] << 16) | (data[i+3] << 24))        
-        
+                    (data[i+2] << 16) | (data[i+3] << 24))
+
+        if tile_int == 0:
+            output_file.write(struct.pack('<H', 0))
+            continue
+
         flip_h = (tile_int & FLIPPED_HORIZONTALLY_FLAG) != 0
         flip_v = (tile_int & FLIPPED_VERTICALLY_FLAG) != 0
         tid = tile_int & 0x0FFFFFFF
         assert tid <= 255
-
-        if tid > 0:
-            tid = tid - 1
         
         out_int = tid
         if flip_h:

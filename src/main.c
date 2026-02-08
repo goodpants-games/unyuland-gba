@@ -19,7 +19,7 @@ int main()
     irq_add(II_VBLANK, NULL);
 
     gfx_init();
-    memcpy32(&tile_mem[0][0], tileset_gfxTiles, tileset_gfxTilesLen / sizeof(u32));
+    memcpy32(&tile_mem[0][0] + 2, tileset_gfxTiles, tileset_gfxTilesLen / sizeof(u32));
     memcpy32(tile_mem_obj[0][0].data, game_sprdb_gfxTiles, game_sprdb_gfxTilesLen / sizeof(u32));
 
     const map_header_s *map = maps[0];

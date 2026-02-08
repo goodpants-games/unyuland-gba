@@ -77,7 +77,7 @@ id_map: dict[int, int] = dict([
     (68, 33),
     (82, 34),
     (83, -1),
-    (84, 45),
+    (84, 35),
     (98, 36),
     (99, 37),
     (100, 38),
@@ -178,7 +178,7 @@ def convert(ifile_path: str, ofile: TextIO):
         
         tid = tile_int & TILE_ID_MASK
         tflags = tile_int & TILE_FLAGS_MASK
-        
+
         new_tile_int = id_map[(tid - 1) | tflags]
         if new_tile_int == -1:
             omap_data.append(0)

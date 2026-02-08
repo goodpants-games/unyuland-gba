@@ -34,8 +34,16 @@ u16 gfx_palette[16] = {
 
 static void write_scr_block(const uint map_entry, u32 *const dest)
 {
+    if (map_entry == 0)
+    {
+        *dest = 0;
+        *(dest + 16) = 0;
+        return;
+    }
+
     int gfx_id = map_entry & 0xFF;
     int v = gfx_id % 16 * 2 + gfx_id / 16 * 64;
+    --v;
 
     u32 upper = ((v+1) << 16) | v;
     v += 32;
