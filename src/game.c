@@ -440,10 +440,27 @@ static bool physics_substep(entity_coldata_s *col_ents, int col_ent_count,
             // tile contacts
             if (col_mask & COLGROUP_DEFAULT)
             {
-                int min_x = (int)((uint)entity->pos.x / (WORLD_TILE_SIZE * FIX_SCALE));
-                int min_y = (int)((uint)entity->pos.y / (WORLD_TILE_SIZE * FIX_SCALE));
-                int max_x = (int)((uint)(entity->pos.x + col_w) / (WORLD_TILE_SIZE * FIX_SCALE));
-                int max_y = (int)((uint)(entity->pos.y + col_h) / (WORLD_TILE_SIZE * FIX_SCALE));
+                const int el = entity->pos.x;
+                const int et = entity->pos.y;
+                const int er = (entity->pos.x + col_w);
+                const int eb = (entity->pos.y + col_h);
+
+                int min_x = el / (WORLD_TILE_SIZE * FIX_SCALE);
+                int min_y = et / (WORLD_TILE_SIZE * FIX_SCALE);
+                int max_x = er / (WORLD_TILE_SIZE * FIX_SCALE);
+                int max_y = eb / (WORLD_TILE_SIZE * FIX_SCALE);
+                
+                // integer division rounds towards zero, but i want to round
+                // towards negative infinity (floor). this should fix it.
+                // micro-optimization notice: doing `a / b - (a < 0)` is faster,
+                // but it incurs a cost for both positive and negative values.
+                // most of the time, the value will be positive. therefore, it
+                // is generally faster to branch.
+                // (at least on -O2)
+                if (el < 0) --min_x;
+                if (et < 0) --min_y;
+                if (er < 0) --min_x;
+                if (eb < 0) --min_y;
 
                 bool tile_col_found = false;
                 FIXED final_nx = 0, final_ny = 0, final_pd = 0;
