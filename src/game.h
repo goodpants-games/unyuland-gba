@@ -17,6 +17,7 @@
 #define ACTOR_FLAG_GROUNDED   1
 #define ACTOR_FLAG_WALL       2
 #define ACTOR_FLAG_DID_JUMP   4
+#define ACTOR_FLAG_CAN_MOVE   8
 
 #define SPRITE_FLAG_PLAYING   1
 #define SPRITE_FLAG_FLIP_X    2

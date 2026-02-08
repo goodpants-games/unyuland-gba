@@ -8,8 +8,15 @@
 // player_behavior //
 /////////////////////
 
+typedef struct player_data
+{
+    bool spitting;
+} player_data_s;
+
 void entity_player_init(entity_s *self)
 {
+    player_data_s *data = (player_data_s *)self->userdata;
+
     self->flags |= ENTITY_FLAG_MOVING | ENTITY_FLAG_COLLIDE | ENTITY_FLAG_ACTOR;
     self->col.w = 6;
     self->col.h = 8;
@@ -20,31 +27,46 @@ void entity_player_init(entity_s *self)
     self->sprite.oy = -8;
     self->sprite.graphic_id = SPRID_GAME_PLAYER_IDLE;
     self->sprite.flags |= SPRITE_FLAG_PLAYING;
-
     self->behavior = &behavior_player;
+
+    *data = (player_data_s){0};
 }
 
 static void behavior_player_update(entity_s *self)
 {
+    player_data_s *data = (player_data_s *)self->userdata;
+
     // input
     self->actor.move_x = 0;
 
     if (g_game.input_enabled)
     {
-        int player_move_x = 0;
+        bool can_move = !data->spitting;
 
-        if (key_is_down(KEY_RIGHT))
-            ++player_move_x;
+        int actor_flags = (int) self->actor.flags;
+        actor_flags &= ~ACTOR_FLAG_CAN_MOVE;
+        if (can_move) actor_flags |= ACTOR_FLAG_CAN_MOVE;
 
-        if (key_is_down(KEY_LEFT))
-            --player_move_x;
+        self->actor.flags = actor_flags;
 
-        self->actor.move_x = (s8) player_move_x;
+        if (can_move)
+        {
+            int player_move_x = 0;
+
+            if (key_is_down(KEY_RIGHT))
+                ++player_move_x;
+
+            if (key_is_down(KEY_LEFT))
+                --player_move_x;
+
+            self->actor.move_x = (s8) player_move_x;
+        }
 
         if (key_hit(KEY_B))
             self->actor.jump_trigger = 8;
 
-        if (key_hit(KEY_A) && self->actor.flags & ACTOR_FLAG_GROUNDED)
+        if (key_hit(KEY_A) && self->actor.flags & ACTOR_FLAG_GROUNDED &&
+            can_move)
         {
             entity_s *droplet = entity_alloc();
             if (droplet)
@@ -67,6 +89,12 @@ static void behavior_player_update(entity_s *self)
                 }
 
                 entity_player_droplet_init(droplet, x, y, type, dir);
+                data->spitting = true;
+                self->sprite.graphic_id = SPRID_GAME_PLAYER_SPIT;
+                self->sprite.accum = 0;
+                self->sprite.frame = 0;
+                self->sprite.flags |= SPRITE_FLAG_PLAYING;
+                self->vel.x = 0;
             }
         }
     }
@@ -82,6 +110,14 @@ static void behavior_player_update(entity_s *self)
     }
 
     // animation
+    if (data->spitting)
+    {
+        if (self->sprite.flags & SPRITE_FLAG_PLAYING)
+            goto skip_animation;
+        else
+            data->spitting = false;
+    }
+
     int anim = SPRID_GAME_PLAYER_IDLE;    
     if (self->actor.flags & ACTOR_FLAG_GROUNDED)
     {
@@ -106,6 +142,8 @@ static void behavior_player_update(entity_s *self)
         self->sprite.frame = 0;
         self->sprite.flags |= SPRITE_FLAG_PLAYING;
     }
+
+    skip_animation:;
 }
 
 const behavior_def_s behavior_player = {

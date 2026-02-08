@@ -274,6 +274,7 @@ static void update_entities(void)
 
         if (entity->flags & ENTITY_FLAG_ACTOR)
         {
+            const int actor_flags = (int) entity->actor.flags;
             int move_x = (int) entity->actor.move_x;
 
             if (move_x != 0)
@@ -301,7 +302,8 @@ static void update_entities(void)
             uint jump_trigger = (uint) entity->actor.jump_trigger;
             if (jump_trigger > 0)
             {
-                if (entity->actor.flags & ACTOR_FLAG_GROUNDED)
+                if (actor_flags & ACTOR_FLAG_GROUNDED &&
+                    actor_flags & ACTOR_FLAG_CAN_MOVE)
                 {
                     entity->vel.y = -entity->actor.jump_velocity;
                     jump_trigger = 0;
