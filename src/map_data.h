@@ -5,13 +5,15 @@
 #include <tonc_types.h>
 #include <stddef.h>
 #include "mgba.h"
+#include "math_util.h"
 
 typedef struct map_header
 {
     u16 width;
     u16 height;
     u16 object_count;
-    u16 _pad0;
+    u8  px;
+    u8  py;
 } map_header_s;
 
 extern const map_header_s *const maps[8];
@@ -23,14 +25,13 @@ INLINE const u8* map_collision_data(const map_header_s *header)
 
 INLINE uint map_collision_data_size(const map_header_s *header)
 {
-    return ((uint)header->width * (uint)header->height + 4 - 1) / 4;
+    return CEIL_DIV((uint)header->width * (uint)header->height, 4);
 }
 
 INLINE const u16* map_graphics_data(const map_header_s *header)
 {
-    const u8 *data = (const u8 *)header;
-    uintptr_t ptr = ((uintptr_t) data + sizeof(map_header_s) + map_collision_data_size(header));
-    return (const u16 *)(uintptr_t)align(ptr, sizeof(uintptr_t));
+    uintptr_t ptr = ((uintptr_t)(header + 1) + map_collision_data_size(header));
+    return (const u16 *)(uintptr_t)align(ptr, 4);
 }
 
 INLINE int map_collision_get(const u8 *data, uint pitch, uint x, uint y)

@@ -34,6 +34,8 @@ int main()
     player->pos.x = int2fx(16);
     player->pos.y = int2fx(16);
 
+    LOG_DBG("room pos: %i %i", (int) map->px, (int) map->py);
+
     {
         entity_s *e = entity_alloc();
         e->flags |= ENTITY_FLAG_ENABLED | ENTITY_FLAG_COLLIDE | ENTITY_FLAG_MOVING;

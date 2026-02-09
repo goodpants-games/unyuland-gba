@@ -1,6 +1,5 @@
 #include "map_data.h"
 
-#include <very_small_room_map.h>
 #include <b01_map.h>
 #include <room01_map.h>
 

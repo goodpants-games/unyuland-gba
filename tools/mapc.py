@@ -5,7 +5,9 @@ import base64
 import struct
 import sys
 import argparse
+import os
 import os.path as path
+import json
 from typing import BinaryIO, TextIO
 
 FLIPPED_HORIZONTALLY_FLAG  = 0x80000000
@@ -39,8 +41,10 @@ def parse_tileset(tmx_path: str):
 
     return output
 
-def parse(input_file: TextIO, output_file: BinaryIO, tileset: Tileset):
-    file_contents = input_file.read()
+def parse(ifile_path: str, output_file: BinaryIO, tileset: Tileset,
+          world_data: dict):
+    with open(ifile_path, 'r') as ifile:
+        file_contents = ifile.read()
     
     data = xml.fromstring(file_contents)
     layer = data.find('layer')
@@ -59,7 +63,13 @@ def parse(input_file: TextIO, output_file: BinaryIO, tileset: Tileset):
     
     data = base64.b64decode(data_base64.text.strip())
 
-    output_file.write(struct.pack('<HHHxx', map_width, map_height, 0))
+    room_name = path.splitext(path.basename(ifile_path))[0]
+    if not room_name in world_data['rooms']:
+        raise Exception(f"could not find '{room_name}' in world.json")
+
+    room_data = world_data['rooms'][room_name]
+    output_file.write(struct.pack('<HHHBB', map_width, map_height, 0,
+                                  room_data['x'], room_data['y']))
 
     # write collision data
     bytes_written = 0
@@ -110,48 +120,61 @@ def parse(input_file: TextIO, output_file: BinaryIO, tileset: Tileset):
                     (data[i+2] << 16) | (data[i+3] << 24))
 
         if tile_int == 0:
-            output_file.write(struct.pack('<H', 0))
-            continue
+            out_int = 0
+        else:
+            flip_h = (tile_int & FLIPPED_HORIZONTALLY_FLAG) != 0
+            flip_v = (tile_int & FLIPPED_VERTICALLY_FLAG) != 0
+            tid = tile_int & 0x00FFFFFF
 
-        flip_h = (tile_int & FLIPPED_HORIZONTALLY_FLAG) != 0
-        flip_v = (tile_int & FLIPPED_VERTICALLY_FLAG) != 0
-        tid = tile_int & 0x0FFFFFFF
-        assert tid <= 255
-        
-        out_int = tid
-        if flip_h:
-            out_int = out_int | (1 << 8)
-        if flip_v:
-            out_int = out_int | (1 << 9)
+            if tid > 255:
+                print(data_base64.text.strip())
+                print(i // 4, tile_int)
+                print((i // 4) % (map_width), i // (4 * map_width))
+                tid = tile_int & 0x0FFFFFFF
+            
+            assert tid <= 255
+            
+            out_int = tid
+            if flip_h:
+                out_int = out_int | (1 << 8)
+            if flip_v:
+                out_int = out_int | (1 << 9)
         
         output_file.write(struct.pack('<H', out_int))
 
 def main():
     parser = argparse.ArgumentParser(prog='mapc')
-    parser.add_argument('input', help='Input tmx file. Pass - to read from stdin.')
-    parser.add_argument('output', help='Output bin file. Pass - to read from stdout.')
+    parser.add_argument('input', help="path to input tmx file.")
+    parser.add_argument('world', help="path to worldproc json output.")
+    parser.add_argument('output', help="output bin file. pass - to write to stdout.")
 
     args = parser.parse_args()
 
-    use_stdin = args.input == '-'
     use_stdout = args.output == '-'
-
-    if use_stdin:
-        in_file = sys.stdin.buffer
-    else:
-        in_file = open(args.input, 'r')
 
     if use_stdout:
         out_file = sys.stdout.buffer
     else:
         out_file = open(args.output, 'wb')
 
-    parse(in_file, out_file, parse_tileset(args.input))
+    with open(args.world, 'r') as wf:
+        world_data = json.load(wf)
 
-    if not use_stdin:
-        in_file.close()
+    s = False
+    try:
+        parse(args.input, out_file, parse_tileset(args.input), world_data)
+        s = True
+    finally:
+        if not s:
+            sys.stderr.write("error, deleting file "  + args.output)
+            sys.stderr.write("\n")
 
-    if not use_stdout:
+            if not use_stdout:
+                out_file.close()
+                os.remove(args.output)
+                out_file = None
+
+    if out_file and not use_stdout:
         out_file.close()
 
 if __name__ == '__main__': main()
