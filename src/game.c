@@ -152,7 +152,7 @@ static inline int map_col_get_bounded(int x, int y)
 
     if (y < 0)
         y = 0;
-    else if (y >= g_game.room_width)
+    else if (y >= g_game.room_height)
         y = g_game.room_height - 1;
 
     return map_collision_get(g_game.room_collision, g_game.room_width, x, y);
