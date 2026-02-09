@@ -6,6 +6,7 @@ import base64
 import sys
 import argparse
 import os.path as path
+import ioutil
 from typing import BinaryIO, TextIO
 
 HFLIP_FLAG = 0x80000000
@@ -211,19 +212,13 @@ def main():
 
     args = parser.parse_args()
 
-    use_stdout = args.output == '-'
-
     ifile_path = path.abspath(args.input)
-    if use_stdout:
-        out_file = sys.stdout.buffer
-    else:
-        out_file = open(args.output, 'wb')
+    out_file = ioutil.open_output(args.output, binary=True)
 
     try:
         convert(ifile_path, out_file)
     finally:
-        if not use_stdout:
-            out_file.close()
+        out_file.close()
 
 
 if __name__ == '__main__':

@@ -8,6 +8,7 @@ import argparse
 import os
 import os.path as path
 import json
+import ioutil
 from typing import BinaryIO, TextIO
 
 FLIPPED_HORIZONTALLY_FLAG  = 0x80000000
@@ -150,12 +151,7 @@ def main():
 
     args = parser.parse_args()
 
-    use_stdout = args.output == '-'
-
-    if use_stdout:
-        out_file = sys.stdout.buffer
-    else:
-        out_file = open(args.output, 'wb')
+    out_file = ioutil.open_output(args.output, binary=True)
 
     with open(args.world, 'r') as wf:
         world_data = json.load(wf)
@@ -169,12 +165,11 @@ def main():
             sys.stderr.write("error, deleting file "  + args.output)
             sys.stderr.write("\n")
 
-            if not use_stdout:
+            if not out_file.isatty():
                 out_file.close()
                 os.remove(args.output)
                 out_file = None
 
-    if out_file and not use_stdout:
-        out_file.close()
+    out_file.close()
 
 if __name__ == '__main__': main()
