@@ -16,8 +16,6 @@ typedef struct map_header
     u8  py;
 } map_header_s;
 
-extern const map_header_s *const maps[8];
-
 INLINE const u8* map_collision_data(const map_header_s *header)
 {
     return (const u8 *)(header + 1);

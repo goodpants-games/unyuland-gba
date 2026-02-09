@@ -3,7 +3,7 @@
 #include <tileset_gfx.h>
 #include <assert.h>
 
-#include "map_data.h"
+#include <world.h>
 #include "game.h"
 #include "gfx.h"
 #include "log.h"
@@ -22,7 +22,7 @@ int main()
     memcpy32(&tile_mem[0][0] + 2, tileset_gfxTiles, tileset_gfxTilesLen / sizeof(u32));
     memcpy32(tile_mem_obj[0][0].data, game_sprdb_gfxTiles, game_sprdb_gfxTilesLen / sizeof(u32));
 
-    const map_header_s *map = maps[0];
+    const map_header_s *map = world_rooms[3];
     gfx_load_map(map);
     game_init();
     game_load_room(map);
@@ -36,6 +36,7 @@ int main()
 
     LOG_DBG("room pos: %i %i", (int) map->px, (int) map->py);
 
+    if (false)
     {
         entity_s *e = entity_alloc();
         e->flags |= ENTITY_FLAG_ENABLED | ENTITY_FLAG_COLLIDE | ENTITY_FLAG_MOVING;
@@ -51,6 +52,7 @@ int main()
         e->mass = 2;
     }
 
+    if (false)
     {
         entity_s *e = entity_alloc();
         e->flags |= ENTITY_FLAG_ENABLED | ENTITY_FLAG_COLLIDE | ENTITY_FLAG_MOVING;
