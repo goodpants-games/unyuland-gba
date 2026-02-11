@@ -22,7 +22,7 @@ int main()
     memcpy32(&tile_mem[0][0] + 2, tileset_gfxTiles, tileset_gfxTilesLen / sizeof(u32));
     memcpy32(tile_mem_obj[0][0].data, game_sprdb_gfxTiles, game_sprdb_gfxTilesLen / sizeof(u32));
 
-    const map_header_s *map = world_rooms[3];
+    const map_header_s *map = world_rooms[0];
     gfx_load_map(map);
     game_init();
     game_load_room(map);
@@ -76,6 +76,7 @@ int main()
 
         key_poll();
         game_update();
+        game_transition_update(player);
 
         g_game.cam_x = (player->pos.x >> FIX_SHIFT) - SCREEN_WIDTH / 4;
         g_game.cam_y = (player->pos.y >> FIX_SHIFT) - SCREEN_HEIGHT / 4;

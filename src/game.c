@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <tonc.h>
 
+#include <world.h>
 #include "datastruct.h"
 #include "log.h"
 #include "gfx.h"
@@ -235,6 +236,12 @@ entity_s* entity_alloc(void)
 
 void entity_free(entity_s *entity)
 {
+    // given entity is already free, don't do anything
+    if (!(entity->flags & ENTITY_FLAG_ENABLED)) return;
+
+    if (entity->behavior && entity->behavior->free)
+        entity->behavior->free(entity);
+
     entity->flags = 0;
 
     // remove from render list
@@ -688,6 +695,7 @@ void game_update(void)
 
 void game_load_room(const map_header_s *map)
 {
+    g_game.map = map;
     g_game.room_collision = map_collision_data(map);
     g_game.room_width = (int) map->width;
     g_game.room_height = (int) map->height;
@@ -822,4 +830,132 @@ void game_render(int *p_last_obj_index)
     }
 
     *p_last_obj_index = obj_index;
+}
+
+static bool change_room(int matx, int maty, const map_header_s **new_room)
+{
+    uint new_room_idx = (uint) world_matrix[maty][matx];
+    if (new_room_idx == 0)
+    {
+        LOG_ERR("screen (%i, %i) is unassigned!!", matx, maty);
+        return false;
+    }
+    --new_room_idx;
+
+    *new_room = world_rooms[new_room_idx];
+    game_load_room(*new_room);
+    gfx_load_map(*new_room);
+
+    // remove all entities in the world, except ones with the
+    // keep-on-room-change flag (i.e. the player and the platform cursor)
+    for (int i = 0; i < MAX_ENTITY_COUNT; ++i)
+    {
+        entity_s *ent = &g_game.entities[i];
+
+        if (!(ent->flags & ENTITY_FLAG_ENABLED)) continue;
+        if (ent->flags & ENTITY_FLAG_KEEP_ON_ROOM_CHANGE) continue;
+
+        entity_free(ent);
+    }
+
+    return true;
+}
+
+void game_transition_update(entity_s *player)
+{
+    FIXED roomw = int2fx(g_game.room_width * WORLD_TILE_SIZE);
+    FIXED roomh = int2fx(g_game.room_height * WORLD_TILE_SIZE);
+    FIXED colw = int2fx((int) player->col.w);
+    FIXED colh = int2fx((int) player->col.h);
+    FIXED cx = player->pos.x + colw / 2;
+    FIXED cy = player->pos.y + colh / 2;
+
+    int matx, maty;
+    enum
+    {
+        DIR_RIGHT,
+        DIR_UP,
+        DIR_LEFT,
+        DIR_DOWN
+    } dir;
+
+    if (cx > roomw)
+    {
+        matx = (int) g_game.map->px +
+               g_game.map->width / WORLD_MATRIX_GRID_WIDTH;
+        maty = (int) g_game.map->py +
+               fx2int(cy) / (WORLD_MATRIX_GRID_HEIGHT * WORLD_TILE_SIZE);
+
+        dir = DIR_RIGHT;
+        cx = roomw;
+    }
+    else if (cx < 0)
+    {
+        matx = (int) g_game.map->px - 1;
+        maty = (int) g_game.map->py +
+               fx2int(cy) / (WORLD_MATRIX_GRID_HEIGHT * WORLD_TILE_SIZE);
+
+        dir = DIR_LEFT;
+        cx = 0;
+    }
+    else if (cy > roomh)
+    {
+        matx = (int) g_game.map->px +
+               fx2int(cx) / (WORLD_MATRIX_GRID_WIDTH * WORLD_TILE_SIZE);
+        maty = (int) g_game.map->py +
+               g_game.map->height / WORLD_MATRIX_GRID_HEIGHT;
+        
+        dir = DIR_DOWN;
+        cy = roomh;
+    }
+    else if (cy < 0)
+    {
+        matx = (int) g_game.map->px +
+               fx2int(cx) / (WORLD_MATRIX_GRID_WIDTH * WORLD_TILE_SIZE);
+        maty = (int) g_game.map->py - 1;
+        
+        dir = DIR_UP;
+        cy = 0;
+    }
+    else return;
+
+    const map_header_s *old_room = g_game.map;
+    const map_header_s *new_room;
+    if (!change_room(matx, maty, &new_room)) return;
+
+    switch (dir)
+    {
+    case DIR_RIGHT:
+        cx = 0;
+        cy += int2fx((old_room->py - new_room->py) * WORLD_MATRIX_GRID_HEIGHT * WORLD_TILE_SIZE);
+        player->vel.x = 0;
+        player->vel.y = 0;
+        break;
+
+    case DIR_LEFT:
+        cx = int2fx(new_room->width * WORLD_TILE_SIZE);
+        cy += int2fx((old_room->py - new_room->py) * WORLD_MATRIX_GRID_HEIGHT * WORLD_TILE_SIZE);
+        player->vel.x = 0;
+        player->vel.y = 0;
+        break;
+
+    case DIR_DOWN:
+        cx += int2fx((old_room->px - new_room->px) * WORLD_MATRIX_GRID_WIDTH * WORLD_TILE_SIZE);
+        cy = 0;
+        player->vel.x = 0;
+        player->vel.y = 0;
+        break;
+
+    case DIR_UP:
+        cx += int2fx((old_room->px - new_room->px) * WORLD_MATRIX_GRID_WIDTH * WORLD_TILE_SIZE);
+        cy = int2fx(new_room->height * WORLD_TILE_SIZE);
+        player->vel.x = 0;
+        player->vel.y = TO_FIXED(-2);
+        break;
+
+    default: LOG_ERR("unreachable switch statement wtf???");
+    }
+
+    player->pos.x = cx - colw / 2;
+    player->pos.y = cy - colh / 2;
 }

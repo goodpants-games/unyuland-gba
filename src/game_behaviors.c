@@ -17,7 +17,8 @@ void entity_player_init(entity_s *self)
 {
     player_data_s *data = (player_data_s *)self->userdata;
 
-    self->flags |= ENTITY_FLAG_MOVING | ENTITY_FLAG_COLLIDE | ENTITY_FLAG_ACTOR;
+    self->flags |= ENTITY_FLAG_MOVING | ENTITY_FLAG_COLLIDE | ENTITY_FLAG_ACTOR
+                   | ENTITY_FLAG_KEEP_ON_ROOM_CHANGE;
     self->col.w = 6;
     self->col.h = 8;
     self->actor.move_speed = TO_FIXED(1.0);

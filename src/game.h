@@ -13,6 +13,7 @@
 #define ENTITY_FLAG_ACTOR                4
 #define ENTITY_FLAG_COLLIDE              8
 #define ENTITY_FLAG_REMOVE_ON_CHECKPOINT 16
+#define ENTITY_FLAG_KEEP_ON_ROOM_CHANGE  32
 
 #define ACTOR_FLAG_GROUNDED   1
 #define ACTOR_FLAG_WALL       2
@@ -53,6 +54,7 @@ typedef struct behavior_def
 {
     void (*update)(struct entity *self);
     void (*message)(struct entity *self, entity_msgid_e msg, ...);
+    void (*free)(struct entity *self);
 } behavior_def_s;
 
 typedef struct entity {
@@ -98,6 +100,7 @@ typedef struct entity {
 
 typedef struct game {
     entity_s entities[MAX_ENTITY_COUNT];
+    const map_header_s *map;
     const u8 *room_collision;
     int room_width;
     int room_height;
@@ -116,7 +119,7 @@ void entity_free(entity_s *entity);
 void game_init(void);
 void game_update(void);
 void game_load_room(const map_header_s *map);
-
+void game_transition_update(entity_s *player);
 void game_render(int *last_obj_index);
 
 void entity_player_init(entity_s *self);
