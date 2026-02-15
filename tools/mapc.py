@@ -29,6 +29,9 @@ class Tileset:
         else:
             return None
 
+def align(x: int, width: int) -> int:
+    return (x + width - 1) // width * width
+
 def parse_tileset(tmx_path: str):
     tsx_path = path.join(path.dirname(tmx_path), 'tileset.tsx')
     with open(tsx_path, 'r') as file:
@@ -47,8 +50,8 @@ def parse(ifile_path: str, output_file: BinaryIO, tileset: Tileset,
     with open(ifile_path, 'r') as ifile:
         file_contents = ifile.read()
     
-    data = xml.fromstring(file_contents)
-    layer = data.find('layer')
+    tmx_data = xml.fromstring(file_contents)
+    layer = tmx_data.find('layer')
     if layer is None:
         raise Exception("map has no tile layer")
 
@@ -69,12 +72,12 @@ def parse(ifile_path: str, output_file: BinaryIO, tileset: Tileset,
         raise Exception(f"could not find '{room_name}' in world.json")
 
     room_data = world_data['rooms'][room_name]
-    output_file.write(struct.pack('<HHHBB', map_width, map_height, 0,
+    output_file.write(struct.pack('<HHBBxx', map_width, map_height,
                                   room_data['x'], room_data['y']))
 
     # write collision data
-    bytes_written = 0
     byte_accum: list[int] = []
+    col_data = bytearray()
     for i in range(0, map_width * map_height * 4, 4):
         tile_int = (data[i] | (data[i+1] << 8) |
                     (data[i+2] << 16) | (data[i+3] << 24))
@@ -98,24 +101,19 @@ def parse(ifile_path: str, output_file: BinaryIO, tileset: Tileset,
 
         if len(byte_accum) == 4:
             out_byte = byte_accum[0] | (byte_accum[1] << 2) | (byte_accum[2] << 4) | (byte_accum[3] << 6)
-            output_file.write(struct.pack('<B', out_byte))
+            col_data += struct.pack('<B', out_byte)
             byte_accum.clear()
-            bytes_written += 1
     
     if len(byte_accum) > 0:
         while len(byte_accum) < 4:
             byte_accum.append(0)
 
         out_byte = byte_accum[0] | (byte_accum[1] << 2) | (byte_accum[2] << 4) | (byte_accum[3] << 6)
-        output_file.write(struct.pack('<B', out_byte))
+        col_data += struct.pack('<B', out_byte)
         byte_accum.clear()
-        bytes_written += 1
-
-    while bytes_written % 4 != 0:
-        output_file.write(struct.pack('x'))
-        bytes_written += 1
     
     # write graphics data
+    gfx_data = bytearray()
     for i in range(0, map_width * map_height * 4, 4):
         tile_int = (data[i] | (data[i+1] << 8) |
                     (data[i+2] << 16) | (data[i+3] << 24))
@@ -141,7 +139,96 @@ def parse(ifile_path: str, output_file: BinaryIO, tileset: Tileset,
             if flip_v:
                 out_int = out_int | (1 << 9)
         
-        output_file.write(struct.pack('<H', out_int))
+        gfx_data += struct.pack('<H', out_int)
+    
+    obj_tmx = tmx_data.find('objectgroup')
+    ent_data = None
+    if obj_tmx is not None:
+        ent_data = bytearray()
+
+        # get list of entities
+        entities: list[xml.Element[str]] = []
+        for ent in obj_tmx.findall('object'):
+            if ent.get('type') == 'entity':
+                entities.append(ent)
+
+        # write entity count
+        ent_data += struct.pack('<H', len(entities))
+
+        # write entity data
+        for ent in entities:
+            ent_name = ent.get('name')
+            
+            odata = bytearray()
+            odata += struct.pack('<HHHH', int(ent.get('x')), int(ent.get('y')),
+                                int(ent.get('width')), int(ent.get('height')))
+            name_bytes = bytes(ent_name, 'ascii')
+            odata += name_bytes
+            odata.append(0)
+
+            prop_tag = ent.find('properties')
+            if prop_tag:
+                ent_props = prop_tag.findall('property')
+                odata += struct.pack('<B', len(ent_props))
+
+                for prop in ent_props:
+                    odata += bytes(prop.get('name'), 'ascii')
+                    odata.append(0)
+
+                    match prop.get('type', 'string'):
+                        case 'string':
+                            odata.append(0)
+                            odata += bytes(prop.get('value'), 'ascii')
+                            odata.append(0)
+
+                        case 'int':
+                            odata.append(1)
+                            odata += struct.pack('<I', int(prop.get('value')))
+
+                        case 'float':
+                            odata.append(2)
+                            fx_val = int(float(prop.get('value')) * 256)
+                            odata += struct.pack('<I', fx_val)
+
+                        case t:
+                            raise Exception("unknown property type " + t)
+            else:
+                odata += struct.pack('<B', 0)
+
+            ent_data += struct.pack('<H', len(odata))
+            ent_data += odata
+    
+    section_offset = 20
+    output_file.write(struct.pack('<I', section_offset)) # col offset
+    section_offset += align(len(col_data), 4)
+    output_file.write(struct.pack('<I', section_offset)) # gfx offset
+    section_offset += align(len(gfx_data), 4)
+
+    if ent_data:
+        output_file.write(struct.pack('<I', section_offset)) # ent offset
+    else:
+        output_file.write(bytes([0]))
+
+    bytes_written = 0
+
+    output_file.write(col_data)
+    bytes_written += len(col_data)
+    while bytes_written % 4 != 0:
+        output_file.write(bytes([0]))
+        bytes_written += 1
+
+    output_file.write(gfx_data)
+    bytes_written += len(gfx_data)
+    while bytes_written % 4 != 0:
+        output_file.write(bytes([0]))
+        bytes_written += 1
+
+    if ent_data:
+        output_file.write(ent_data)
+        bytes_written += len(ent_data)
+    # while bytes_written % 4 != 0:
+    #     output_file.write(0)
+    #     bytes_written += 1
 
 def main():
     parser = argparse.ArgumentParser(prog='mapc')

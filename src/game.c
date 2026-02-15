@@ -701,12 +701,78 @@ void game_update(void)
     update_physics();
 }
 
+#define READ8(ptr, accum) (accum = *((ptr)++), \
+                           accum)
+#define READ16(ptr, accum) (accum = *((ptr)++), \
+                           accum |= *((ptr)++) << 8, \
+                           accum)
+#define READ32(ptr, accum) (accum = *((ptr)++), \
+                           accum |= *((ptr)++) << 8, \
+                           accum |= *((ptr)++) << 16, \
+                           accum |= *((ptr)++) << 24, \
+                           accum)
+
 void game_load_room(const map_header_s *map)
 {
     g_game.map = map;
     g_game.room_collision = map_collision_data(map);
     g_game.room_width = (int) map->width;
     g_game.room_height = (int) map->height;
+
+    u32 accum;
+
+    const u8 *data_ptr = map_entity_data(map);
+    int ent_count = READ16(data_ptr, accum);
+
+    for (int i = 0; i < ent_count; ++i)
+    {
+        int chunk_size = READ16(data_ptr, accum);
+        const u8 *chunk_ptr = data_ptr;
+        data_ptr += chunk_size;
+
+        int ex = (s16) READ16(chunk_ptr, accum);
+        int ey = (s16) READ16(chunk_ptr, accum);
+        int ew = (s16) READ16(chunk_ptr, accum);
+        int eh = (s16) READ16(chunk_ptr, accum);
+        const char *name = (const char *)chunk_ptr;
+        while (*(chunk_ptr++) != 0);
+
+        int prop_count = READ8(chunk_ptr, accum);
+
+        for (int i = 0; i < prop_count; ++i)
+        {
+            const char *prop_name = (const char *)chunk_ptr;
+            while (*(chunk_ptr++) != 0);
+
+            switch (READ8(chunk_ptr, accum))
+            {
+            case 0: // string
+            {
+                const char *prop_data_str = (const char *)chunk_ptr;
+                while (*(chunk_ptr++) != 0);
+
+                LOG_DBG("%s = %s", prop_name, prop_data_str);
+                break;
+            }
+
+            case 1: // int
+            {
+                int prop_data_int = READ32(chunk_ptr, accum);
+                
+                LOG_DBG("%s = %i", prop_name, prop_data_int);
+                break;
+            }
+
+            case 2: // fixed-point
+            {
+                FIXED prop_data_fx = READ32(chunk_ptr, accum);
+
+                LOG_DBG("%s = %f", prop_name, fx2float(prop_data_fx));
+                break;
+            }
+            }
+        }
+    }
 }
 
 void game_render(int *p_last_obj_index)
@@ -842,9 +908,6 @@ void game_render(int *p_last_obj_index)
 
 static void change_room(const map_header_s *new_room)
 {
-    game_load_room(new_room);
-    gfx_load_map(new_room);
-
     // remove all entities in the world, except ones with the
     // keep-on-room-change flag (i.e. the player and the platform cursor)
     for (int i = 0; i < MAX_ENTITY_COUNT; ++i)
@@ -856,6 +919,9 @@ static void change_room(const map_header_s *new_room)
 
         entity_free(ent);
     }
+
+    game_load_room(new_room);
+    gfx_load_map(new_room);
 }
 
 static void room_transition_inactive_update(entity_s *player)
