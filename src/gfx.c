@@ -196,17 +196,18 @@ void gfx_load_map(const map_header_s *map)
 
 void gfx_reset_palette(void)
 {
-    // 0-16: regular palette + black, may be darkened for screen transition
-    // 17-33: regular palette + black, will not be darkened during screen trans
+    // 0-15: regular palette, may be darkened for room transition
+    // 16: black (if on 16-bit color mode, this will be the start of the 2nd bank)
+    // 17-32: regular palette + black, will not be darkened during room trans
     for (int i = 0; i < 16; ++i)
         pal_bg_mem[i] = gfx_palette[i];
     pal_bg_mem[16] = gfx_palette[0];
 
-    for (int i = 0; i < 16; ++i)
-        pal_bg_mem[17 + i] = gfx_palette[i];
-    pal_bg_mem[33] = gfx_palette[0];
+    for (int i = 1; i < 16; ++i)
+        pal_bg_mem[16 + i] = gfx_palette[i];
+    pal_bg_mem[32] = gfx_palette[0];
 
-    // pal bank 0: regular palette, may be darkened for screen transition
+    // pal bank 0: regular palette, may be darkened for room transition
     // pal bank 1: dynamically changing rainbow palette (TODO)
     for (int i = 0; i < 16; ++i)
         pal_obj_bank[0][i] = gfx_palette[i];
@@ -221,7 +222,7 @@ void gfx_set_palette_multiplied(FIXED factor)
     LOG_DBG("%i", factor);
     // const FIXED scale_factor = TO_FIXED(256.0 / 31.0) + 1;
 
-    for (int i = 0; i < 16; ++i)
+    for (int i = 1; i < 16; ++i)
     {
         int color = gfx_palette[i];
         FIXED r = (2 * FIX_ONE) * (color & 0x1F);
@@ -258,7 +259,6 @@ void gfx_set_palette_multiplied(FIXED factor)
 
     for (int i = 1; i < 16; ++i)
         pal_bg_mem[i] = new_palette[i];
-    pal_bg_mem[16] = new_palette[0];
 
     for (int i = 1; i < 16; ++i)
         pal_obj_bank[0][i] = new_palette[i];
