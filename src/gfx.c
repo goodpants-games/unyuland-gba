@@ -1,6 +1,7 @@
 #include <tonc.h>
 #include "gfx.h"
 #include "mgba.h"
+#include "log.h"
 
 OBJ_ATTR gfx_oam_buffer[128];
 int gfx_scroll_x = 0;
@@ -70,19 +71,10 @@ static void write_scr_block(const uint map_entry, u32 *const dest)
     *(dest + 16) = lower;;
 }
 
-
 void gfx_init(void)
 {
     oam_init(gfx_oam_buffer, 128);
-
-    for (int i = 0; i < 16; ++i)
-        pal_bg_mem[i] = gfx_palette[i];
-    pal_bg_mem[16] = gfx_palette[0];
-
-    // pal bank 0: default palette
-    // pal bank 1: dynamically changing rainbow palette (TODO)
-    for (int i = 0; i < 16; ++i)
-        pal_obj_bank[0][i] = gfx_palette[i];
+    gfx_reset_palette();
 
     REG_BG0CNT = BG_CBB(0) | BG_SBB(GFX_BG0_INDEX) | BG_8BPP | BG_REG_32x32;
     REG_BG0HOFS = 0;
@@ -200,4 +192,74 @@ void gfx_load_map(const map_header_s *map)
     gfx_map_width = gfx_loaded_map->width;
     gfx_map_height = gfx_loaded_map->height;
     screen_dirty = true;
+}
+
+void gfx_reset_palette(void)
+{
+    // 0-16: regular palette + black, may be darkened for screen transition
+    // 17-33: regular palette + black, will not be darkened during screen trans
+    for (int i = 0; i < 16; ++i)
+        pal_bg_mem[i] = gfx_palette[i];
+    pal_bg_mem[16] = gfx_palette[0];
+
+    for (int i = 0; i < 16; ++i)
+        pal_bg_mem[17 + i] = gfx_palette[i];
+    pal_bg_mem[33] = gfx_palette[0];
+
+    // pal bank 0: regular palette, may be darkened for screen transition
+    // pal bank 1: dynamically changing rainbow palette (TODO)
+    for (int i = 0; i < 16; ++i)
+        pal_obj_bank[0][i] = gfx_palette[i];
+}
+
+void gfx_set_palette_multiplied(FIXED factor)
+{
+    if      (factor < 0)       factor = 0;
+    else if (factor > FIX_ONE) factor = FIX_ONE;
+
+    u16 new_palette[16];
+    LOG_DBG("%i", factor);
+    // const FIXED scale_factor = TO_FIXED(256.0 / 31.0) + 1;
+
+    for (int i = 0; i < 16; ++i)
+    {
+        int color = gfx_palette[i];
+        FIXED r = (2 * FIX_ONE) * (color & 0x1F);
+        FIXED g = (2 * FIX_ONE) * ((color >> 5) & 0x1F);
+        FIXED b = (2 * FIX_ONE) * ((color >> 10) & 0x1F);
+        r = fxmul(r, factor);
+        g = fxmul(g, factor);
+        b = fxmul(b, factor);
+
+        FIXED min_dist_sq = INT32_MAX;
+        int color_index = 0;
+
+        for (int j = 0; j < 16; ++j)
+        {
+            int ocolor = gfx_palette[j];
+            FIXED or = (2 * FIX_ONE) * (ocolor & 0x1F);
+            FIXED og = (2 * FIX_ONE) * ((ocolor >> 5) & 0x1F);
+            FIXED ob = (2 * FIX_ONE) * ((ocolor >> 10) & 0x1F);
+
+            FIXED dr = or - r;
+            FIXED dg = og - g;
+            FIXED db = ob - b;
+
+            FIXED dist_sq = fxmul(dr, dr) + fxmul(dg, dg) + fxmul(db, db);
+            if (dist_sq < min_dist_sq)
+            {
+                color_index = j;
+                min_dist_sq = dist_sq;
+            }
+        }
+
+        new_palette[i] = gfx_palette[color_index];
+    }
+
+    for (int i = 1; i < 16; ++i)
+        pal_bg_mem[i] = new_palette[i];
+    pal_bg_mem[16] = new_palette[0];
+
+    for (int i = 1; i < 16; ++i)
+        pal_obj_bank[0][i] = new_palette[i];
 }

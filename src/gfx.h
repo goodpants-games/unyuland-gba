@@ -21,12 +21,14 @@ extern u16 gfx_palette[16];
 void gfx_init(void);
 void gfx_new_frame(void);
 void gfx_load_map(const map_header_s *map);
-
 INLINE void gfx_unload_map(void)
 {
     gfx_loaded_map = NULL;
     gfx_map_width = 0;
     gfx_map_height = 0;
 }
+
+void gfx_reset_palette(void);
+void gfx_set_palette_multiplied(FIXED factor);
 
 #endif

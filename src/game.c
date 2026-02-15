@@ -943,6 +943,8 @@ static void room_transition_phase1_update(entity_s *player)
     if (g_game.room_trans.dir == DIR4_UP)
         player->vel.y = TO_FIXED(-1);
 
+    FIXED fac = g_game.room_trans.ticks * (FIX_ONE / 20);
+    gfx_set_palette_multiplied(FIX_ONE - fac);
     if (++g_game.room_trans.ticks < 30) return;
 
     const map_header_s *old_room = g_game.map;
@@ -1005,13 +1007,19 @@ static void room_transition_phase1_update(entity_s *player)
 
 static void room_transition_phase2_update(entity_s *player)
 {
+    FIXED fac = g_game.room_trans.ticks * (FIX_ONE / 20);
+    gfx_set_palette_multiplied(fac);
+
     ++g_game.room_trans.ticks;
 
     if (g_game.room_trans.ticks == 15)
         g_game.room_trans.override_player_move_x = false;
 
     if (g_game.room_trans.ticks == 30)
+    {
         g_game.room_trans.phase = 0;
+        gfx_reset_palette();
+    }
 }
 
 void game_transition_update(entity_s *player)
