@@ -590,6 +590,12 @@ static bool physics_substep(entity_coldata_s *col_ents, int col_ent_count,
                         ent_a->actor.flags |= ACTOR_FLAG_GROUNDED;
                     else if (ny > 0)
                         ent_b->actor.flags |= ACTOR_FLAG_GROUNDED;
+
+                    if (nx != 0)
+                    {
+                        ent_a->actor.flags |= ACTOR_FLAG_WALL;
+                        ent_b->actor.flags |= ACTOR_FLAG_WALL;
+                    }
                 }
                 else
                 {   
@@ -603,6 +609,9 @@ static bool physics_substep(entity_coldata_s *col_ents, int col_ent_count,
 
                     if (ny < 0)
                         ent_a->actor.flags |= ACTOR_FLAG_GROUNDED;
+
+                    if (nx != 0)
+                        ent_a->actor.flags |= ACTOR_FLAG_WALL;
                 }
             }
         }
