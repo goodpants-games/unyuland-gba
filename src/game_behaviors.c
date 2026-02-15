@@ -40,7 +40,7 @@ static void behavior_player_update(entity_s *self)
     // input
     self->actor.move_x = 0;
 
-    if (g_game.input_enabled)
+    if (g_game.input_enabled && !g_game.room_trans.override_player_move_x)
     {
         bool can_move = !data->spitting;
 
@@ -99,6 +99,9 @@ static void behavior_player_update(entity_s *self)
             }
         }
     }
+
+    if (g_game.room_trans.override_player_move_x)
+        self->actor.move_x = g_game.room_trans.player_move_x;
 
     if (self->actor.move_x != 0)
     {

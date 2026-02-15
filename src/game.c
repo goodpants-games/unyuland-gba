@@ -18,6 +18,8 @@
 #define ENTITY_PAIR_CLEAR(pairs, pkey) \
     (pairs[(pkey) >> 3] &= ~(1 << ((pkey) & 0x7)))
 
+#define GRAVITY TO_FIXED(0.1)
+
 typedef struct gfx_frame
 {
     u16 obj_pool_index;
@@ -122,11 +124,13 @@ col_contact_s;
 //       remove entries referencing self in the old partition cells
 //       add entries in new intersecting cells
 
-typedef struct col_bp_edge {
+typedef struct col_bp_edge
+{
     u16 eid;
     bool right;
     int pos;
-} col_bp_edge_s;
+}
+col_bp_edge_s;
 
 game_s g_game;
 
@@ -264,7 +268,6 @@ void entity_free(entity_s *entity)
 
 static void update_entities(void)
 {
-    const FIXED gravity = float2fx(0.1f);
     const FIXED terminal_vel = int2fx(5);
 
     col_contact_count = 0;
@@ -326,7 +329,7 @@ static void update_entities(void)
 
         if (entity->flags & ENTITY_FLAG_MOVING)
         {
-            FIXED g = fxmul(gravity, entity->gmult);
+            FIXED g = fxmul(GRAVITY, entity->gmult);
             entity->vel.y += g;
 
             if (entity->vel.y > terminal_vel)
@@ -685,6 +688,11 @@ void game_init(void)
     {
         g_game.entities[i].flags = 0;
     }
+
+    g_game.room_trans = (room_trans_state_s)
+    {
+        .phase = 0
+    };
 }
 
 void game_update(void)
@@ -832,19 +840,10 @@ void game_render(int *p_last_obj_index)
     *p_last_obj_index = obj_index;
 }
 
-static bool change_room(int matx, int maty, const map_header_s **new_room)
+static void change_room(const map_header_s *new_room)
 {
-    uint new_room_idx = (uint) world_matrix[maty][matx];
-    if (new_room_idx == 0)
-    {
-        LOG_ERR("screen (%i, %i) is unassigned!!", matx, maty);
-        return false;
-    }
-    --new_room_idx;
-
-    *new_room = world_rooms[new_room_idx];
-    game_load_room(*new_room);
-    gfx_load_map(*new_room);
+    game_load_room(new_room);
+    gfx_load_map(new_room);
 
     // remove all entities in the world, except ones with the
     // keep-on-room-change flag (i.e. the player and the platform cursor)
@@ -857,11 +856,9 @@ static bool change_room(int matx, int maty, const map_header_s **new_room)
 
         entity_free(ent);
     }
-
-    return true;
 }
 
-void game_transition_update(entity_s *player)
+static void room_transition_inactive_update(entity_s *player)
 {
     FIXED roomw = int2fx(g_game.room_width * WORLD_TILE_SIZE);
     FIXED roomh = int2fx(g_game.room_height * WORLD_TILE_SIZE);
@@ -871,13 +868,8 @@ void game_transition_update(entity_s *player)
     FIXED cy = player->pos.y + colh / 2;
 
     int matx, maty;
-    enum
-    {
-        DIR_RIGHT,
-        DIR_UP,
-        DIR_LEFT,
-        DIR_DOWN
-    } dir;
+    dir4_e dir;
+    int player_mx = 0;
 
     if (cx > roomw)
     {
@@ -886,7 +878,8 @@ void game_transition_update(entity_s *player)
         maty = (int) g_game.map->py +
                fx2int(cy) / (WORLD_MATRIX_GRID_HEIGHT * WORLD_TILE_SIZE);
 
-        dir = DIR_RIGHT;
+        dir = DIR4_RIGHT;
+        player_mx = 1;
         cx = roomw;
     }
     else if (cx < 0)
@@ -895,7 +888,8 @@ void game_transition_update(entity_s *player)
         maty = (int) g_game.map->py +
                fx2int(cy) / (WORLD_MATRIX_GRID_HEIGHT * WORLD_TILE_SIZE);
 
-        dir = DIR_LEFT;
+        dir = DIR4_LEFT;
+        player_mx = -1;
         cx = 0;
     }
     else if (cy > roomh)
@@ -905,7 +899,8 @@ void game_transition_update(entity_s *player)
         maty = (int) g_game.map->py +
                g_game.map->height / WORLD_MATRIX_GRID_HEIGHT;
         
-        dir = DIR_DOWN;
+        dir = DIR4_DOWN;
+        player_mx = 0;
         cy = roomh;
     }
     else if (cy < 0)
@@ -914,43 +909,83 @@ void game_transition_update(entity_s *player)
                fx2int(cx) / (WORLD_MATRIX_GRID_WIDTH * WORLD_TILE_SIZE);
         maty = (int) g_game.map->py - 1;
         
-        dir = DIR_UP;
+        dir = DIR4_UP;
+        player_mx = 0;
         cy = 0;
     }
     else return;
 
-    const map_header_s *old_room = g_game.map;
     const map_header_s *new_room;
-    if (!change_room(matx, maty, &new_room)) return;
 
-    switch (dir)
+    uint new_room_idx = (uint) world_matrix[maty][matx];
+    if (new_room_idx == 0)
     {
-    case DIR_RIGHT:
+        LOG_ERR("screen (%i, %i) is unassigned!!", matx, maty);
+        return;
+    }
+    --new_room_idx;
+
+    new_room = world_rooms[new_room_idx];
+
+    g_game.room_trans = (room_trans_state_s)
+    {
+        .phase = 1,
+        .ticks = 0,
+        .dir = dir,
+        .new_room = new_room,
+        .override_player_move_x = true,
+        .player_move_x = player_mx
+    };
+}
+
+static void room_transition_phase1_update(entity_s *player)
+{
+    if (g_game.room_trans.dir == DIR4_UP)
+        player->vel.y = TO_FIXED(-1);
+
+    if (++g_game.room_trans.ticks < 30) return;
+
+    const map_header_s *old_room = g_game.map;
+    const map_header_s *new_room = g_game.room_trans.new_room;
+    change_room(new_room);
+
+    FIXED colw = int2fx((int) player->col.w);
+    FIXED colh = int2fx((int) player->col.h);
+    FIXED cx = player->pos.x + colw / 2;
+    FIXED cy = player->pos.y + colh / 2;
+
+    int player_mx = 0;
+
+    switch (g_game.room_trans.dir)
+    {
+    case DIR4_RIGHT:
         cx = 0;
         cy += int2fx((old_room->py - new_room->py) * WORLD_MATRIX_GRID_HEIGHT * WORLD_TILE_SIZE);
-        player->vel.x = 0;
         player->vel.y = 0;
+        player_mx = 1;
         break;
 
-    case DIR_LEFT:
+    case DIR4_LEFT:
         cx = int2fx(new_room->width * WORLD_TILE_SIZE);
         cy += int2fx((old_room->py - new_room->py) * WORLD_MATRIX_GRID_HEIGHT * WORLD_TILE_SIZE);
-        player->vel.x = 0;
         player->vel.y = 0;
+        player_mx = -1;
         break;
 
-    case DIR_DOWN:
+    case DIR4_DOWN:
         cx += int2fx((old_room->px - new_room->px) * WORLD_MATRIX_GRID_WIDTH * WORLD_TILE_SIZE);
         cy = 0;
         player->vel.x = 0;
-        player->vel.y = 0;
+        player->vel.y = TO_FIXED(1);
+        player_mx = 0;
         break;
 
-    case DIR_UP:
+    case DIR4_UP:
         cx += int2fx((old_room->px - new_room->px) * WORLD_MATRIX_GRID_WIDTH * WORLD_TILE_SIZE);
         cy = int2fx(new_room->height * WORLD_TILE_SIZE);
         player->vel.x = 0;
         player->vel.y = TO_FIXED(-2);
+        player_mx = player->actor.face_dir;
         break;
 
     default: LOG_ERR("unreachable switch statement wtf???");
@@ -958,4 +993,41 @@ void game_transition_update(entity_s *player)
 
     player->pos.x = cx - colw / 2;
     player->pos.y = cy - colh / 2;
+
+    g_game.room_trans = (room_trans_state_s)
+    {
+        .phase = 2,
+        .ticks = 0,
+        .player_move_x = player_mx,
+        .override_player_move_x = true,
+    };
+}
+
+static void room_transition_phase2_update(entity_s *player)
+{
+    ++g_game.room_trans.ticks;
+
+    if (g_game.room_trans.ticks == 15)
+        g_game.room_trans.override_player_move_x = false;
+
+    if (g_game.room_trans.ticks == 30)
+        g_game.room_trans.phase = 0;
+}
+
+void game_transition_update(entity_s *player)
+{
+    switch (g_game.room_trans.phase)
+    {
+    case 0:
+        room_transition_inactive_update(player);
+        break;
+
+    case 1:
+        room_transition_phase1_update(player);
+        break;
+
+    case 2:
+        room_transition_phase2_update(player);
+        break;
+    }
 }

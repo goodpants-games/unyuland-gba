@@ -98,6 +98,25 @@ typedef struct entity {
     const behavior_def_s *behavior;
 } entity_s;
 
+typedef enum dir4
+{
+    DIR4_RIGHT,
+    DIR4_UP,
+    DIR4_LEFT,
+    DIR4_DOWN
+} dir4_e;
+
+typedef struct room_trans_state
+{
+    int phase;
+    int ticks;
+    const map_header_s *new_room;
+    dir4_e dir;
+
+    int player_move_x;
+    bool override_player_move_x;
+} room_trans_state_s;
+
 typedef struct game {
     entity_s entities[MAX_ENTITY_COUNT];
     const map_header_s *map;
@@ -109,6 +128,8 @@ typedef struct game {
     int cam_y;
 
     bool input_enabled;
+
+    room_trans_state_s room_trans;
 } game_s;
 
 extern game_s g_game;
