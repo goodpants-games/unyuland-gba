@@ -305,6 +305,10 @@ static void behavior_crawler_update(entity_s *self)
     }
     
     self->actor.move_x = self->actor.face_dir;
+
+    self->sprite.flags &= ~SPRITE_FLAG_FLIP_X;
+    if (self->actor.move_x < 0)
+        self->sprite.flags |= SPRITE_FLAG_FLIP_X;
 }
 
 const behavior_def_s behavior_crawler = {
