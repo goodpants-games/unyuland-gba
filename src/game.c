@@ -730,48 +730,74 @@ void game_load_room(const map_header_s *map)
         const u8 *chunk_ptr = data_ptr;
         data_ptr += chunk_size;
 
-        int ex = (s16) READ16(chunk_ptr, accum);
-        int ey = (s16) READ16(chunk_ptr, accum);
-        int ew = (s16) READ16(chunk_ptr, accum);
-        int eh = (s16) READ16(chunk_ptr, accum);
+        s16 ex = READ16(chunk_ptr, accum);
+        s16 ey = READ16(chunk_ptr, accum);
+        s16 ew = READ16(chunk_ptr, accum);
+        s16 eh = READ16(chunk_ptr, accum);
         const char *name = (const char *)chunk_ptr;
         while (*(chunk_ptr++) != 0);
 
         int prop_count = READ8(chunk_ptr, accum);
 
+        // oh. Bruh. i wrote this entire malloc implementation only to then
+        // realize "wait. actually there won't be any more than one property per
+        // object. so like. i can just allocate this on the stack."
+        entity_load_prop_s props[8];
+
+        if (prop_count > 8)
+        {
+            LOG_ERR("only up to 8 entity properties supported!");
+            continue;
+        }
+
         for (int i = 0; i < prop_count; ++i)
         {
             const char *prop_name = (const char *)chunk_ptr;
             while (*(chunk_ptr++) != 0);
+            entity_load_prop_type_e prop_type = READ8(chunk_ptr, accum);
+
+            props[i].name = prop_name;
+            props[i].type = prop_type;
 
             switch (READ8(chunk_ptr, accum))
             {
-            case 0: // string
+            case ELPT_STRING:
             {
                 const char *prop_data_str = (const char *)chunk_ptr;
                 while (*(chunk_ptr++) != 0);
 
-                LOG_DBG("%s = %s", prop_name, prop_data_str);
+                props[i].data = (uintptr_t) prop_data_str;
                 break;
             }
 
-            case 1: // int
+            case ELPT_INT:
             {
                 int prop_data_int = READ32(chunk_ptr, accum);
-                
-                LOG_DBG("%s = %i", prop_name, prop_data_int);
+                props[i].data = (uintptr_t) prop_data_int;
                 break;
             }
 
-            case 2: // fixed-point
+            case ELPT_DECIMAL: // fixed-point
             {
                 FIXED prop_data_fx = READ32(chunk_ptr, accum);
-
-                LOG_DBG("%s = %f", prop_name, fx2float(prop_data_fx));
+                props[i].data = (uintptr_t) prop_data_fx;
                 break;
             }
             }
         }
+
+        entity_load_s load_ent = (entity_load_s)
+        {
+            .x = int2fx((int) ex),
+            .y = int2fx((int) ey),
+            .w = int2fx((int) ew),
+            .h = int2fx((int) eh),
+            .name = name,
+            .prop_count = prop_count,
+            .props = props,
+        };
+
+        game_load_entity(&load_ent);
     }
 }
 

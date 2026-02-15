@@ -264,3 +264,49 @@ static void behavior_player_droplet_update(entity_s *self)
 const behavior_def_s behavior_player_droplet = {
     .update = behavior_player_droplet_update
 };
+
+/////////////
+// crawler //
+/////////////
+
+typedef struct crawler_data
+{
+    FIXED max_dist;
+}
+crawler_data_s;
+
+void entity_crawler_init(entity_s *self, FIXED px, FIXED py, FIXED max_dist)
+{
+    crawler_data_s *data = (crawler_data_s *)&self->userdata;
+    self->behavior = &behavior_crawler;
+    self->flags |= ENTITY_FLAG_MOVING | ENTITY_FLAG_COLLIDE | ENTITY_FLAG_ACTOR;
+    self->pos.x = px + int2fx(1);
+    self->pos.y = py;
+    self->col.w = 6;
+    self->col.h = 8;
+    self->sprite.graphic_id = SPRID_GAME_CRAWLER_WALK;
+    self->sprite.flags |= SPRITE_FLAG_PLAYING;
+    self->sprite.ox = -1;
+    self->actor.face_dir = 1;
+    self->actor.move_speed = TO_FIXED(0.5);
+    self->actor.move_accel = TO_FIXED(1.0 / 8.0);
+    
+    data->max_dist = max_dist;
+}
+
+static void behavior_crawler_update(entity_s *self)
+{
+    player_bullet_data_s *data = (player_bullet_data_s *)&self->userdata;
+    
+    if (self->actor.flags & ACTOR_FLAG_WALL)
+    {
+        self->actor.face_dir = -self->actor.face_dir;
+        LOG_DBG("crawler bump");
+    }
+    
+    self->actor.move_x = self->actor.face_dir;
+}
+
+const behavior_def_s behavior_crawler = {
+    .update = behavior_crawler_update
+};

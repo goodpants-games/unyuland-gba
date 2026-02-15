@@ -132,6 +132,31 @@ typedef struct game {
     room_trans_state_s room_trans;
 } game_s;
 
+typedef enum entity_load_prop_type
+{
+    ELPT_STRING,
+    ELPT_INT,
+    ELPT_DECIMAL,
+} entity_load_prop_type_e;
+
+typedef struct entity_load_prop
+{
+    const char *name;
+    int type;
+    uintptr_t data;
+} entity_load_prop_s;
+
+typedef struct entity_load
+{
+    const char *name;
+    FIXED x;
+    FIXED y;
+    FIXED w;
+    FIXED h;
+    uint prop_count;
+    entity_load_prop_s *props;
+} entity_load_s;
+
 extern game_s g_game;
 
 entity_s* entity_alloc(void);
@@ -143,11 +168,16 @@ void game_load_room(const map_header_s *map);
 void game_transition_update(entity_s *player);
 void game_render(int *last_obj_index);
 
+void game_load_entity(const entity_load_s *load_data);
+
 void entity_player_init(entity_s *self);
 extern const behavior_def_s behavior_player;
 
 void entity_player_droplet_init(entity_s *self, FIXED px, FIXED py,
                                 int type, int dir);
 extern const behavior_def_s behavior_player_droplet;
+
+void entity_crawler_init(entity_s *self, FIXED px, FIXED py, FIXED max_dist);
+extern const behavior_def_s behavior_crawler;
 
 #endif

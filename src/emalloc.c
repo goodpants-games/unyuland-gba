@@ -1,3 +1,5 @@
+// TODO: i actually don't know if this works lmao
+
 #include "emalloc.h"
 
 #include <stdint.h>
@@ -124,6 +126,12 @@ void efree(void *ptr)
     block_header_s *prev = header->prev;
     block_header_s *next = header->next;
 
-    header->next->prev = prev;
-    header->prev->next = next;
+    if (next)
+        next->prev = prev;
+
+    if (prev)
+        prev->next = next;
+
+    if (header == first_block)
+        first_block = NULL;
 }
