@@ -414,7 +414,7 @@ local function process_sprdb(output_img, output_dat, output_h)
         output_h_f:write(",\n")
     end
 
-    output_h_f:write("    GFXID_COUNT\n")
+    output_h_f:write("    SPRID_" .. string.upper(sprdb_ident) .. "_COUNT\n")
     output_h_f:write("} sprid_", sprdb_ident, "_e;\n")
 
     output_h_f:write("\n#endif\n")
