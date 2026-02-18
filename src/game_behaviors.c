@@ -272,6 +272,7 @@ const behavior_def_s behavior_player_droplet = {
 typedef struct crawler_data
 {
     FIXED max_dist;
+    FIXED home_x;
 }
 crawler_data_s;
 
@@ -292,16 +293,23 @@ void entity_crawler_init(entity_s *self, FIXED px, FIXED py, FIXED max_dist)
     self->actor.move_accel = TO_FIXED(1.0 / 8.0);
     
     data->max_dist = max_dist;
+    data->home_x = px;
+
+    LOG_DBG("max dist: %i", max_dist);
 }
 
 static void behavior_crawler_update(entity_s *self)
 {
-    player_bullet_data_s *data = (player_bullet_data_s *)&self->userdata;
+    crawler_data_s *data = (crawler_data_s *)&self->userdata;
+
+    int face_dir = (int) self->actor.face_dir;
+
+    const FIXED x_from_home = (self->pos.x - data->home_x) * face_dir;
     
-    if (self->actor.flags & ACTOR_FLAG_WALL)
+    if (self->actor.flags & ACTOR_FLAG_WALL || (data->max_dist != 0 && x_from_home >= data->max_dist))
     {
-        self->actor.face_dir = -self->actor.face_dir;
-        LOG_DBG("crawler bump");
+        face_dir = -face_dir;
+        self->actor.face_dir = face_dir;
     }
     
     self->actor.move_x = self->actor.face_dir;

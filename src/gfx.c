@@ -219,7 +219,6 @@ void gfx_set_palette_multiplied(FIXED factor)
     else if (factor > FIX_ONE) factor = FIX_ONE;
 
     u16 new_palette[16];
-    LOG_DBG("%i", factor);
     // const FIXED scale_factor = TO_FIXED(256.0 / 31.0) + 1;
 
     for (int i = 1; i < 16; ++i)
