@@ -768,7 +768,7 @@ void game_load_room(const map_header_s *map)
             props[i].name = prop_name;
             props[i].type = prop_type;
 
-            switch (READ8(chunk_ptr, accum))
+            switch (prop_type)
             {
             case ELPT_STRING:
             {
@@ -792,6 +792,10 @@ void game_load_room(const map_header_s *map)
                 props[i].data = (uintptr_t) prop_data_fx;
                 break;
             }
+
+            default:
+                LOG_ERR("unknown property data type %i", (int) prop_type);
+                break;
             }
         }
 
