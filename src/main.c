@@ -3,6 +3,7 @@
 #include <tileset_gfx.h>
 #include <font_sprdb_gfx.h>
 #include <assert.h>
+#include <ctype.h>
 
 #include <world.h>
 #include "game.h"
@@ -10,6 +11,11 @@
 #include "log.h"
 
 // #define MAIN_PROFILE
+
+static void screen_print(SCR_ENTRY *ptr, const char *txt)
+{
+    
+}
 
 int main()
 {
@@ -20,6 +26,7 @@ int main()
     irq_add(II_VBLANK, NULL);
 
     gfx_init();
+
     memcpy32(&tile_mem[0][0] + 1, font_sprdb_gfxTiles, font_sprdb_gfxTilesLen / sizeof(u32));
     memcpy32(&tile_mem[0][0] + GFX_CHAR_GAME_TILESET + 2, tileset_gfxTiles,
              tileset_gfxTilesLen / sizeof(u32));
@@ -76,6 +83,7 @@ int main()
         #ifdef MAIN_PROFILE
         profile_start();
         #endif
+        // screen_print(&se_mat[GFX_BG0_INDEX][18][0], "Hello, world!");
 
         key_poll();
         game_update();
@@ -93,6 +101,8 @@ int main()
         if (g_game.cam_y > y_max) g_game.cam_y = y_max;
 
         game_render(&last_obj_index);
+
+        gfx_text_bmap_print(0, 0, "M");
 
         #ifdef MAIN_PROFILE
         uint frame_len = profile_stop();

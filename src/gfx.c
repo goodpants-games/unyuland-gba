@@ -1,7 +1,11 @@
 #include <tonc.h>
+#include <ctype.h>
+#include <font_sprdb_gfx.h>
 #include "gfx.h"
 #include "mgba.h"
 #include "log.h"
+
+#define TEXT_CHAR_ID(i) ((i) * 4)
 
 OBJ_ATTR gfx_oam_buffer[128];
 int gfx_scroll_x = 0;
@@ -76,20 +80,25 @@ void gfx_init(void)
     oam_init(gfx_oam_buffer, 128);
     gfx_reset_palette();
 
-    REG_BG0CNT = BG_CBB(0) | BG_SBB(GFX_BG0_INDEX) | BG_8BPP | BG_REG_32x32;
+    REG_DISPCNT = DCNT_OBJ_1D;
+
+    REG_BG0CNT = BG_CBB(0) | BG_SBB(GFX_BG0_INDEX) | BG_4BPP | BG_REG_32x32;
     REG_BG0HOFS = 0;
     REG_BG0VOFS = 0;
-    REG_DISPCNT = DCNT_OBJ_1D;
+
+    REG_BG1CNT = BG_CBB(0) | BG_SBB(GFX_BG1_INDEX) | BG_8BPP | BG_REG_32x32;
+    REG_BG1HOFS = 0;
+    REG_BG1VOFS = 0;
 }
 
 void gfx_new_frame(void)
 {
-    REG_DISPCNT |= DCNT_OBJ | DCNT_BG0;
+    REG_DISPCNT |= DCNT_OBJ | DCNT_BG0 | DCNT_BG1;
 
     if (gfx_loaded_map)
     {
         const u16 *map_data = map_graphics_data(gfx_loaded_map);
-        u32 *se32 = (u32 *)se_mem[GFX_BG0_INDEX];
+        u32 *se32 = (u32 *)se_mem[GFX_BG1_INDEX];
 
         int prev_cam_tx = old_scroll_x / 16;
         int cam_tx = gfx_scroll_x / 16;
@@ -182,8 +191,8 @@ void gfx_new_frame(void)
     old_scroll_y = gfx_scroll_y;
 
     oam_copy(oam_mem, gfx_oam_buffer, 128);
-    REG_BG0HOFS = gfx_scroll_x;
-    REG_BG0VOFS = gfx_scroll_y;
+    REG_BG1HOFS = gfx_scroll_x;
+    REG_BG1VOFS = gfx_scroll_y;
 }
 
 void gfx_load_map(const map_header_s *map)
@@ -262,4 +271,99 @@ void gfx_set_palette_multiplied(FIXED factor)
 
     for (int i = 1; i < 16; ++i)
         pal_obj_bank[0][i] = new_palette[i];
+}
+
+static void blit_tile(int x, int y, const TILE4 *src_tile)
+{
+    int dst_y = y;
+    for (int r = 0; r < 8; ++r)
+    {
+        u32 src_row = src_tile->data[r];
+        int dst_x = x;
+        for (int c = 0; c < 32; c += 4)
+        {
+            gfx_text_bmap_blit_pixel(dst_x, dst_y, (src_row >> c) & 0xF);
+            ++dst_x;
+        }
+        ++dst_y;
+    }
+}
+
+void gfx_text_bmap_print(int x, int y, const char *text)
+{
+    const TILE4 *const text_data = (const TILE4 *)font_sprdb_gfxTiles;
+
+    for (; *text != '\0'; ++text)
+    {
+        char ch = *text;
+        int id;
+        switch (ch)
+        {
+        case ' ':
+            id = TEXT_CHAR_ID(0);
+            break;
+
+        case '.':
+            id = TEXT_CHAR_ID(26);
+            break;
+
+        case ',':
+            id = TEXT_CHAR_ID(27);
+            break;
+
+        case '!':
+            id = TEXT_CHAR_ID(28);
+            break;
+
+        case '?':
+            id = TEXT_CHAR_ID(29);
+            break;
+
+        case '-':
+            id = TEXT_CHAR_ID(30);
+            break;
+
+        case '_':
+            id = TEXT_CHAR_ID(31);
+            break;
+
+        case ':':
+            id = TEXT_CHAR_ID(32);
+            break;
+        
+        case '*': // not actually the asterisk character but whatever. sure.
+            id = TEXT_CHAR_ID(33);
+            break;
+
+        // assume [a-zA-Z0-9]
+        default:
+            if (ch >= '0' && ch <= '9')
+                id = TEXT_CHAR_ID(ch - '0');
+            else
+                // assume it's a letter
+                id = TEXT_CHAR_ID(toupper(ch) - 'A' + 1);
+        }
+
+        blit_tile(x + 8, y, &text_data[id]);
+        // blit_tile(x + 8, y, &text_data[id + 1]);
+        // blit_tile(x, y + 6, &text_data[id + 2]);
+        // blit_tile(x + 6, y + 6, &text_data[id + 3]);
+        x += 12;
+
+        // int dst_y = y;
+        // const TILE4 *src_tile = text_data + id;
+        // for (int r = 0; r < 8; ++r)
+        // {
+        //     u32 src_row = src_tile->data[r];
+        //     int dst_x = x;
+        //     for (int c = 0; c < 24; c += 4)
+        //     {
+        //         gfx_text_bmap_blit_pixel(dst_x, dst_y, (src_row >> c) & 0xF);
+        //         ++dst_x;
+        //     }
+        //     ++dst_y;
+        // }
+
+        // x += 6;
+    }
 }
