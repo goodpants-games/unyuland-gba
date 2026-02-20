@@ -357,6 +357,14 @@ local function process_sprdb(output_img, output_dat, output_h)
     local obj_pool_buf = {}
     local gfx_data_buf = {}
 
+    -- keep track of written bytes for the purpose of then adding padding to the
+    -- end of the chunk such that its size is a multiple of 4
+    -- (the gba word size). just for convenience i guess.
+    local frame_pool_bytes_written = 0
+    local obj_pool_bytes_written = 0
+    -- don't need to keep track of gfx data size since the size of each element
+    -- is already a multiple of 4. and i'm lazy.
+
     for _, anim in ipairs(output_data) do
         tinsert(names, anim.name)
         tinsert(gfx_data_buf, spack("<!4 I1 I1 I2", #anim.frames, anim.loop and 1 or 0, #frame_pool_buf))
@@ -365,10 +373,29 @@ local function process_sprdb(output_img, output_dat, output_h)
             local obji = #obj_pool_buf
             local objc = create_objs(obj_pool_buf, frame, anim.src_w, anim.src_h)
 
-            tinsert(frame_pool_buf,
-                    spack("<!4 I2 I1 I1 I1 I1", obji, frame.w, frame.h,
-                          frame.len, objc))
+            obj_pool_bytes_written = obj_pool_bytes_written + objc * 10
+
+            local byte_data = spack("<!4 I2 I1 I1 I1 I1", obji, frame.w, frame.h,
+                          frame.len, objc)
+            
+            tinsert(frame_pool_buf, byte_data)
+            frame_pool_bytes_written = frame_pool_bytes_written
+                + string.len(byte_data)
         end
+    end
+
+    local frame_pool_pad_bytes =
+        4 - frame_pool_bytes_written % 4
+
+    local obj_pool_pad_bytes =
+        4 - obj_pool_bytes_written % 4
+    
+    if frame_pool_pad_bytes ~= 4 then
+        table.insert(frame_pool_buf, string.rep("\0", frame_pool_pad_bytes))
+    end
+
+    if obj_pool_pad_bytes ~= 4 then
+        table.insert(obj_pool_buf, string.rep("\0", obj_pool_pad_bytes))
     end
 
     local gfx_data = table.concat(gfx_data_buf)

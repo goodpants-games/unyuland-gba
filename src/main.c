@@ -1,6 +1,7 @@
 #include <tonc.h>
 #include <game_sprdb.h>
 #include <tileset_gfx.h>
+#include <font_sprdb_gfx.h>
 #include <assert.h>
 
 #include <world.h>
@@ -19,7 +20,9 @@ int main()
     irq_add(II_VBLANK, NULL);
 
     gfx_init();
-    memcpy32(&tile_mem[0][0] + 2, tileset_gfxTiles, tileset_gfxTilesLen / sizeof(u32));
+    memcpy32(&tile_mem[0][0] + 1, font_sprdb_gfxTiles, font_sprdb_gfxTilesLen / sizeof(u32));
+    memcpy32(&tile_mem[0][0] + GFX_CHAR_GAME_TILESET + 2, tileset_gfxTiles,
+             tileset_gfxTilesLen / sizeof(u32));
     memcpy32(tile_mem_obj[0][0].data, game_sprdb_gfxTiles, game_sprdb_gfxTilesLen / sizeof(u32));
 
     const map_header_s *map = world_rooms[0];

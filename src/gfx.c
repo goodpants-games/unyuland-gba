@@ -37,14 +37,14 @@ static void write_scr_block(const uint map_entry, u32 *const dest)
 {
     if (map_entry == 0)
     {
-        *dest = 0;
+        *dest        = 0;
         *(dest + 16) = 0;
         return;
     }
 
     int gfx_id = map_entry & 0xFF;
     int v = gfx_id % 16 * 2 + gfx_id / 16 * 64;
-    --v;
+    v = (v - 1) + GFX_CHAR_GAME_TILESET / 2;
 
     u32 upper = ((v+1) << 16) | v;
     v += 32;
@@ -198,14 +198,15 @@ void gfx_reset_palette(void)
 {
     // 0-15: regular palette, may be darkened for room transition
     // 16: black (if on 16-bit color mode, this will be the start of the 2nd bank)
-    // 17-32: regular palette + black, will not be darkened during room trans
+    // 17-32: regular palette, with idx15 (peach) swapped out for black.
+    // will not be darkened during room trans. used for UI (presumably).
     for (int i = 0; i < 16; ++i)
         pal_bg_mem[i] = gfx_palette[i];
     pal_bg_mem[16] = gfx_palette[0];
 
     for (int i = 1; i < 16; ++i)
         pal_bg_mem[16 + i] = gfx_palette[i];
-    pal_bg_mem[32] = gfx_palette[0];
+    pal_bg_mem[31] = gfx_palette[0];
 
     // pal bank 0: regular palette, may be darkened for room transition
     // pal bank 1: dynamically changing rainbow palette (TODO)
