@@ -50,11 +50,14 @@ void gfx_text_bmap_print(int x, int y, const char *text);
 static inline void gfx_text_bmap_blit_pixel(int x, int y, int pixel)
 {
     // LOG_DBG("(%i, %i) -> tile %i row %i shift %i", x, y, y & 7, (y / 8) * GFX_TEXT_BMP_COLS + (x / 8), ((x & 7) * 4));
-
-    // divide all by 8?
-    // WHY TF IS THIS NOT WORKING?? IT ONLY WORKS WHEN x (and presumably y) IS ZERO??
-    TILE *tile = GFX_TEXT_BMP + ((y / 8) * GFX_TEXT_BMP_COLS + (x / 8));
-    tile->data[y & 7] |= (pixel & 0xF) << ((x & 7) * 4);
+    if (pixel & 0xF)
+    {
+        // divide all by 8?
+        TILE *tile = GFX_TEXT_BMP + ((y / 8) * GFX_TEXT_BMP_COLS + (x / 8));
+        int shf = ((x & 7) * 4);
+        tile->data[y & 7] = (tile->data[y & 7] & ~(0xF << shf))
+                            | ((pixel & 0xF) << shf);
+    }
 }
 
 #endif

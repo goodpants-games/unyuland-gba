@@ -344,10 +344,10 @@ void gfx_text_bmap_print(int x, int y, const char *text)
                 id = TEXT_CHAR_ID(toupper(ch) - 'A' + 1);
         }
 
-        blit_tile(x + 8, y, &text_data[id]);
-        // blit_tile(x + 8, y, &text_data[id + 1]);
-        // blit_tile(x, y + 6, &text_data[id + 2]);
-        // blit_tile(x + 6, y + 6, &text_data[id + 3]);
+        blit_tile(x , y, &text_data[id]);
+        blit_tile(x + 8, y, &text_data[id + 1]);
+        blit_tile(x, y + 8, &text_data[id + 2]);
+        blit_tile(x + 8, y + 8, &text_data[id + 3]);
         x += 12;
 
         // int dst_y = y;
