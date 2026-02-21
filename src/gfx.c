@@ -14,6 +14,10 @@ uint gfx_map_width = 0;
 uint gfx_map_height = 0;
 const map_header_s *gfx_loaded_map = NULL;
 
+// put in ewram as the buffer takes 8.4 KiB
+// TODO: should i have gfx_text_bmp in iwram, ewram, or modify vram directly??
+// (probably not modify vram directly)
+__attribute__((section(".ewram")))
 TILE gfx_text_bmp[GFX_TEXT_BMP_SIZE];
 
 static uint old_scroll_x = 0;

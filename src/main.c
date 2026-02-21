@@ -9,12 +9,7 @@
 #include "gfx.h"
 #include "log.h"
 
-// #define MAIN_PROFILE
-
-static void screen_print(SCR_ENTRY *ptr, const char *txt)
-{
-    
-}
+#define MAIN_PROFILE
 
 int main()
 {
