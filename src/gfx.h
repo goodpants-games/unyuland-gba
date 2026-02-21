@@ -17,10 +17,10 @@
 
 // end: 1791 (0x6ff)
 // 450 is how many tiles i think i need for five lines (240x12*5)/32
-// 12*5 is also a multiple of 8 so that's pretty neat as well.
+// 12*5 is also a multiple of 8 so that's pretty neat as well. (p.s.: NO IT'S NOT. STUPID.)
 #define GFX_TEXT_BMP_SIZE 450 // in tiles
-#define GFX_TEXT_BMP_COLS 240 // pixels per column
-#define GFX_TEXT_BMP ((&(tile_mem[0][0]))) // ((tile_mem + (0x400 - GFX_TEXT_BMP_SIZE)))
+#define GFX_TEXT_BMP_COLS 30  // tiles per column
+#define GFX_TEXT_BMP_VRAM ((tile_mem[27]))
 
 extern OBJ_ATTR gfx_oam_buffer[128];
 extern int gfx_scroll_x;
@@ -30,6 +30,8 @@ extern uint gfx_map_height;
 extern const map_header_s *gfx_loaded_map;
 
 extern u16 gfx_palette[16];
+
+extern TILE gfx_text_bmp[GFX_TEXT_BMP_SIZE];
 
 void gfx_init(void);
 void gfx_new_frame(void);
@@ -45,19 +47,5 @@ void gfx_reset_palette(void);
 void gfx_set_palette_multiplied(FIXED factor);
 
 void gfx_text_bmap_print(int x, int y, const char *text);
-
-// not really a blit because it ORs rather than sets but good enough!
-static inline void gfx_text_bmap_blit_pixel(int x, int y, int pixel)
-{
-    // LOG_DBG("(%i, %i) -> tile %i row %i shift %i", x, y, y & 7, (y / 8) * GFX_TEXT_BMP_COLS + (x / 8), ((x & 7) * 4));
-    if (pixel & 0xF)
-    {
-        // divide all by 8?
-        TILE *tile = GFX_TEXT_BMP + ((y / 8) * GFX_TEXT_BMP_COLS + (x / 8));
-        int shf = ((x & 7) * 4);
-        tile->data[y & 7] = (tile->data[y & 7] & ~(0xF << shf))
-                            | ((pixel & 0xF) << shf);
-    }
-}
 
 #endif

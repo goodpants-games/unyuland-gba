@@ -5,7 +5,7 @@
 #include "mgba.h"
 #include "log.h"
 
-#define TEXT_CHAR_ID(i) ((i) * 4)
+#define TEXT_CHAR_ID(i) (((i) - 1) * 4)
 
 OBJ_ATTR gfx_oam_buffer[128];
 int gfx_scroll_x = 0;
@@ -13,6 +13,8 @@ int gfx_scroll_y = 0;
 uint gfx_map_width = 0;
 uint gfx_map_height = 0;
 const map_header_s *gfx_loaded_map = NULL;
+
+TILE gfx_text_bmp[GFX_TEXT_BMP_SIZE];
 
 static uint old_scroll_x = 0;
 static uint old_scroll_y = 0;
@@ -273,19 +275,39 @@ void gfx_set_palette_multiplied(FIXED factor)
         pal_obj_bank[0][i] = new_palette[i];
 }
 
+// not really a blit because it ORs rather than sets but good enough!
+static inline void gfx_text_bmap_blit_pixel(uint x, uint y, uint pixel)
+{
+    // LOG_DBG("(%i, %i) -> tile %i row %i shift %i", x, y, y & 7, (y / 8) * GFX_TEXT_BMP_COLS + (x / 8), ((x & 7) * 4));
+    if (pixel & 0xF)
+    {
+        // divide all by 8?
+        u32 *row = &GFX_TEXT_BMP_VRAM[((y >> 3) * GFX_TEXT_BMP_COLS + (x >> 3))].data[y & 7];
+        uint shf = ((x & 7) << 2);
+        *row = (*row & ~(0xF << shf)) | ((pixel & 0xF) << shf);
+    }
+}
+
 static void blit_tile(int x, int y, const TILE4 *src_tile)
 {
-    int dst_y = y;
+    const int dx = x;
+    int dy = y;
     for (int r = 0; r < 8; ++r)
     {
         u32 src_row = src_tile->data[r];
-        int dst_x = x;
-        for (int c = 0; c < 32; c += 4)
+
+        u32 *row = &GFX_TEXT_BMP_VRAM[((dy >> 3) * GFX_TEXT_BMP_COLS + (dx >> 3))].data[dy & 7];
+        int shf = (dx & 7) << 2;
+        *row |= src_row << shf;
+
+        if (shf) // shf > 0
         {
-            gfx_text_bmap_blit_pixel(dst_x, dst_y, (src_row >> c) & 0xF);
-            ++dst_x;
+            row = &GFX_TEXT_BMP_VRAM[((dy >> 3) * GFX_TEXT_BMP_COLS + (dx >> 3) + 1)].data[dy & 7];
+            shf = 32 - shf;
+            *row |= src_row >> shf;
         }
-        ++dst_y;
+
+        ++dy;
     }
 }
 

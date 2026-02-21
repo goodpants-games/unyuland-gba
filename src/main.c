@@ -102,7 +102,7 @@ int main()
 
         game_render(&last_obj_index);
 
-        gfx_text_bmap_print(0, 0, "M");
+        gfx_text_bmap_print(3, 0, "Hello, world!");
 
         #ifdef MAIN_PROFILE
         uint frame_len = profile_stop();
