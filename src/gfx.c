@@ -1,11 +1,11 @@
 #include <tonc.h>
 #include <ctype.h>
-#include <font_sprdb_gfx.h>
+#include <font_gfx.h>
 #include "gfx.h"
 #include "mgba.h"
 #include "log.h"
 
-#define TEXT_CHAR_ID(i) (((i) - 1) * 4)
+#define TEXT_CHAR_ID(i) ((i) * 4)
 
 OBJ_ATTR gfx_oam_buffer[128];
 int gfx_scroll_x = 0;
@@ -84,7 +84,7 @@ void gfx_init(void)
 
     REG_DISPCNT = DCNT_OBJ_1D;
 
-    REG_BG0CNT = BG_CBB(0) | BG_SBB(GFX_BG0_INDEX) | BG_4BPP | BG_REG_32x32;
+    REG_BG0CNT = BG_CBB(GFX_TEXT_BMP_BLOCK) | BG_SBB(GFX_BG0_INDEX) | BG_4BPP | BG_REG_32x32;
     REG_BG0HOFS = 0;
     REG_BG0VOFS = 0;
 
@@ -209,8 +209,9 @@ void gfx_reset_palette(void)
 {
     // 0-15: regular palette, may be darkened for room transition
     // 16: black (if on 16-bit color mode, this will be the start of the 2nd bank)
-    // 17-32: regular palette, with idx15 (peach) swapped out for black.
+    // 17-31: regular palette, with idx15 (peach) swapped out for black.
     // will not be darkened during room trans. used for UI (presumably).
+    // 32-47: #15 - white. used for the dialogue text bitmap.
     for (int i = 0; i < 16; ++i)
         pal_bg_mem[i] = gfx_palette[i];
     pal_bg_mem[16] = gfx_palette[0];
@@ -218,6 +219,8 @@ void gfx_reset_palette(void)
     for (int i = 1; i < 16; ++i)
         pal_bg_mem[16 + i] = gfx_palette[i];
     pal_bg_mem[31] = gfx_palette[0];
+
+    pal_bg_mem[47] = gfx_palette[7];
 
     // pal bank 0: regular palette, may be darkened for room transition
     // pal bank 1: dynamically changing rainbow palette (TODO)
@@ -275,17 +278,9 @@ void gfx_set_palette_multiplied(FIXED factor)
         pal_obj_bank[0][i] = new_palette[i];
 }
 
-// not really a blit because it ORs rather than sets but good enough!
-static inline void gfx_text_bmap_blit_pixel(uint x, uint y, uint pixel)
+static inline u32* get_pixel_row(const uint x, const uint y)
 {
-    // LOG_DBG("(%i, %i) -> tile %i row %i shift %i", x, y, y & 7, (y / 8) * GFX_TEXT_BMP_COLS + (x / 8), ((x & 7) * 4));
-    if (pixel & 0xF)
-    {
-        // divide all by 8?
-        u32 *row = &GFX_TEXT_BMP_VRAM[((y >> 3) * GFX_TEXT_BMP_COLS + (x >> 3))].data[y & 7];
-        uint shf = ((x & 7) << 2);
-        *row = (*row & ~(0xF << shf)) | ((pixel & 0xF) << shf);
-    }
+    return &gfx_text_bmp[((y >> 3) * GFX_TEXT_BMP_COLS + (x >> 3))].data[y & 7];
 }
 
 static void blit_tile(int x, int y, const TILE4 *src_tile)
@@ -296,13 +291,13 @@ static void blit_tile(int x, int y, const TILE4 *src_tile)
     {
         u32 src_row = src_tile->data[r];
 
-        u32 *row = &GFX_TEXT_BMP_VRAM[((dy >> 3) * GFX_TEXT_BMP_COLS + (dx >> 3))].data[dy & 7];
+        u32 *row = get_pixel_row(dx, dy);
         int shf = (dx & 7) << 2;
         *row |= src_row << shf;
 
         if (shf) // shf > 0
         {
-            row = &GFX_TEXT_BMP_VRAM[((dy >> 3) * GFX_TEXT_BMP_COLS + (dx >> 3) + 1)].data[dy & 7];
+            row = get_pixel_row(dx + 8, dy);
             shf = 32 - shf;
             *row |= src_row >> shf;
         }
@@ -313,7 +308,7 @@ static void blit_tile(int x, int y, const TILE4 *src_tile)
 
 void gfx_text_bmap_print(int x, int y, const char *text)
 {
-    const TILE4 *const text_data = (const TILE4 *)font_sprdb_gfxTiles;
+    const TILE4 *const text_data = (const TILE4 *)font_gfxTiles;
 
     for (; *text != '\0'; ++text)
     {
@@ -322,70 +317,56 @@ void gfx_text_bmap_print(int x, int y, const char *text)
         switch (ch)
         {
         case ' ':
-            id = TEXT_CHAR_ID(0);
+            goto next_char;
             break;
 
         case '.':
-            id = TEXT_CHAR_ID(26);
+            id = TEXT_CHAR_ID(36);
             break;
 
         case ',':
-            id = TEXT_CHAR_ID(27);
+            id = TEXT_CHAR_ID(37);
             break;
 
         case '!':
-            id = TEXT_CHAR_ID(28);
+            id = TEXT_CHAR_ID(38);
             break;
 
         case '?':
-            id = TEXT_CHAR_ID(29);
+            id = TEXT_CHAR_ID(39);
             break;
 
         case '-':
-            id = TEXT_CHAR_ID(30);
+            id = TEXT_CHAR_ID(40);
             break;
 
         case '_':
-            id = TEXT_CHAR_ID(31);
+            id = TEXT_CHAR_ID(41);
             break;
 
         case ':':
-            id = TEXT_CHAR_ID(32);
+            id = TEXT_CHAR_ID(42);
             break;
         
         case '*': // not actually the asterisk character but whatever. sure.
-            id = TEXT_CHAR_ID(33);
+            id = TEXT_CHAR_ID(43);
             break;
 
         // assume [a-zA-Z0-9]
         default:
             if (ch >= '0' && ch <= '9')
-                id = TEXT_CHAR_ID(ch - '0');
+                id = TEXT_CHAR_ID(ch - '0' + 26);
             else
                 // assume it's a letter
-                id = TEXT_CHAR_ID(toupper(ch) - 'A' + 1);
+                id = TEXT_CHAR_ID(toupper(ch) - 'A');
         }
 
         blit_tile(x , y, &text_data[id]);
         blit_tile(x + 8, y, &text_data[id + 1]);
         blit_tile(x, y + 8, &text_data[id + 2]);
         blit_tile(x + 8, y + 8, &text_data[id + 3]);
+
+        next_char:;
         x += 12;
-
-        // int dst_y = y;
-        // const TILE4 *src_tile = text_data + id;
-        // for (int r = 0; r < 8; ++r)
-        // {
-        //     u32 src_row = src_tile->data[r];
-        //     int dst_x = x;
-        //     for (int c = 0; c < 24; c += 4)
-        //     {
-        //         gfx_text_bmap_blit_pixel(dst_x, dst_y, (src_row >> c) & 0xF);
-        //         ++dst_x;
-        //     }
-        //     ++dst_y;
-        // }
-
-        // x += 6;
     }
 }

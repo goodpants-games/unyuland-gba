@@ -1,7 +1,6 @@
 #include <tonc.h>
 #include <game_sprdb.h>
 #include <tileset_gfx.h>
-#include <font_sprdb_gfx.h>
 #include <assert.h>
 #include <ctype.h>
 
@@ -27,10 +26,22 @@ int main()
 
     gfx_init();
 
-    memcpy32(&tile_mem[0][0] + 1, font_sprdb_gfxTiles, font_sprdb_gfxTilesLen / sizeof(u32));
     memcpy32(&tile_mem[0][0] + GFX_CHAR_GAME_TILESET + 2, tileset_gfxTiles,
              tileset_gfxTilesLen / sizeof(u32));
     memcpy32(tile_mem_obj[0][0].data, game_sprdb_gfxTiles, game_sprdb_gfxTilesLen / sizeof(u32));
+
+    {
+        int i = 1;
+        int j = 0;
+        for (int y = 0; y < 6; ++y)
+        {
+            for (int x = 0; x < 30; ++x)
+            {
+                se_mem[GFX_BG0_INDEX][j++] = SE_PALBANK(2) | SE_ID(i++);
+            }
+            j += 2;
+        }
+    }
 
     const map_header_s *map = world_rooms[0];
     gfx_load_map(map);
@@ -102,7 +113,15 @@ int main()
 
         game_render(&last_obj_index);
 
-        gfx_text_bmap_print(3, 0, "Hello, world!");
+        gfx_text_bmap_print(0, 0, "Hello, world!");
+        gfx_text_bmap_print(0, 12, "lorem ipsum dolor");
+        gfx_text_bmap_print(2, 24, "sit amet");
+
+        gfx_text_sync_row(0);
+        gfx_text_sync_row(1);
+        gfx_text_sync_row(2);
+        gfx_text_sync_row(3);
+        gfx_text_sync_row(4);
 
         #ifdef MAIN_PROFILE
         uint frame_len = profile_stop();

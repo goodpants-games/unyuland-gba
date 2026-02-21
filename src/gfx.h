@@ -13,14 +13,14 @@
 #define GFX_BG2_INDEX 30 // mountain parallax (for that one room)
 #define GFX_BG3_INDEX 31 // sky background (for that one room)
 
-#define GFX_CHAR_GAME_TILESET 128
+#define GFX_CHAR_GAME_TILESET 0
 
-// end: 1791 (0x6ff)
-// 450 is how many tiles i think i need for five lines (240x12*5)/32
-// 12*5 is also a multiple of 8 so that's pretty neat as well. (p.s.: NO IT'S NOT. STUPID.)
-#define GFX_TEXT_BMP_SIZE 450 // in tiles
-#define GFX_TEXT_BMP_COLS 30  // tiles per column
-#define GFX_TEXT_BMP_VRAM ((tile_mem[27]))
+// 270 is how many tiles i think i need for six lines (240)/8 * (12*6)/8
+// 12*6 is also a multiple of 8 so that's pretty neat as well.
+#define GFX_TEXT_BMP_SIZE  270 // in tiles
+#define GFX_TEXT_BMP_COLS  30  // tiles per column
+#define GFX_TEXT_BMP_BLOCK 2
+#define GFX_TEXT_BMP_VRAM  (&(tile_mem[GFX_TEXT_BMP_BLOCK][1]))
 
 extern OBJ_ATTR gfx_oam_buffer[128];
 extern int gfx_scroll_x;
@@ -47,5 +47,13 @@ void gfx_reset_palette(void);
 void gfx_set_palette_multiplied(FIXED factor);
 
 void gfx_text_bmap_print(int x, int y, const char *text);
+
+static inline void gfx_text_sync_row(int row) // copy row of tiles to VRAM
+{
+    // TODO: gfx_text_sync_row DMA copy?
+    int ofs = row * GFX_TEXT_BMP_COLS;
+    memcpy32(GFX_TEXT_BMP_VRAM + ofs, gfx_text_bmp + ofs,
+             GFX_TEXT_BMP_COLS * sizeof(TILE) / 4);
+}
 
 #endif
