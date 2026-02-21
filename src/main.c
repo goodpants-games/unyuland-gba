@@ -9,7 +9,7 @@
 #include "gfx.h"
 #include "log.h"
 
-#define MAIN_PROFILE
+// #define MAIN_PROFILE
 
 int main()
 {
@@ -108,15 +108,15 @@ int main()
 
         game_render(&last_obj_index);
 
-        gfx_text_bmap_print(0, 0, "Hello, world!");
-        gfx_text_bmap_print(0, 12, "lorem ipsum dolor");
-        gfx_text_bmap_print(2, 24, "sit amet");
+        // gfx_text_bmap_print(0, 0, "Hello, world!");
+        // gfx_text_bmap_print(0, 12, "lorem ipsum dolor");
+        // gfx_text_bmap_print(2, 24, "sit amet");
 
-        gfx_text_sync_row(0);
-        gfx_text_sync_row(1);
-        gfx_text_sync_row(2);
-        gfx_text_sync_row(3);
-        gfx_text_sync_row(4);
+        // gfx_text_sync_row(0);
+        // gfx_text_sync_row(1);
+        // gfx_text_sync_row(2);
+        // gfx_text_sync_row(3);
+        // gfx_text_sync_row(4);
 
         #ifdef MAIN_PROFILE
         uint frame_len = profile_stop();

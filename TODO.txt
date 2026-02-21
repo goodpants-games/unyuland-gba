@@ -3,3 +3,65 @@
   or something. i dunno.) this theoretically should make it faster writing text
   in case that it is too slow, because iwram is (probably) faster to read/write
   from/to than vram.
+
+
+
+
+
+
+                   entity broadphase: sweep and prune
+- for the X and Y axes, store a sorted edge list containing the edges of each
+  collidable entity.
+- for the X and Y axes, store a bitfield with each bit describing if two
+  entities are colliding. refer to the upair2u function.
+- (only for the X axis) store a separate contiguous array which stores
+  broadphase overlap entries. each array entry contains references to both
+  entities.
+- when updating the edge list, if a new overlap was detected, set the
+  bitfield entry to 1 and add it to the overlap list. if a overlap was
+  destroyed, set the bitfield entry to 0, do a linear search of the overlap.
+  list with the pertinent entities and remove that overlap, shifting the
+  entries afterwards backwards to fill the slot.
+- since the Y axis does not have an overlap list, simply do not do anything
+  pertaining to such on that axis.
+- contact detection will therefore be fast; it's just going through the X
+  overlap list, and checking if the overlap exists on the Y axis bitfield. if
+  it does, do narrow-phase collision detection.
+
+              projectile broadphase: spatial partitioning
+the original unyuland used sweep and prune for both regular entities and
+projectiles. projectiles were also considered normal entities. but i feel
+that for this gba port, that will not suffice for memory or performance, for
+two reasons:
+  1) it is not possible for projectiles to store as much data as an entity
+     does, as projectiles only need to store position, velocity, sprite id,
+     and projectile kind. this is relevant because one room in unyuland can
+     have at least 80 projectiles active at once. that's a lot!
+  2) sweep and prune is not very optimal for projectiles, since they move
+     fast, are created and destroyed very frequently, and axis overlaps
+     between projectiles can change very frequently.
+thus what i propose is that projectiles be stored in a pool separate from
+entities and with a separate, more lean data structure. and additionally,
+that spatial partitioning will be used as the broadphase optimization for
+them.
+
+each partition cell will be 8x8 tiles in size. the grid will also have 8
+columns of cells and 8 rows of cells, making the maximum room size 64 tiles
+on any axis. fortunately, no rooms exceed this size. each cell stores a
+pointer to the root of a singly-linked list describing which projectiles
+occupy the cell. each linked list node is allocated in a pool.
+
+entity/projectile intersection will be handled by the entity collision code.
+
+on update:
+  for each projectile:
+    store old partition-grid bounds
+
+    move projectile
+    if projectile is touching a tile:
+      destroy projectile
+
+    compute new partition-grid bounds
+    if grid bounds has changed:
+      remove entries referencing self in the old partition cells
+      add entries in new intersecting cells

@@ -164,6 +164,7 @@ void entity_free(entity_s *entity);
 
 void game_init(void);
 void game_update(void);
+void game_physics_update(void);
 void game_load_room(const map_header_s *map);
 void game_transition_update(entity_s *player);
 void game_render(int *last_obj_index);

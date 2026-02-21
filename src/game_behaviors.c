@@ -21,6 +21,8 @@ void entity_player_init(entity_s *self)
                    | ENTITY_FLAG_KEEP_ON_ROOM_CHANGE;
     self->col.w = 6;
     self->col.h = 8;
+    self->col.group = COLGROUP_ENTITY;
+    self->col.mask = COLGROUP_DEFAULT;
     self->actor.move_speed = TO_FIXED(1.0);
     self->actor.move_accel = TO_FIXED(1.0 / 8.0);
     self->actor.jump_velocity = TO_FIXED(2.0);
@@ -285,6 +287,8 @@ void entity_crawler_init(entity_s *self, FIXED px, FIXED py, FIXED max_dist)
     self->pos.y = py;
     self->col.w = 6;
     self->col.h = 8;
+    self->col.group = COLGROUP_ENTITY;
+    self->col.mask = COLGROUP_DEFAULT;
     self->sprite.graphic_id = SPRID_GAME_CRAWLER_WALK;
     self->sprite.flags |= SPRITE_FLAG_PLAYING;
     self->sprite.ox = -1;
