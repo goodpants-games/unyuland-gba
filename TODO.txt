@@ -1,0 +1,5 @@
+- make it so text bitmap is intermediarily handled in iwram, then before vsync
+  DMA it to the correct portion of VRAM (perhaps limit it to one line per frame
+  or something. i dunno.) this theoretically should make it faster writing text
+  in case that it is too slow, because iwram is (probably) faster to read/write
+  from/to than vram.
