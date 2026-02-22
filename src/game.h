@@ -26,6 +26,7 @@
 #define SPRITE_FLAG_FLIP_Y    4
 
 #define COL_FLAG_FLOOR_ONLY 1
+// TODO: COL_FLAG_MONITOR_ONLY
 
 #define COLGROUP_DEFAULT           ((1 << 0))
 #define COLGROUP_ENTITY            ((1 << 1))
