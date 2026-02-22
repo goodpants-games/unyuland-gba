@@ -3,6 +3,9 @@
 #include <tileset_gfx.h>
 #include <assert.h>
 #include <ctype.h>
+#include <maxmod.h>
+#include "soundbank.h"
+#include "soundbank_bin.h"
 
 #include <world.h>
 #include "game.h"
@@ -51,13 +54,25 @@ static void text_test2(void)
     gfx_text_sync_row(1);
 }
 
+__attribute__((section(".ewram")))
+static u8 mm_memory[8 * (MM_SIZEOF_MODCH
+                         + MM_SIZEOF_ACTCH
+                         + MM_SIZEOF_MIXCH)
+                         + MM_MIXLEN_16KHZ];
+
+// Mixing buffer (globals should go in IWRAM)
+// Mixing buffer SHOULD be in IWRAM, otherwise the CPU load
+// will _drastially_ increase
+__attribute((aligned(4)))
+static u8 mm_mixing_buf[MM_MIXLEN_16KHZ];
+
 int main(void)
 {
     LOG_INIT();
     LOG_DBG("Hello, world!");
 
     irq_init(NULL);
-    irq_add(II_VBLANK, NULL);
+    irq_add(II_VBLANK, mmVBlank);
 
     gfx_init();
 
@@ -115,6 +130,24 @@ int main(void)
     (void)text_test2;
     text_test2();
 
+    mmInit(&(mm_gba_system)
+    {
+        .mixing_mode = MM_MIX_16KHZ,
+        .mod_channel_count = 8,
+        .mix_channel_count = 8,
+        .module_channels   = (mm_addr)(mm_memory+0),
+        .active_channels   = (mm_addr)(mm_memory+(8*MM_SIZEOF_MODCH)),
+        .mixing_channels   = (mm_addr)(mm_memory+(8*(MM_SIZEOF_MODCH
+                                                     + MM_SIZEOF_ACTCH))),
+        .mixing_memory     = (mm_addr)mm_mixing_buf,
+        .wave_memory       = (mm_addr)(mm_memory+(8*(MM_SIZEOF_MODCH
+                                                     + MM_SIZEOF_ACTCH
+                                                     + MM_SIZEOF_MIXCH))),
+        .soundbank         = (mm_addr)soundbank_bin
+    });
+    mmStart(MOD_TESTMUSIC, MM_PLAY_LOOP);
+    mmSetModuleVolume((int)(1024 * 0.5));
+
     while (true)
     {
         #ifdef MAIN_PROFILE
@@ -144,6 +177,7 @@ int main(void)
         LOG_DBG("frame usage: %.1f%%", (float)frame_len / 280896.f * 100.f);
         #endif
 
+        mmFrame();
         VBlankIntrWait();
         gfx_new_frame();
     }
