@@ -449,6 +449,11 @@ static bool physics_substep(FIXED vel_mult)
                 .ent_b = entc2
             };
             ++col_contact_count;
+
+            if (entity->behavior && entity->behavior->ent_touch)
+                entity->behavior->ent_touch(entity, ent2);
+            if (ent2->behavior && ent2->behavior->ent_touch)
+                ent2->behavior->ent_touch(ent2, entity);
         }
 
         // collect tile contacts
@@ -557,17 +562,33 @@ static bool physics_substep(FIXED vel_mult)
                 for (int y = min_py; y <= max_py; ++y)
                     for (int x = min_px; x <= max_px; ++x)
                     {
-                        for (partgrid_node_s *node = partgrid[y][x];
-                            node; node = node->next)
+                        for (partgrid_node_s *node = partgrid[y][x]; node;
+                            node = node->next)
                         {
                             projectile_s *proj = node->projectile;
+                            if (proj->flags & PROJ_FLAG_QFREE) continue;
+
                             FIXED px = proj->px;
                             FIXED py = proj->py;
 
-                            if (px > el && px < er && py > et && py < eb)
+                            if (!(px > el && px < er && py > et && py < eb))
+                                continue;
+
+                            LOG_DBG("projectile collision!");
+
+                            bool keep;
+                            if (entity->behavior &&
+                                entity->behavior->proj_touch)
                             {
-                                LOG_DBG("projectile collision!");
+                                keep = entity->behavior->proj_touch(entity, proj);
                             }
+                            else
+                            {
+                                keep = false;
+                            }
+                            
+                            if (!keep)
+                                projectile_queue_free(proj);
                         }
                     }
             }
@@ -795,7 +816,7 @@ void game_physics_move_projs(FIXED vel_mult)
     for (projectile_s *proj = g_game.projectiles; proj != projectile_end;
         ++proj, ++pdata)
     {
-        if (!proj->active) continue;
+        if (!IS_PROJ_ACTIVE(proj)) continue;
 
         proj->px += fxmul(proj->vx, vel_mult);
         proj->py += fxmul(proj->vy, vel_mult);
@@ -916,7 +937,7 @@ void game_physics_update(void)
     for (int i = 0; i < MAX_PROJECTILE_COUNT; ++i)
     {
         projectile_s *proj = g_game.projectiles + i;
-        if (!proj->active) continue;
+        if (!IS_PROJ_ACTIVE(proj)) continue;
 
         int speed = max(abs(proj->vx), abs(proj->vy));
         int subst = ceil_div(speed, FIX_ONE * 2);

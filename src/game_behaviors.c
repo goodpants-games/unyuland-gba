@@ -29,7 +29,7 @@ void entity_player_init(entity_s *self)
                    | ENTITY_FLAG_KEEP_ON_ROOM_CHANGE;
     self->col.w = 6;
     self->col.h = 8;
-    self->col.group = COLGROUP_ENTITY | COLGROUP_PROJECTILE_TARGET;
+    self->col.group = COLGROUP_ENTITY;
     self->col.mask = COLGROUP_DEFAULT | COLGROUP_PROJECTILE;
     self->actor.move_speed = TO_FIXED(1.0);
     self->actor.move_accel = TO_FIXED(1.0 / 8.0);
@@ -209,8 +209,17 @@ static void behavior_player_update(entity_s *self)
     skip_animation:;
 }
 
+static bool behavior_player_proj_touch(entity_s *self, projectile_s *proj)
+{
+    player_data_s *data = (player_data_s *)self->userdata;
+    (void)data;
+
+    return proj->kind == PROJ_KIND_PLAYER;
+}
+
 const behavior_def_s behavior_player = {
-    .update = behavior_player_update
+    .update = behavior_player_update,
+    .proj_touch = behavior_player_proj_touch
 };
 
 ///////////////////
@@ -289,7 +298,8 @@ static void behavior_player_droplet_update(entity_s *self)
 
         // offset controls whether it rounds to the nearest tile or always
         // downwards.
-        int offset = 0;
+        // int offset = 0;
+
         // int offset = data->type == PLAYER_DROPLET_TYPE_UP
         //                  ? 0
         //                  : (FIXED)(FIX_ONE * 0.5);
@@ -311,7 +321,7 @@ static void behavior_player_droplet_update(entity_s *self)
         platf->pos.y = py;
         platf->col.w = 6;
         platf->col.h = 2;
-        platf->col.group = COLGROUP_DEFAULT | COLGROUP_PROJECTILE_TARGET;
+        platf->col.group = COLGROUP_DEFAULT;
         platf->col.flags |= COL_FLAG_FLOOR_ONLY;
         platf->sprite.graphic_id = SPRID_GAME_ICE_PLATFORM;
         platf->sprite.ox = -1;
@@ -345,8 +355,8 @@ void entity_crawler_init(entity_s *self, FIXED px, FIXED py, FIXED max_dist)
     self->pos.y = py;
     self->col.w = 6;
     self->col.h = 8;
-    self->col.group = COLGROUP_ENTITY | COLGROUP_PROJECTILE_TARGET;
-    self->col.mask = COLGROUP_DEFAULT;
+    self->col.group = COLGROUP_ENTITY;
+    self->col.mask = COLGROUP_DEFAULT | COLGROUP_PROJECTILE;
     self->sprite.graphic_id = SPRID_GAME_CRAWLER_WALK;
     self->sprite.flags |= SPRITE_FLAG_PLAYING;
     self->sprite.ox = -1;

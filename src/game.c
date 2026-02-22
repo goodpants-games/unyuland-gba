@@ -10,6 +10,7 @@
 
 #define GRAVITY TO_FIXED(0.1)
 #define MAX_RENDER_OBJS ((MAX_ENTITY_COUNT + MAX_PROJECTILE_COUNT))
+#define PROJ_FREE_QUEUE_MAX_SIZE 16
 
 typedef enum render_obj_t
 {
@@ -61,6 +62,9 @@ game_s g_game;
 
 static uint render_object_count = 0;
 static render_obj_s render_objects[MAX_RENDER_OBJS];
+
+static int proj_free_queue_count = 0;
+static projectile_s *proj_free_queue[PROJ_FREE_QUEUE_MAX_SIZE];
 
 entity_s* entity_alloc(void)
 {
@@ -125,11 +129,11 @@ projectile_s* projectile_alloc(void)
     for (int i = 0; i < MAX_PROJECTILE_COUNT; ++i)
     {
         projectile_s *proj = g_game.projectiles + i;
-        if (proj->active) continue;
+        if (IS_PROJ_ACTIVE(proj)) continue;
 
         *proj = (projectile_s)
         {
-            .active = true,
+            .flags = PROJ_FLAG_ACTIVE,
         };
 
         if (render_object_count == MAX_RENDER_OBJS)
@@ -151,10 +155,10 @@ projectile_s* projectile_alloc(void)
 
 void projectile_free(projectile_s *proj)
 {
-    if (!proj->active) return;
+    if (!IS_PROJ_ACTIVE(proj)) return;
 
     game_physics_on_proj_free(proj);
-    proj->active = false;
+    proj->flags = 0;
 
     // remove from render list
     for (int i = 0; i < render_object_count; ++i)
@@ -170,6 +174,16 @@ void projectile_free(projectile_s *proj)
     }
 
     LOG_ERR("projectile_free: could not find projectile in render list");
+}
+
+bool projectile_queue_free(projectile_s *proj)
+{
+    if (proj_free_queue_count >= PROJ_FREE_QUEUE_MAX_SIZE)
+        return false;
+
+    proj_free_queue[proj_free_queue_count++] = proj;
+    proj->flags |= PROJ_FLAG_QFREE;
+    return true;
 }
 
 static void update_entities(void)
@@ -254,7 +268,7 @@ static void update_projectiles()
     for (int i = 0; i < MAX_PROJECTILE_COUNT; ++i)
     {
         projectile_s *proj = g_game.projectiles + i;
-        if (!proj->active) continue;
+        if (!IS_PROJ_ACTIVE(proj)) continue;
 
         if (--proj->life == 0)
             projectile_free(proj);
@@ -282,6 +296,10 @@ void game_init(void)
 
 void game_update(void)
 {
+    for (int i = 0; i < proj_free_queue_count; ++i)
+        projectile_free(proj_free_queue[i]);
+    proj_free_queue_count = 0;
+
     update_entities();
     update_projectiles();
     game_physics_update();
@@ -585,7 +603,7 @@ static void change_room(const map_header_s *new_room)
     for (int i = 0; i < MAX_PROJECTILE_COUNT; ++i)
     {
         projectile_s *proj = &g_game.projectiles[i];
-        if (!proj->active) continue;
+        if (!IS_PROJ_ACTIVE(proj)) continue;
         projectile_free(proj);
     }
 

@@ -29,7 +29,6 @@
 #define COLGROUP_DEFAULT           ((1 << 0))
 #define COLGROUP_ENTITY            ((1 << 1))
 #define COLGROUP_PROJECTILE        ((1 << 2))
-#define COLGROUP_PROJECTILE_TARGET ((1 << 3))
 #define COLGROUP_ALL               UINT16_MAX
 
 #define MAX_ENTITY_COUNT 32
@@ -43,6 +42,11 @@
 #define PLAYER_DROPLET_TYPE_SIDE      0
 #define PLAYER_DROPLET_TYPE_SIDE_SLOW 1
 #define PLAYER_DROPLET_TYPE_UP        2
+
+#define PROJ_FLAG_ACTIVE 1
+#define PROJ_FLAG_QFREE  2 // if projectile is put in free queue
+
+#define IS_PROJ_ACTIVE(proj) ((proj)->flags & PROJ_FLAG_ACTIVE)
 
 typedef enum dir4
 {
@@ -66,11 +70,30 @@ typedef enum proj_kind
 
 struct entity;
 
+typedef struct projectile
+{
+    u8 flags;
+    u8 kind;
+    u8 graphic_id;
+
+    u16 life;
+
+    FIXED px, py;
+    FIXED vx, vy;
+} projectile_s;
+
 typedef struct behavior_def
 {
     void (*update)(struct entity *self);
     void (*message)(struct entity *self, entity_msgid_e msg, ...);
     void (*free)(struct entity *self);
+
+    // fires on every frame an entity is being touched
+    void (*ent_touch)(struct entity *self, struct entity *other);
+
+    // fires on every frame a projectile is touched.
+    // returns true if projectile should not be destroyed.
+    bool (*proj_touch)(struct entity *self, projectile_s *other);
 } behavior_def_s;
 
 typedef struct entity
@@ -114,18 +137,6 @@ typedef struct entity
     s32 userdata[4];
     const behavior_def_s *behavior;
 } entity_s;
-
-typedef struct projectile
-{
-    u8 active;
-    u8 kind;
-    u8 graphic_id;
-
-    u16 life;
-
-    FIXED px, py;
-    FIXED vx, vy;
-} projectile_s;
 
 typedef struct room_trans_state
 {
@@ -187,6 +198,10 @@ void entity_free(entity_s *entity);
 
 projectile_s* projectile_alloc(void);
 void projectile_free(projectile_s *proj);
+
+// queue projectile to be freed at the start of the next game_update call.
+// returns false if queue is full.
+bool projectile_queue_free(projectile_s *proj);
 
 void game_init(void);
 void game_update(void);
