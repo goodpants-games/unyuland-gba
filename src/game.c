@@ -551,7 +551,7 @@ void game_render(int *p_last_obj_index)
             }
 
             obj_set_attr(obj_dst, obj_src->a0, obj_src->a1 | (u16)flip_flags,
-                         obj_src->a2 | ATTR2_PALBANK(0));
+                         obj_src->a2 | ATTR2_PALBANK(0) | ATTR2_PRIO(1));
             obj_set_pos(obj_dst, draw_cam_x + ox, draw_cam_y + oy);
             
             if (++obj_index >= 64) goto exit_entity_loop;
