@@ -26,9 +26,11 @@
 
 #define COL_FLAG_FLOOR_ONLY 1
 
-#define COLGROUP_DEFAULT 1
-#define COLGROUP_ENTITY  2
-#define COLGROUP_ALL     UINT16_MAX
+#define COLGROUP_DEFAULT           ((1 << 0))
+#define COLGROUP_ENTITY            ((1 << 1))
+#define COLGROUP_PROJECTILE        ((1 << 2))
+#define COLGROUP_PROJECTILE_TARGET ((1 << 3))
+#define COLGROUP_ALL               UINT16_MAX
 
 #define MAX_ENTITY_COUNT 32
 #define MAX_PROJECTILE_COUNT 128
@@ -118,6 +120,8 @@ typedef struct projectile
     u8 active;
     u8 kind;
     u8 graphic_id;
+
+    u16 life;
 
     FIXED px, py;
     FIXED vx, vy;

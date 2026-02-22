@@ -29,8 +29,8 @@ void entity_player_init(entity_s *self)
                    | ENTITY_FLAG_KEEP_ON_ROOM_CHANGE;
     self->col.w = 6;
     self->col.h = 8;
-    self->col.group = COLGROUP_ENTITY;
-    self->col.mask = COLGROUP_DEFAULT;
+    self->col.group = COLGROUP_ENTITY | COLGROUP_PROJECTILE_TARGET;
+    self->col.mask = COLGROUP_DEFAULT | COLGROUP_PROJECTILE;
     self->actor.move_speed = TO_FIXED(1.0);
     self->actor.move_accel = TO_FIXED(1.0 / 8.0);
     self->actor.jump_velocity = TO_FIXED(2.0);
@@ -88,10 +88,26 @@ static void player_bullet_spit(entity_s *self)
 
     proj->px = self->pos.x + int2fx(self->col.w) / 2;
     proj->py = self->pos.y + int2fx(self->col.h) / 2;
-    proj->vx = int2fx(1);
-    proj->vy = 0;
+
+    if (key_is_down(KEY_UP))
+    {
+        proj->vx = 0;
+        proj->vy = TO_FIXED(-4.0);
+    }
+    else if (key_is_down(KEY_DOWN))
+    {
+        proj->vx = 0;
+        proj->vy = TO_FIXED(4.0);
+    }
+    else
+    {
+        proj->vx = TO_FIXED(4.0) * self->actor.face_dir;
+        proj->vy = 0;
+    }
+
     proj->kind = PROJ_KIND_PLAYER;
     proj->graphic_id = SPRID_GAME_WATER_DROPLET;
+    proj->life = 60;
 }
 
 static void behavior_player_update(entity_s *self)
@@ -295,6 +311,7 @@ static void behavior_player_droplet_update(entity_s *self)
         platf->pos.y = py;
         platf->col.w = 6;
         platf->col.h = 2;
+        platf->col.group = COLGROUP_DEFAULT | COLGROUP_PROJECTILE_TARGET;
         platf->col.flags |= COL_FLAG_FLOOR_ONLY;
         platf->sprite.graphic_id = SPRID_GAME_ICE_PLATFORM;
         platf->sprite.ox = -1;
@@ -328,7 +345,7 @@ void entity_crawler_init(entity_s *self, FIXED px, FIXED py, FIXED max_dist)
     self->pos.y = py;
     self->col.w = 6;
     self->col.h = 8;
-    self->col.group = COLGROUP_ENTITY;
+    self->col.group = COLGROUP_ENTITY | COLGROUP_PROJECTILE_TARGET;
     self->col.mask = COLGROUP_DEFAULT;
     self->sprite.graphic_id = SPRID_GAME_CRAWLER_WALK;
     self->sprite.flags |= SPRITE_FLAG_PLAYING;

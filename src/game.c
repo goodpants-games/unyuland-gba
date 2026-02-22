@@ -249,6 +249,18 @@ static void update_entities(void)
     }
 }
 
+static void update_projectiles()
+{
+    for (int i = 0; i < MAX_PROJECTILE_COUNT; ++i)
+    {
+        projectile_s *proj = g_game.projectiles + i;
+        if (!proj->active) continue;
+
+        if (--proj->life == 0)
+            projectile_free(proj);
+    }
+}
+
 void game_init(void)
 {
     g_game.cam_x = 0;
@@ -271,8 +283,8 @@ void game_init(void)
 void game_update(void)
 {
     update_entities();
-    game_physics_update_ents();
-    game_physics_update_projs();
+    update_projectiles();
+    game_physics_update();
 }
 
 #define READ8(ptr, accum) (accum = *((ptr)++), \
@@ -469,9 +481,7 @@ void game_render(int *p_last_obj_index)
         const gfx_sprite_s *spr = &gfx_sprites[sprite_graphic_id];
         const gfx_frame_s *frame = frame_pool + spr->frame_pool_idx + sprite_frame;
         const gfx_obj_s *objs = obj_pool + frame->obj_pool_index;
-
-        int frame_count = spr->frame_count;
-        int frame_len = frame->frame_len;
+        
         int frame_obj_count = frame->obj_count;
 
         // draw object assembly
@@ -569,6 +579,14 @@ static void change_room(const map_header_s *new_room)
         if (ent->flags & ENTITY_FLAG_KEEP_ON_ROOM_CHANGE) continue;
 
         entity_free(ent);
+    }
+
+    // remove all projectiles
+    for (int i = 0; i < MAX_PROJECTILE_COUNT; ++i)
+    {
+        projectile_s *proj = &g_game.projectiles[i];
+        if (!proj->active) continue;
+        projectile_free(proj);
     }
 
     game_load_room(new_room);
