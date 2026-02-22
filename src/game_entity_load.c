@@ -62,6 +62,14 @@ void game_load_entity(const entity_load_s *load_data)
         entity_crawler_init(ent, load_data->x, load_data->y,
                             max_dist * WORLD_TILE_SIZE);
     }
+    STR_CASE("home")
+    {
+        entity_home_init(ent, load_data->x, load_data->y);
+    }
+    STR_CASE("sign")
+    {
+        entity_sign_init(ent, load_data->x, load_data->y, NULL, false);
+    }
     STR_CASE_FALLBACK
     {
         LOG_DBG("unknown entity type %s", name);

@@ -17,7 +17,8 @@
       will be displayed. controls menu takes more lines though. maybe i can
       cut it out from the pause menu?
        
-
+- BUG: spitting a projectile in water causes a crash. this iss probably because
+       the projectile gets immediately destroyed afterward.
 
 
 

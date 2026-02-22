@@ -828,7 +828,7 @@ void game_physics_move_projs(FIXED vel_mult)
         if (ty < 0) --ty;
 
         int map_col = map_col_get_bounded(tx, ty);
-        if (map_col == 1 || map_col == 3)
+        if (map_col == 1 || map_col == 2)
         {
             // it was Destroyed.
             projectile_queue_free(proj);
@@ -977,7 +977,7 @@ void game_physics_update(void)
         game_physics_move_projs(vel_mult);
         if (physics_substep(vel_mult))
         {
-            for (int j = i; j < substeps; ++j)
+            for (int j = i + 1; j < substeps; ++j)
                 game_physics_move_projs(vel_mult);
             break;
         }

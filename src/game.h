@@ -227,4 +227,11 @@ extern const behavior_def_s behavior_player_droplet;
 void entity_crawler_init(entity_s *self, FIXED px, FIXED py, FIXED max_dist);
 extern const behavior_def_s behavior_crawler;
 
+void entity_home_init(entity_s *self, FIXED px, FIXED py);
+extern const behavior_def_s behavior_home;
+
+void entity_sign_init(entity_s *self, FIXED px, FIXED py, void *dialogue,
+                      bool alt_appearance);
+extern const behavior_def_s behavior_sign;
+
 #endif

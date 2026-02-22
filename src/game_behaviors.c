@@ -434,3 +434,38 @@ const behavior_def_s behavior_crawler = {
     .update = behavior_crawler_update,
     .proj_touch = behavior_crawler_proj_touch
 };
+
+//////////
+// home //
+//////////
+
+void entity_home_init(entity_s *self, FIXED px, FIXED py)
+{
+    self->pos.x = px;
+    self->pos.y = py;
+    self->col.w = 8;
+    self->col.h = 8;
+    self->sprite.graphic_id = SPRID_GAME_HOME;
+    self->sprite.ox = -4;
+    self->sprite.oy = -16;
+    self->sprite.zidx = -20;
+}
+
+const behavior_def_s behavior_home = {0};
+
+//////////
+// sign //
+//////////
+
+void entity_sign_init(entity_s *self, FIXED px, FIXED py, void *dialogue,
+                      bool alt_appearance)
+{
+    self->pos.x = px;
+    self->pos.y = py;
+    self->col.w = 6;
+    self->col.h = 8;
+    self->sprite.graphic_id = alt_appearance ? SPRID_GAME_HINT_SIGN : SPRID_GAME_SIGN;
+    self->sprite.zidx = -20;
+}
+
+extern const behavior_def_s behavior_sign;
