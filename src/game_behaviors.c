@@ -120,6 +120,25 @@ static void behavior_player_update(entity_s *self)
     if (g_game.input_enabled && !g_game.room_trans.override_player_move_x)
     {
         bool can_move = !data->spitting;
+        
+#ifdef DEVDEBUG
+        if (key_is_down(KEY_R))
+        {
+            can_move = false;
+
+            self->vel.x = 0;
+            self->vel.y = 0;
+            self->flags &= ~(ENTITY_FLAG_COLLIDE | ENTITY_FLAG_MOVING);
+            if (key_is_down(KEY_RIGHT))
+                self->pos.x += int2fx(3);
+            if (key_is_down(KEY_LEFT))
+                self->pos.x -= int2fx(3);
+            if (key_is_down(KEY_DOWN))
+                self->pos.y += int2fx(3);
+            if (key_is_down(KEY_UP))
+                self->pos.y -= int2fx(3);
+        } else self->flags |= (ENTITY_FLAG_COLLIDE | ENTITY_FLAG_MOVING);
+#endif
 
         int actor_flags = (int) self->actor.flags;
         actor_flags &= ~ACTOR_FLAG_CAN_MOVE;

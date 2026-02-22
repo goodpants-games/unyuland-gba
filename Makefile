@@ -10,6 +10,7 @@ include $(DEVKITARM)/gba_rules
 
 PYTHON ?= python
 ASEPRITE ?= aseprite
+DEVDEBUG ?= yes
 
 #---------------------------------------------------------------------------------
 # the LIBGBA path is defined in gba_rules, but we have to define LIBTONC ourselves
@@ -48,6 +49,10 @@ CFLAGS	:=	-g -Wall -O2\
 		$(ARCH)
 
 CFLAGS	+=	$(INCLUDE)
+
+ifeq ($(DEVDEBUG),yes)
+  CFLAGS += -DDEVDEBUG
+endif
 
 CXXFLAGS	:=	$(CFLAGS) -fno-rtti -fno-exceptions
 
