@@ -46,6 +46,7 @@ INLINE void gfx_unload_map(void)
 void gfx_reset_palette(void);
 void gfx_set_palette_multiplied(FIXED factor);
 
+void gfx_text_bmap_fill(int oc, int or, int cols, int rows, u32 data[8]);
 void gfx_text_bmap_print(int x, int y, const char *text);
 
 static inline void gfx_text_sync_row(int row) // copy row of tiles to VRAM

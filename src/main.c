@@ -11,7 +11,27 @@
 
 // #define MAIN_PROFILE
 
-int main()
+static void text_test(void)
+{
+    u32 black8[8] = {0x11111111, 0x11111111, 0x11111111, 0x11111111,
+                    0x11111111, 0x11111111, 0x11111111, 0x11111111};
+    u32 black2[8] = {0x11111111, 0x11111111, 0x00000000, 0x00000000,
+                    0x00000000, 0x00000000, 0x00000000, 0x00000000};
+    gfx_text_bmap_fill(0, 0, 30, 4, black8);
+    gfx_text_bmap_fill(0, 4, 30, 1, black2);
+
+    gfx_text_bmap_print(0, 0, "Hello, world!");
+    gfx_text_bmap_print(0, 12, "lorem ipsum dolor");
+    gfx_text_bmap_print(2, 24, "sit amet");
+
+    gfx_text_sync_row(0);
+    gfx_text_sync_row(1);
+    gfx_text_sync_row(2);
+    gfx_text_sync_row(3);
+    gfx_text_sync_row(4);
+}
+
+int main(void)
 {
     LOG_INIT();
     LOG_DBG("Hello, world!");
@@ -84,6 +104,9 @@ int main()
         e->mass = 4;
     }
 
+    (void)text_test;
+    // text_test();
+
     while (true)
     {
         #ifdef MAIN_PROFILE
@@ -107,16 +130,6 @@ int main()
         if (g_game.cam_y > y_max) g_game.cam_y = y_max;
 
         game_render(&last_obj_index);
-
-        // gfx_text_bmap_print(0, 0, "Hello, world!");
-        // gfx_text_bmap_print(0, 12, "lorem ipsum dolor");
-        // gfx_text_bmap_print(2, 24, "sit amet");
-
-        // gfx_text_sync_row(0);
-        // gfx_text_sync_row(1);
-        // gfx_text_sync_row(2);
-        // gfx_text_sync_row(3);
-        // gfx_text_sync_row(4);
 
         #ifdef MAIN_PROFILE
         uint frame_len = profile_stop();

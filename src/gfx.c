@@ -374,3 +374,17 @@ void gfx_text_bmap_print(int x, int y, const char *text)
         x += 12;
     }
 }
+
+void gfx_text_bmap_fill(int oc, int or, int cols, int rows, u32 data[8])
+{
+    for (int r = or; r < or + rows; ++r)
+    {
+        TILE *t = &gfx_text_bmp[r * GFX_TEXT_BMP_COLS];
+        TILE *end_tile = t + cols;
+        for (; t != end_tile; ++t)
+        {
+            for (int i = 0; i < 8; ++i)
+                t->data[i] = data[i];
+        }
+    }
+}
