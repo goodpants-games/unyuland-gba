@@ -8,6 +8,17 @@
     type *list, size_t *list##_size, size_t *list##_capacity
 #define DYNARR(list) list, &list##_size, &list##_capacity
 
+#define DYNARR_INSERT_SHIFT(list, size, idx) do {  \
+    for (int _i = (size)++; _i > idx; --_i)  \
+        (list)[_i] = (list)[_i - 1];  \
+    } while (false);
+
+#define DYNARR_REMOVE(list, size, idx) do {  \
+    for (int _i = (idx); _i < (size); ++_i)  \
+        (list)[_i] = (list)[_i+1];  \
+    --(size);  \
+    } while (false);
+
 typedef struct pqueue_entry
 {
     int priority;

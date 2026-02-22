@@ -1,9 +1,9 @@
-#include "game.h"
-
 #include <stdlib.h>
 #include <tonc.h>
-
 #include <world.h>
+
+#include "game.h"
+#include "game_physics.h"
 #include "log.h"
 #include "gfx.h"
 #include "math_util.h"
@@ -192,6 +192,8 @@ void game_init(void)
     {
         .phase = 0
     };
+
+    game_physics_init();
 }
 
 void game_update(void)

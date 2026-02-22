@@ -1,9 +1,11 @@
 #include <stdlib.h>
 
 #include "game.h"
+#include "game_physics.h"
 #include "datastruct.h"
 #include "math_util.h"
 #include "log.h"
+#include "tonc_math.h"
 
 
 #define ENTITY_PAIR_SIZE \
@@ -14,6 +16,8 @@
     (pairs[(pkey) >> 3] |= (1 << ((pkey) & 0x7)))
 #define ENTITY_PAIR_CLEAR(pairs, pkey) \
     (pairs[(pkey) >> 3] &= ~(1 << ((pkey) & 0x7)))
+
+#define EDGE_LIST_MAX_COUNT ((MAX_ENTITY_COUNT * 2))
 
 typedef struct entity_coldata
 {
@@ -32,21 +36,43 @@ col_contact_s;
 typedef struct col_bp_edge
 {
     u16 eid;
-    bool right;
-    int pos;
+    bool left;
+    FIXED pos;
 }
 col_bp_edge_s;
+
+typedef struct col_bp_overlap
+{
+    u16 eid_a, eid_b;
+}
+col_bp_overlap_s;
 
 typedef struct col_overlap_res {
     bool overlap;
     FIXED nx, ny, pd;
 } col_overlap_res_s;
 
+static int col_ent_count = 0;
+static entity_coldata_s col_ent_map[MAX_ENTITY_COUNT];
+static entity_coldata_s *col_ents[MAX_ENTITY_COUNT];
+
 static uint col_contact_count = 0;
 static col_contact_s col_contacts[MAX_CONTACT_COUNT];
+// static u8 contact_pairs[ENTITY_PAIR_SIZE];
 
-// static u8 x_overlap_pairs[ENTITY_PAIR_SIZE];
-// static u8 y_overlap_pairs[ENTITY_PAIR_SIZE];
+static int x_overlap_count = 0;
+static col_bp_overlap_s x_overlaps[MAX_ENTITY_COUNT * 2];
+
+static int x_edge_count = 0;
+static col_bp_edge_s x_edges[EDGE_LIST_MAX_COUNT];
+
+static int y_edge_count = 0;
+static col_bp_edge_s y_edges[EDGE_LIST_MAX_COUNT];
+
+static u8 x_contact_pairs[ENTITY_PAIR_SIZE];
+static u8 y_contact_pairs[ENTITY_PAIR_SIZE];
+
+// static pqueue_entry_s contact_queue[MAX_CONTACT_COUNT];
 
 static inline int map_col_get_bounded(int x, int y)
 {
@@ -114,18 +140,175 @@ static col_overlap_res_s rect_collision(FIXED x0, FIXED y0, FIXED w0, FIXED h0,
     return res;
 }
 
-static bool physics_substep(entity_coldata_s *col_ents, int col_ent_count,
-                            FIXED vel_mult)
+static void col_ent_added(int col_ent_idx)
+{
+    LOG_DBG("col_ent_added %i", col_ent_idx);
+
+    x_edges[x_edge_count++] = (col_bp_edge_s)
+    {
+        .eid = (u16) col_ent_idx,
+        .left = true
+    };
+    x_edges[x_edge_count++] = (col_bp_edge_s)
+    {
+        .eid = (u16) col_ent_idx,
+        .left = false
+    };
+
+    y_edges[y_edge_count++] = (col_bp_edge_s)
+    {
+        .eid = (u16) col_ent_idx,
+        .left = true
+    };
+    y_edges[y_edge_count++] = (col_bp_edge_s)
+    {
+        .eid = (u16) col_ent_idx,
+        .left = false
+    };
+}
+        
+
+static void col_ent_removed(int col_ent_idx)
+{
+    LOG_DBG("col_ent_removed");
+
+    // remove x edge
+    for (int i = x_edge_count - 1; i >= 0; --i)
+    {
+        if (x_edges[i].eid == col_ent_idx)
+            DYNARR_REMOVE(x_edges, x_edge_count, i);
+    }
+
+    // remove y edge
+    for (int i = y_edge_count - 1; i >= 0; --i)
+    {
+        if (y_edges[i].eid == col_ent_idx)
+            DYNARR_REMOVE(y_edges, y_edge_count, i);
+    }
+}
+
+static void sort_edge_list(col_bp_edge_s *const list,
+                           const int list_count,
+                           u8 contact_pairs[ENTITY_PAIR_SIZE],
+                           col_bp_overlap_s *overlaps, int *overlap_count)
+{
+    for (int i = 1; i < list_count; ++i)
+    {
+        int j = i - 1;
+        while (list[j].pos > list[j+1].pos)
+        {
+            // LOG_DBG("swap %i%s %i%s",
+            //         (int) list[j].eid, list[j].left ? "L" : "R",
+            //         (int) list[j+1].eid, list[j+1].left ? "L" : "R");
+            {
+                col_bp_edge_s temp;
+                SWAP3(list[j], list[j+1], temp);
+            }
+
+            col_bp_edge_s *const edge1 = &list[j];
+            col_bp_edge_s *const edge2 = &list[j+1];
+
+            int eid1 = edge1->eid;
+            int eid2 = edge2->eid;
+
+            uint pair_key = upair2u(eid1, eid2);
+
+            // R-L -> L-R (add overlap)
+            if (edge1->left && !edge2->left)
+            {
+                ENTITY_PAIR_SET(contact_pairs, pair_key);
+
+                if (overlaps)
+                {
+                    // LOG_DBG("new X overlap %i %i", eid1, eid2);
+
+                    // for (int k = 0; k < *overlap_count; ++k)
+                    // {
+                    //     if ((overlaps[k].eid_a == eid1 && overlaps[k].eid_b == eid2) ||
+                    //         (overlaps[k].eid_a == eid2 && overlaps[k].eid_b == eid1))
+                    //     {
+                    //         LOG_ERR("overlap already exists in list!");
+                    //         break;
+                    //     }
+                    // }
+
+                    overlaps[(*overlap_count)++] = (col_bp_overlap_s)
+                    {
+                        .eid_a = eid1,
+                        .eid_b = eid2
+                    };
+                }
+            }
+            // L-R -> R-L (remove overlap)
+            else if (!edge1->left && edge2->left)
+            {
+                ENTITY_PAIR_CLEAR(contact_pairs, pair_key);
+
+                if (overlaps)
+                {
+                    // LOG_DBG("delete X overlap %i %i", eid1, eid2);
+                    int count = *overlap_count;
+                    for (int k = 0; k < count; ++k)
+                    {
+                        if ((overlaps[k].eid_a == eid1 && overlaps[k].eid_b == eid2) ||
+                            (overlaps[k].eid_a == eid2 && overlaps[k].eid_b == eid1))
+                        {
+                            DYNARR_REMOVE(overlaps, *overlap_count, k);
+                            goto overlap_found;
+                        }
+                    }
+                    LOG_ERR("overlap not found in list!");
+                    overlap_found:;
+                }
+            }
+
+            if (j == 0) break;
+            --j;
+        }
+    }
+}
+
+static void update_edge_lists(void)
+{
+    // sync x edges
+    for (int i = 0; i < x_edge_count; ++i)
+    {
+        col_bp_edge_s *edge = x_edges + i;
+        const entity_coldata_s *col_ent = col_ent_map + edge->eid;
+        const entity_s *ent = col_ent->ent;
+
+        if (edge->left)
+            edge->pos = ent->pos.x;
+        else
+            edge->pos = ent->pos.x + int2fx(ent->col.w);
+    }
+
+    // sync y edges
+    for (int i = 0; i < y_edge_count; ++i)
+    {
+        col_bp_edge_s *edge = y_edges + i;
+        const entity_coldata_s *col_ent = col_ent_map + edge->eid;
+        const entity_s *ent = col_ent->ent;
+
+        if (edge->left)
+            edge->pos = ent->pos.y;
+        else
+            edge->pos = ent->pos.y + int2fx(ent->col.h);
+    }
+
+    sort_edge_list(x_edges, x_edge_count, x_contact_pairs, x_overlaps,
+                   &x_overlap_count);
+    sort_edge_list(y_edges, y_edge_count, y_contact_pairs, NULL, NULL);
+}
+
+static bool physics_substep(FIXED vel_mult)
 {
     size_t contact_queue_size = 0;
-
-    static pqueue_entry_s contact_queue[MAX_CONTACT_COUNT];
-    static u8 contact_pairs[ENTITY_PAIR_SIZE];
 
     // first move all entities
     for (int i = 0; i < col_ent_count; ++i)
     {
-        entity_coldata_s *const col_ent = col_ents + i;
+        entity_coldata_s *const col_ent = col_ents[i];
         entity_s *entity = col_ent->ent;
 
         FIXED s_vx = fxmul(entity->vel.x, vel_mult);
@@ -147,25 +330,94 @@ static bool physics_substep(entity_coldata_s *col_ents, int col_ent_count,
             break;
         }
 
-        col_contact_count = 0;
-
-        // clear contact pair flags
-        memset32(contact_pairs, 0, sizeof(contact_pairs) / 4);
-
         #ifdef PHYS_PROFILE
         profile_start();
         #endif
 
-        // collect contacts
+        update_edge_lists();
+        col_contact_count = 0;
+
+        // collect entity contacts
+        for (int i = 0; i < x_overlap_count; ++i)
+        {
+            if (col_contact_count >= MAX_CONTACT_COUNT)
+            {
+                LOG_WRN("max contacts exceeded!");
+                goto exit_contact_collection;
+            }
+
+            const col_bp_overlap_s *x_overlap = x_overlaps + i;
+            uint pkey = upair2u(x_overlap->eid_a, x_overlap->eid_b);
+            if (!ENTITY_PAIR_GET(y_contact_pairs, pkey)) continue;
+
+            entity_coldata_s *col_ent = col_ent_map + x_overlap->eid_a;
+            entity_coldata_s *entc2 = col_ent_map + x_overlap->eid_b;
+
+            // make sure that the second is the one that isn't moving
+            if (entc2->ent->flags & ENTITY_FLAG_MOVING)
+            {
+                entity_coldata_s *temp;
+                SWAP3(col_ent, entc2, temp);
+            }
+
+            entity_s *entity = col_ent->ent;
+            entity_s *ent2 = entc2->ent;
+
+            // if both entities are static objects, collision cannot happen
+            // between them.
+            if (!(entity->flags & ENTITY_FLAG_MOVING) &&
+                !(ent2->flags & ENTITY_FLAG_MOVING))
+                continue;
+
+            const FIXED col_w = int2fx((int)entity->col.w);
+            const FIXED col_h = int2fx((int)entity->col.h);
+            // const uint col_group = (uint)entity->col.group;
+            const uint col_mask = (uint)entity->col.mask;
+
+            if (col_ent == entc2)
+            {
+                LOG_WRN("entity contact is with itself? how tf?");
+                continue;
+            }
+
+            const FIXED c2_w = int2fx((int)ent2->col.w);
+            const FIXED c2_h = int2fx((int)ent2->col.h);
+            
+            col_overlap_res_s overlap_res =
+                rect_collision(entity->pos.x, entity->pos.y, col_w, col_h,
+                                ent2->pos.x, ent2->pos.y, c2_w, c2_h);
+
+            if (!overlap_res.overlap) continue;
+            if (overlap_res.ny >= 0 && ent2->col.flags & COL_FLAG_FLOOR_ONLY)
+                continue;
+            if (overlap_res.ny <= 0 && entity->col.flags & COL_FLAG_FLOOR_ONLY)
+                continue;
+
+            // pqueue_enqueue(contact_queue,
+            //                &contact_queue_size, MAX_CONTACT_COUNT,
+            //                col_contacts + col_contact_count, pd);
+
+            col_contacts[col_contact_count] = (col_contact_s)
+            {
+                .nx = overlap_res.nx,
+                .ny = overlap_res.ny,
+                .pd = overlap_res.pd,
+                .ent_a = col_ent,
+                .ent_b = entc2
+            };
+            ++col_contact_count;
+        }
+
+        // collect tile contacts
         for (int i = 0; i < col_ent_count; ++i)
         {
             if (col_contact_count >= MAX_CONTACT_COUNT)
             {
                 LOG_WRN("max contacts exceeded!");
-                break;
+                goto exit_contact_collection;
             }
 
-            entity_coldata_s *const col_ent = col_ents + i;
+            entity_coldata_s *const col_ent = col_ents[i];
             entity_s *entity = col_ent->ent;
 
             if (!(entity->flags & ENTITY_FLAG_MOVING)) continue;
@@ -175,48 +427,6 @@ static bool physics_substep(entity_coldata_s *col_ents, int col_ent_count,
             // const uint col_group = (uint)entity->col.group;
             const uint col_mask = (uint)entity->col.mask;
 
-            // entity contacts
-            for (int j = 0; j < col_ent_count; ++j)
-            {
-                entity_coldata_s *const entc2 = col_ents + j;
-                if (col_ent == entc2) continue;
-
-                uint pkey = upair2u(i, j);
-                
-                if (ENTITY_PAIR_GET(contact_pairs, pkey))
-                    continue;
-
-                entity_s *ent2 = entc2->ent;
-                const FIXED c2_w = int2fx((int)ent2->col.w);
-                const FIXED c2_h = int2fx((int)ent2->col.h);
-                
-                col_overlap_res_s overlap_res =
-                    rect_collision(entity->pos.x, entity->pos.y, col_w, col_h,
-                                   ent2->pos.x, ent2->pos.y, c2_w, c2_h);
-
-                if (!overlap_res.overlap) continue;
-                if (overlap_res.ny >= 0 && ent2->col.flags & COL_FLAG_FLOOR_ONLY)
-                    continue;
-                if (overlap_res.ny <= 0 && entity->col.flags & COL_FLAG_FLOOR_ONLY)
-                    continue;
-
-                ENTITY_PAIR_SET(contact_pairs, pkey);
-                // pqueue_enqueue(contact_queue,
-                //                &contact_queue_size, MAX_CONTACT_COUNT,
-                //                col_contacts + col_contact_count, pd);
-
-                col_contacts[col_contact_count] = (col_contact_s)
-                {
-                    .nx = overlap_res.nx,
-                    .ny = overlap_res.ny,
-                    .pd = overlap_res.pd,
-                    .ent_a = col_ent,
-                    .ent_b = entc2
-                };
-                ++col_contact_count;
-            }
-
-            // tile contacts
             if (col_mask & COLGROUP_DEFAULT)
             {
                 const int el = entity->pos.x;
@@ -284,6 +494,8 @@ static bool physics_substep(entity_coldata_s *col_ents, int col_ent_count,
                 }
             }
         }
+
+        exit_contact_collection:;
 
         #ifdef PHYS_PROFILE
         detection_time += profile_stop();
@@ -416,7 +628,7 @@ static bool physics_substep(entity_coldata_s *col_ents, int col_ent_count,
 
     for (int i = 0; i < col_ent_count; ++i)
     {
-        entity_s *entity = col_ents[i].ent;
+        entity_s *entity = col_ents[i]->ent;
         if (entity->vel.x != 0 || entity->vel.y != 0)
         {
             no_movement = false;
@@ -427,35 +639,62 @@ static bool physics_substep(entity_coldata_s *col_ents, int col_ent_count,
     return no_movement;
 }
 
+void game_physics_init(void)
+{
+    for (int i = 0; i < MAX_ENTITY_COUNT; ++i)
+        col_ent_map[i] = (entity_coldata_s){0};
+
+    memset32(x_contact_pairs, 0, ENTITY_PAIR_SIZE / 4);
+    memset32(y_contact_pairs, 0, ENTITY_PAIR_SIZE / 4);
+}
+
 void game_physics_update(void)
 {
     col_contact_count = 0;
-
-    static entity_coldata_s col_ents[MAX_ENTITY_COUNT];
-    int col_ent_count = 0;
+    col_ent_count = 0;
     int substeps = 0;
 
     for (int i = 0; i < MAX_ENTITY_COUNT; ++i)
     {
         entity_s *entity = g_game.entities + i;
-        if (!(entity->flags & ENTITY_FLAG_ENABLED)) continue;
 
+        bool is_col_ent = (entity->flags & ENTITY_FLAG_ENABLED) &&
+                          (entity->flags & ENTITY_FLAG_COLLIDE);
+
+        if (is_col_ent)
+        {
+            if (!col_ent_map[i].ent)
+            {
+                col_ent_map[i].ent = entity;
+                col_ent_added(i);
+            }
+        }
+        else
+        {
+            if (col_ent_map[i].ent)
+            {
+                col_ent_removed(i);
+                col_ent_map[i].ent = NULL;
+            }
+        }
+
+        if (!(entity->flags & ENTITY_FLAG_ENABLED))
+            continue;
+        
         if (entity->flags & ENTITY_FLAG_ACTOR)
             entity->actor.flags &= ~(ACTOR_FLAG_GROUNDED | ACTOR_FLAG_WALL |
                                     ACTOR_FLAG_DID_JUMP);
-
+        
         if (!(entity->flags & ENTITY_FLAG_COLLIDE)) continue;
         
-        col_ents[col_ent_count++] = (entity_coldata_s)
-        {
-            .ent = entity,
-            .inv_mass = fxdiv(FIX_ONE * 2, int2fx((int)entity->mass))
-        };
+        col_ent_map[i].inv_mass = fxdiv(FIX_ONE * 2, int2fx((int)entity->mass));
 
         int speed = max(abs(entity->vel.x), abs(entity->vel.y));
         int subst = ceil_div(speed, FIX_ONE * 2);
         if (subst > substeps)
             substeps = subst;
+
+        col_ents[col_ent_count++] = col_ent_map + i;
     }
 
     // probably good if i snap the substep count to a power of two, so that
@@ -471,6 +710,6 @@ void game_physics_update(void)
     FIXED vel_mult = FIX_ONE / substeps;
     for (int i = 0; i < substeps; ++i)
     {
-        if (physics_substep(col_ents, col_ent_count, vel_mult)) break;
+        if (physics_substep(vel_mult)) break;
     }
 }
