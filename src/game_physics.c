@@ -816,10 +816,24 @@ void game_physics_move_projs(FIXED vel_mult)
     for (projectile_s *proj = g_game.projectiles; proj != projectile_end;
         ++proj, ++pdata)
     {
-        if (!IS_PROJ_ACTIVE(proj)) continue;
+        if (!IS_PROJ_ACTIVE(proj) || (proj->flags & PROJ_FLAG_QFREE)) continue;
 
         proj->px += fxmul(proj->vx, vel_mult);
         proj->py += fxmul(proj->vy, vel_mult);
+
+        // if projectile touches a wall, Destroy it.
+        int tx = proj->px / (WORLD_TILE_SIZE * FIX_SCALE);
+        int ty = proj->py / (WORLD_TILE_SIZE * FIX_SCALE);
+        if (tx < 0) --tx;
+        if (ty < 0) --ty;
+
+        int map_col = map_col_get_bounded(tx, ty);
+        if (map_col == 1 || map_col == 3)
+        {
+            // it was Destroyed.
+            projectile_queue_free(proj);
+            continue;
+        }
 
         int new_px = proj->px / (FIX_ONE * PARTGRID_CEL_W);
         int new_py = proj->py / (FIX_ONE * PARTGRID_CEL_H);

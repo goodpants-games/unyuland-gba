@@ -129,6 +129,7 @@ void entity_free(entity_s *entity)
 
 bool entity_queue_free(entity_s *ent)
 {
+    if (ent->flags & ENTITY_FLAG_QFREE) return true;
     if (ent_free_queue_count >= FREE_QUEUE_MAX_SIZE)
         return false;
 
@@ -191,6 +192,7 @@ void projectile_free(projectile_s *proj)
 
 bool projectile_queue_free(projectile_s *proj)
 {
+    if (proj->flags & PROJ_FLAG_QFREE) return true;
     if (proj_free_queue_count >= FREE_QUEUE_MAX_SIZE)
         return false;
 
