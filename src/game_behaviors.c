@@ -391,6 +391,18 @@ static void behavior_crawler_update(entity_s *self)
         self->sprite.flags |= SPRITE_FLAG_FLIP_X;
 }
 
+static bool behavior_crawler_proj_touch(entity_s *self, projectile_s *proj)
+{
+    if (proj->kind == PROJ_KIND_PLAYER)
+    {
+        entity_queue_free(self);
+        return false;
+    }
+
+    return true;
+}
+
 const behavior_def_s behavior_crawler = {
-    .update = behavior_crawler_update
+    .update = behavior_crawler_update,
+    .proj_touch = behavior_crawler_proj_touch
 };

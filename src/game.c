@@ -10,7 +10,7 @@
 
 #define GRAVITY TO_FIXED(0.1)
 #define MAX_RENDER_OBJS ((MAX_ENTITY_COUNT + MAX_PROJECTILE_COUNT))
-#define PROJ_FREE_QUEUE_MAX_SIZE 16
+#define FREE_QUEUE_MAX_SIZE 16
 
 typedef enum render_obj_t
 {
@@ -63,8 +63,11 @@ game_s g_game;
 static uint render_object_count = 0;
 static render_obj_s render_objects[MAX_RENDER_OBJS];
 
+static int ent_free_queue_count = 0;
+static entity_s *ent_free_queue[FREE_QUEUE_MAX_SIZE];
+
 static int proj_free_queue_count = 0;
-static projectile_s *proj_free_queue[PROJ_FREE_QUEUE_MAX_SIZE];
+static projectile_s *proj_free_queue[FREE_QUEUE_MAX_SIZE];
 
 entity_s* entity_alloc(void)
 {
@@ -124,6 +127,16 @@ void entity_free(entity_s *entity)
     LOG_ERR("entity_free: could not find entity in render list");
 }
 
+bool entity_queue_free(entity_s *ent)
+{
+    if (ent_free_queue_count >= FREE_QUEUE_MAX_SIZE)
+        return false;
+
+    ent_free_queue[ent_free_queue_count++] = ent;
+    ent->flags |= ENTITY_FLAG_QFREE;
+    return true;
+}
+
 projectile_s* projectile_alloc(void)
 {
     for (int i = 0; i < MAX_PROJECTILE_COUNT; ++i)
@@ -178,7 +191,7 @@ void projectile_free(projectile_s *proj)
 
 bool projectile_queue_free(projectile_s *proj)
 {
-    if (proj_free_queue_count >= PROJ_FREE_QUEUE_MAX_SIZE)
+    if (proj_free_queue_count >= FREE_QUEUE_MAX_SIZE)
         return false;
 
     proj_free_queue[proj_free_queue_count++] = proj;
@@ -296,13 +309,17 @@ void game_init(void)
 
 void game_update(void)
 {
+    update_entities();
+    update_projectiles();
+    game_physics_update();
+
     for (int i = 0; i < proj_free_queue_count; ++i)
         projectile_free(proj_free_queue[i]);
     proj_free_queue_count = 0;
 
-    update_entities();
-    update_projectiles();
-    game_physics_update();
+    for (int i = 0; i < ent_free_queue_count; ++i)
+        entity_free(ent_free_queue[i]);
+    ent_free_queue_count = 0;
 }
 
 #define READ8(ptr, accum) (accum = *((ptr)++), \

@@ -14,6 +14,7 @@
 #define ENTITY_FLAG_COLLIDE              8
 #define ENTITY_FLAG_REMOVE_ON_CHECKPOINT 16
 #define ENTITY_FLAG_KEEP_ON_ROOM_CHANGE  32
+#define ENTITY_FLAG_QFREE                64
 
 #define ACTOR_FLAG_GROUNDED   1
 #define ACTOR_FLAG_WALL       2
@@ -196,10 +197,14 @@ extern game_s g_game;
 entity_s* entity_alloc(void);
 void entity_free(entity_s *entity);
 
+// queue projectile to be freed at the end of the frame.
+// returns false if queue is full.
+bool entity_queue_free(entity_s *proj);
+
 projectile_s* projectile_alloc(void);
 void projectile_free(projectile_s *proj);
 
-// queue projectile to be freed at the start of the next game_update call.
+// queue projectile to be freed at the start of the frame.
 // returns false if queue is full.
 bool projectile_queue_free(projectile_s *proj);
 
