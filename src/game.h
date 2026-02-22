@@ -42,11 +42,25 @@
 #define PLAYER_DROPLET_TYPE_SIDE_SLOW 1
 #define PLAYER_DROPLET_TYPE_UP        2
 
+typedef enum dir4
+{
+    DIR4_RIGHT,
+    DIR4_UP,
+    DIR4_LEFT,
+    DIR4_DOWN
+} dir4_e;
+
 typedef enum entity_msgid
 {
     ENTITY_MSG_INTERACT,
     ENTITY_MSG_ATTACKED
 } entity_msgid_e;
+
+typedef enum proj_kind
+{
+    PROJ_KIND_PLAYER,
+    PROJ_KIND_ENEMY
+} proj_kind_e;
 
 struct entity;
 
@@ -57,7 +71,8 @@ typedef struct behavior_def
     void (*free)(struct entity *self);
 } behavior_def_s;
 
-typedef struct entity {
+typedef struct entity
+{
     u32 flags;
 
     struct { FIXED x; FIXED y; } pos;
@@ -98,13 +113,15 @@ typedef struct entity {
     const behavior_def_s *behavior;
 } entity_s;
 
-typedef enum dir4
+typedef struct projectile
 {
-    DIR4_RIGHT,
-    DIR4_UP,
-    DIR4_LEFT,
-    DIR4_DOWN
-} dir4_e;
+    u8 active;
+    u8 kind;
+    u8 graphic_id;
+
+    FIXED px, py;
+    FIXED vx, vy;
+} projectile_s;
 
 typedef struct room_trans_state
 {
@@ -119,6 +136,8 @@ typedef struct room_trans_state
 
 typedef struct game {
     entity_s entities[MAX_ENTITY_COUNT];
+    projectile_s projectiles[MAX_PROJECTILE_COUNT];
+
     const map_header_s *map;
     const u8 *room_collision;
     int room_width;
@@ -161,6 +180,9 @@ extern game_s g_game;
 
 entity_s* entity_alloc(void);
 void entity_free(entity_s *entity);
+
+projectile_s* projectile_alloc(void);
+void projectile_free(projectile_s *proj);
 
 void game_init(void);
 void game_update(void);

@@ -8,9 +8,17 @@
 // player_behavior //
 /////////////////////
 
+typedef enum player_spit_mode
+{
+    PLAYER_SPIT_MODE_PLATFORM,
+    PLAYER_SPIT_MODE_BULLET,
+}
+player_spit_mode_e;
+
 typedef struct player_data
 {
     bool spitting;
+    int spit_mode;
 } player_data_s;
 
 void entity_player_init(entity_s *self)
@@ -33,6 +41,57 @@ void entity_player_init(entity_s *self)
     self->behavior = &behavior_player;
 
     *data = (player_data_s){0};
+}
+
+static void player_platform_spit(entity_s *self)
+{
+    if (!(self->actor.flags & ACTOR_FLAG_GROUNDED)) return;
+
+    player_data_s *data = (player_data_s *)self->userdata;
+
+    entity_s *droplet = entity_alloc();
+    if (droplet)
+    {
+        int type, dir;
+        FIXED x = self->pos.x + int2fx(3);
+        FIXED y = self->pos.y + int2fx(4);
+        
+        if (key_is_down(KEY_UP))
+        {
+            type = PLAYER_DROPLET_TYPE_UP;
+            dir = 0;
+        }
+        else
+        {
+            dir = (int) self->actor.face_dir;
+
+            type = key_is_down(KEY_DOWN) ? PLAYER_DROPLET_TYPE_SIDE_SLOW
+                                        : PLAYER_DROPLET_TYPE_SIDE;
+        }
+
+        entity_player_droplet_init(droplet, x, y, type, dir);
+        data->spitting = true;
+        self->sprite.graphic_id = SPRID_GAME_PLAYER_SPIT;
+        self->sprite.accum = 0;
+        self->sprite.frame = 0;
+        self->sprite.flags |= SPRITE_FLAG_PLAYING;
+        self->vel.x = 0;
+    }
+}
+
+static void player_bullet_spit(entity_s *self)
+{
+    projectile_s *proj = projectile_alloc();
+    if (!proj) return;
+
+    LOG_DBG("create player bullet");
+
+    proj->px = self->pos.x + int2fx(self->col.w) / 2;
+    proj->py = self->pos.y + int2fx(self->col.h) / 2;
+    proj->vx = int2fx(1);
+    proj->vy = 0;
+    proj->kind = PROJ_KIND_PLAYER;
+    proj->graphic_id = SPRID_GAME_WATER_DROPLET;
 }
 
 static void behavior_player_update(entity_s *self)
@@ -68,37 +127,19 @@ static void behavior_player_update(entity_s *self)
         if (key_hit(KEY_B))
             self->actor.jump_trigger = 8;
 
-        if (key_hit(KEY_A) && self->actor.flags & ACTOR_FLAG_GROUNDED &&
+        if (key_hit(KEY_A) &&
             can_move)
         {
-            entity_s *droplet = entity_alloc();
-            if (droplet)
-            {
-                int type, dir;
-                FIXED x = self->pos.x + int2fx(3);
-                FIXED y = self->pos.y + int2fx(4);
-                
-                if (key_is_down(KEY_UP))
-                {
-                    type = PLAYER_DROPLET_TYPE_UP;
-                    dir = 0;
-                }
-                else
-                {
-                    dir = (int) self->actor.face_dir;
+            if (data->spit_mode == PLAYER_SPIT_MODE_PLATFORM)
+                player_platform_spit(self);
+            else if (data->spit_mode == PLAYER_SPIT_MODE_BULLET)
+                player_bullet_spit(self);
+        }
 
-                    type = key_is_down(KEY_DOWN) ? PLAYER_DROPLET_TYPE_SIDE_SLOW
-                                                 : PLAYER_DROPLET_TYPE_SIDE;
-                }
-
-                entity_player_droplet_init(droplet, x, y, type, dir);
-                data->spitting = true;
-                self->sprite.graphic_id = SPRID_GAME_PLAYER_SPIT;
-                self->sprite.accum = 0;
-                self->sprite.frame = 0;
-                self->sprite.flags |= SPRITE_FLAG_PLAYING;
-                self->vel.x = 0;
-            }
+        if (key_hit(KEY_L))
+        {
+            if (++data->spit_mode >= 2)
+                data->spit_mode = 0;
         }
     }
 

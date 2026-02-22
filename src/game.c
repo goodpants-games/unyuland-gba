@@ -9,6 +9,13 @@
 #include "math_util.h"
 
 #define GRAVITY TO_FIXED(0.1)
+#define MAX_RENDER_OBJS ((MAX_ENTITY_COUNT + MAX_PROJECTILE_COUNT))
+
+typedef enum render_obj_t
+{
+    RENDER_OBJ_SPRITE,
+    RENDER_OBJ_PROJECTILE
+} render_obj_t_e;
 
 typedef struct gfx_frame
 {
@@ -43,10 +50,17 @@ typedef struct gfx_root_header {
     gfx_sprite_s sprite0;
 } gfx_root_header_s;
 
+typedef struct render_obj
+{
+    u8 type;
+    void *item;
+}
+render_obj_s;
+
 game_s g_game;
 
-static uint sprite_render_arr_size = 0;
-static entity_s *sprite_render_arr[MAX_ENTITY_COUNT];
+static uint render_object_count = 0;
+static render_obj_s render_objects[MAX_RENDER_OBJS];
 
 entity_s* entity_alloc(void)
 {
@@ -64,7 +78,15 @@ entity_s* entity_alloc(void)
             .col.mask = COLGROUP_ALL
         };
 
-        sprite_render_arr[sprite_render_arr_size++] = ent;
+        if (render_object_count == MAX_RENDER_OBJS)
+            LOG_ERR("render object pool is full!");
+        else
+            render_objects[render_object_count++] = (render_obj_s)
+            {
+                .type = RENDER_OBJ_SPRITE,
+                .item = ent
+            };
+
         return ent;
     }
 
@@ -83,21 +105,71 @@ void entity_free(entity_s *entity)
     entity->flags = 0;
 
     // remove from render list
-    for (int i = 0; i < sprite_render_arr_size; ++i)
+    for (int i = 0; i < render_object_count; ++i)
     {
-        if (sprite_render_arr[i] == entity)
+        if (render_objects[i].item == entity)
         {
-            int end = sprite_render_arr_size - 1;
+            int end = render_object_count - 1;
             for (int j = i; j < end; ++j)
-            {
-                sprite_render_arr[j] = sprite_render_arr[j+1];
-            }
-            --sprite_render_arr_size;
+                render_objects[j] = render_objects[j+1];
+            --render_object_count;
             return;
         }
     }
 
     LOG_ERR("entity_free: could not find entity in render list");
+}
+
+projectile_s* projectile_alloc(void)
+{
+    for (int i = 0; i < MAX_PROJECTILE_COUNT; ++i)
+    {
+        projectile_s *proj = g_game.projectiles + i;
+        if (proj->active) continue;
+
+        *proj = (projectile_s)
+        {
+            .active = true,
+        };
+
+        if (render_object_count == MAX_RENDER_OBJS)
+            LOG_ERR("render object pool is full!");
+        else
+            render_objects[render_object_count++] = (render_obj_s)
+            {
+                .type = RENDER_OBJ_PROJECTILE,
+                .item = proj
+            };
+        
+        game_physics_on_proj_alloc(proj);
+        return proj;
+    }
+
+    LOG_ERR("projectile pool is full!");
+    return NULL;
+}
+
+void projectile_free(projectile_s *proj)
+{
+    if (!proj->active) return;
+
+    game_physics_on_proj_free(proj);
+    proj->active = false;
+
+    // remove from render list
+    for (int i = 0; i < render_object_count; ++i)
+    {
+        if (render_objects[i].item == proj)
+        {
+            int end = render_object_count - 1;
+            for (int j = i; j < end; ++j)
+                render_objects[j] = render_objects[j+1];
+            --render_object_count;
+            return;
+        }
+    }
+
+    LOG_ERR("projectile_free: could not find projectile in render list");
 }
 
 static void update_entities(void)
@@ -199,7 +271,8 @@ void game_init(void)
 void game_update(void)
 {
     update_entities();
-    game_physics_update();
+    game_physics_update_ents();
+    game_physics_update_projs();
 }
 
 #define READ8(ptr, accum) (accum = *((ptr)++), \
@@ -306,18 +379,26 @@ void game_load_room(const map_header_s *map)
     }
 }
 
+static inline int render_obj_zidx(const render_obj_s *obj)
+{
+    if (obj->type == RENDER_OBJ_SPRITE)
+        return ((entity_s *)obj->item)->sprite.zidx;
+    else
+        return 0;
+}
+
 void game_render(int *p_last_obj_index)
 {
     // sort render list by z index
-    for (int i = 1; i < sprite_render_arr_size; ++i)
+    for (int i = 1; i < render_object_count; ++i)
     {
         for (int j = i; j > 0; --j)
         {
-            if (sprite_render_arr[j]->sprite.zidx > sprite_render_arr[j-1]->sprite.zidx)
+            if (render_obj_zidx(&render_objects[j]) > render_obj_zidx(&render_objects[j-1]))
             {
-                entity_s *temp = sprite_render_arr[j];
-                sprite_render_arr[j] = sprite_render_arr[j-1];
-                sprite_render_arr[j-1] = temp;
+                render_obj_s temp = render_objects[j];
+                render_objects[j] = render_objects[j-1];
+                render_objects[j-1] = temp;
             }
         }
     }
@@ -336,13 +417,42 @@ void game_render(int *p_last_obj_index)
         (const gfx_obj_s *)((uintptr_t)gfx_root_header + gfx_root_header->obj_pool);
 
     int obj_index = 0;
-    for (int i = 0; i < sprite_render_arr_size; ++i)
+    for (int i = 0; i < render_object_count; ++i)
     {
-        entity_s *ent = sprite_render_arr[i];
-        if (!(ent->flags & ENTITY_FLAG_ENABLED)) continue;
+        const render_obj_s *robj = render_objects + i;
 
-        int draw_x = (ent->pos.x >> FIX_SHIFT) + ent->sprite.ox;
-        int draw_y = (ent->pos.y >> FIX_SHIFT) + ent->sprite.oy;
+        int sprite_graphic_id;
+        int sprite_frame;
+        bool sprite_hflip, sprite_vflip;
+        int draw_x, draw_y;
+
+        if (robj->type == RENDER_OBJ_SPRITE)
+        {
+            entity_s *ent = (entity_s *)robj->item;
+
+            draw_x = (ent->pos.x >> FIX_SHIFT) + ent->sprite.ox;
+            draw_y = (ent->pos.y >> FIX_SHIFT) + ent->sprite.oy;
+            sprite_graphic_id = (int) ent->sprite.graphic_id;
+            sprite_frame = (int) ent->sprite.frame;
+            sprite_hflip = ent->sprite.flags & SPRITE_FLAG_FLIP_X;
+            sprite_vflip = ent->sprite.flags & SPRITE_FLAG_FLIP_Y;
+        }
+        else if (robj->type == RENDER_OBJ_PROJECTILE)
+        {
+            projectile_s *proj = (projectile_s *)robj->item;
+            draw_x = (proj->px >> FIX_SHIFT) - 4;
+            draw_y = (proj->py >> FIX_SHIFT) - 4;
+            sprite_graphic_id = SPRID_GAME_BULLET;
+            sprite_frame = 0;
+            sprite_hflip = false;
+            sprite_vflip = false;
+        }
+        else
+        {
+            LOG_ERR("unknown render object type %i", (int) robj->type);
+            continue;
+        }
+
         int draw_cam_x = (draw_x - g_game.cam_x) * 2;
         int draw_cam_y = (draw_y - g_game.cam_y) * 2;
 
@@ -356,12 +466,7 @@ void game_render(int *p_last_obj_index)
             continue;
         }
 
-        int sprite_frame = ent->sprite.frame;
-        int sprite_time_accum = ent->sprite.accum;
-        bool sprite_hflip = ent->sprite.flags & SPRITE_FLAG_FLIP_X;
-        bool sprite_vflip = ent->sprite.flags & SPRITE_FLAG_FLIP_Y;
-
-        const gfx_sprite_s *spr = &gfx_sprites[ent->sprite.graphic_id];
+        const gfx_sprite_s *spr = &gfx_sprites[sprite_graphic_id];
         const gfx_frame_s *frame = frame_pool + spr->frame_pool_idx + sprite_frame;
         const gfx_obj_s *objs = obj_pool + frame->obj_pool_index;
 
@@ -404,9 +509,26 @@ void game_render(int *p_last_obj_index)
             
             if (++obj_index >= 64) goto exit_entity_loop;
         }
+    }
+    exit_entity_loop:;
 
-        // update sprite animation
-        if ((ent->sprite.flags & SPRITE_FLAG_PLAYING) && ++sprite_time_accum >= frame_len)
+    // update sprite animation
+    for (int i = 0; i < MAX_ENTITY_COUNT; ++i)
+    {
+        entity_s *ent = g_game.entities + i;
+        if (!(ent->flags & ENTITY_FLAG_ENABLED)) continue;
+        if (!(ent->sprite.flags & SPRITE_FLAG_PLAYING)) continue;
+
+        int sprite_time_accum = ent->sprite.accum;
+        int sprite_frame = ent->sprite.frame;
+
+        const gfx_sprite_s *spr = &gfx_sprites[ent->sprite.graphic_id];
+        const gfx_frame_s *frame = frame_pool + spr->frame_pool_idx + sprite_frame;
+
+        int frame_count = spr->frame_count;
+        int frame_len = frame->frame_len;
+
+        if (++sprite_time_accum >= frame_len)
         {
             sprite_time_accum = 0;
             if (sprite_frame == frame_count - 1)
@@ -425,8 +547,6 @@ void game_render(int *p_last_obj_index)
         ent->sprite.frame = sprite_frame;
         ent->sprite.accum = sprite_time_accum;
     }
-
-    exit_entity_loop:;
 
     int last_obj_index = *p_last_obj_index;
     for (int i = obj_index; i < last_obj_index; ++i)

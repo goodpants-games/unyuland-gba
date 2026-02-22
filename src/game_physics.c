@@ -7,6 +7,12 @@
 #include "log.h"
 #include "tonc_math.h"
 
+// in world units (8 units per tile)
+#define PARTGRID_CEL_W 64
+#define PARTGRID_CEL_H 64
+#define PARTGRID_COLS  8
+#define PARTGRID_ROWS  8
+#define PARTGRID_NODE_POOL_SIZE 128
 
 #define ENTITY_PAIR_SIZE \
     IALIGN(CEIL_DIV(UPAIR2U(MAX_ENTITY_COUNT - 1, MAX_ENTITY_COUNT - 1), 8), 4)
@@ -52,6 +58,28 @@ typedef struct col_overlap_res {
     FIXED nx, ny, pd;
 } col_overlap_res_s;
 
+typedef struct partgrid_node
+{
+    projectile_s *projectile;
+
+    // if active (i.e. projectile != NULL), this points to the next node
+    // in the partition cell linked list. if inactive, this instead points to
+    // the next unallocated node in the pool.
+    union
+    {
+        struct partgrid_node *next;
+        struct partgrid_node *next_free;
+    };
+} partgrid_node_s;
+
+typedef partgrid_node_s *part_cell_t;
+
+typedef struct proj_part_data
+{
+    part_cell_t *part_cell;
+}
+proj_part_data_s;
+
 static int col_ent_count = 0;
 static entity_coldata_s col_ent_map[MAX_ENTITY_COUNT];
 static entity_coldata_s *col_ents[MAX_ENTITY_COUNT];
@@ -71,6 +99,11 @@ static col_bp_edge_s y_edges[EDGE_LIST_MAX_COUNT];
 
 static u8 x_contact_pairs[ENTITY_PAIR_SIZE];
 static u8 y_contact_pairs[ENTITY_PAIR_SIZE];
+
+static proj_part_data_s proj_data[MAX_PROJECTILE_COUNT];
+static partgrid_node_s partgrid_node_pool[PARTGRID_NODE_POOL_SIZE];
+static partgrid_node_s *partgrid_node_pool_ffree; // first free
+static part_cell_t partgrid[PARTGRID_ROWS][PARTGRID_COLS];
 
 // static pqueue_entry_s contact_queue[MAX_CONTACT_COUNT];
 
@@ -644,11 +677,23 @@ void game_physics_init(void)
     for (int i = 0; i < MAX_ENTITY_COUNT; ++i)
         col_ent_map[i] = (entity_coldata_s){0};
 
+    for (int i = 0; i < PARTGRID_NODE_POOL_SIZE - 1; ++i)
+        partgrid_node_pool[i] = (partgrid_node_s)
+        {
+            .next_free = partgrid_node_pool + i + 1
+        };
+
+    partgrid_node_pool[PARTGRID_NODE_POOL_SIZE - 1] = (partgrid_node_s){0};
+    partgrid_node_pool_ffree = partgrid_node_pool;
+
+    for (int i = 0; i < PARTGRID_COLS * PARTGRID_ROWS; ++i)
+        ((part_cell_t *)partgrid)[i] = NULL;
+
     memset32(x_contact_pairs, 0, ENTITY_PAIR_SIZE / 4);
     memset32(y_contact_pairs, 0, ENTITY_PAIR_SIZE / 4);
 }
 
-void game_physics_update(void)
+void game_physics_update_ents(void)
 {
     col_contact_count = 0;
     col_ent_count = 0;
@@ -711,5 +756,134 @@ void game_physics_update(void)
     for (int i = 0; i < substeps; ++i)
     {
         if (physics_substep(vel_mult)) break;
+    }
+}
+
+static partgrid_node_s* partgrid_node_alloc(projectile_s *proj)
+{
+    partgrid_node_s *node = partgrid_node_pool_ffree;
+    if (!node)
+    {
+        LOG_ERR("partgrid_node_pool full!");
+        return NULL;
+    }
+
+    partgrid_node_pool_ffree = node->next_free;
+
+    *node = (partgrid_node_s)
+    {
+        .projectile = proj,
+    };
+
+    return node;
+}
+
+static void partgrid_node_free(partgrid_node_s *node)
+{
+    node->projectile = NULL;
+    node->next_free = partgrid_node_pool_ffree;
+    partgrid_node_pool_ffree = node;
+}
+
+static partgrid_node_s* partgrid_cell_remove(partgrid_node_s **cell,
+                                             const projectile_s *proj)
+{
+    LOG_DBG("partgrid_cell_remove called");
+
+    if (!(*cell)) return NULL;
+
+    if ((*cell)->projectile == proj)
+    {
+        partgrid_node_s *node = *cell;
+        *cell = node->next;
+        return node;
+    }
+
+    partgrid_node_s *node = *cell;
+    partgrid_node_s *next = node->next;
+    while (next)
+    {
+        if (next->projectile == proj)
+        {
+            node->next = next->next;
+            return next;
+        }
+
+        node = next;
+        next = next->next;
+    }
+
+    return NULL;
+}
+
+static void partgrid_cell_insert(partgrid_node_s **cell,
+                                 partgrid_node_s *new_node)
+{
+    LOG_DBG("partgrid_cell_insert called");
+
+    new_node->next = *cell;
+    *cell = new_node;
+}
+
+void game_physics_on_proj_alloc(projectile_s *proj)
+{
+    intptr_t idx = proj - g_game.projectiles; // does this do division??
+    LOG_DBG("projectile %i allocated", (int) idx);
+    proj_data[idx] = (proj_part_data_s)
+    {
+        .part_cell = NULL
+    };
+}
+
+void game_physics_on_proj_free(projectile_s *proj)
+{
+    intptr_t idx = proj - g_game.projectiles; // does this do division??
+    LOG_DBG("projectile %i freed", (int) idx);
+
+    partgrid_node_s *cell = partgrid_cell_remove(proj_data[idx].part_cell, proj);
+    if (!cell)
+    {
+        LOG_WRN("game_physics_on_proj_free: projectile is not in partgrid?");
+        return;
+    }
+
+    partgrid_node_free(cell);
+}
+
+void game_physics_update_projs(void)
+{    
+    projectile_s *projectile_end = g_game.projectiles + MAX_PROJECTILE_COUNT;
+    proj_part_data_s *pdata = proj_data;
+    for (projectile_s *proj = g_game.projectiles; proj != projectile_end;
+        ++proj, ++pdata)
+    {
+        if (!proj->active) continue;
+
+        proj->px += proj->vx;
+        proj->py += proj->vy;
+
+        int new_px = proj->px / (FIX_ONE * PARTGRID_CEL_W);
+        int new_py = proj->py / (FIX_ONE * PARTGRID_CEL_H);
+        
+        part_cell_t *new_part_cell = &partgrid[new_py][new_px];
+
+        // location in partition grid changed
+        if (pdata->part_cell != new_part_cell)
+        {
+            LOG_DBG("location in partition grid changed");
+            
+            // remove from linked list of old cell
+            partgrid_node_s *node = pdata->part_cell
+                ? partgrid_cell_remove(pdata->part_cell, proj)
+                : NULL;
+            if (!node)
+            {
+                LOG_DBG("old partition cell had no data");
+                node = partgrid_node_alloc(proj);
+            }
+
+            partgrid_cell_insert(new_part_cell, node);
+            pdata->part_cell = new_part_cell;
+        }
     }
 }
