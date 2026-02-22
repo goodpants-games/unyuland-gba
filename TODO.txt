@@ -1,8 +1,22 @@
-- make it so text bitmap is intermediarily handled in iwram, then before vsync
-  DMA it to the correct portion of VRAM (perhaps limit it to one line per frame
-  or something. i dunno.) this theoretically should make it faster writing text
-  in case that it is too slow, because iwram is (probably) faster to read/write
-  from/to than vram.
+- dialogue lines will be on bottom, covering up the HUD, rather than on top.
+  this has two benefits:
+    - i don't have to worry about how to display the HUD and dialogue
+      simultaneously. otherwise i might have to
+        - cut one line for display and use it for the HUD. to display the HUD
+          bar i would then have to use an Hblank interrupt to cut out BG0
+          display at the right scanline (since 5 lines are not aligned to 8px
+          tile boundary, then reshow it before the HUD gets rendered.)
+    - GBAtek notes that the first 8 scanlines are effectively invisible on
+      a real GBA, since they are covered by a shadow.
+- still have to figure out how i can do the pause menu, since that will
+  definitely take more than six lines.
+    - i could have it be in the center and hide game sprites when the menu
+      is active, so that sprite slots can be used for sprite text ??
+    - i could have it be a Window (how to display HUD? HBlank interrupt?)
+      i think actually it will only need 6 lines. and only the current menu
+      will be displayed. controls menu takes more lines though. maybe i can
+      cut it out from the pause menu?
+       
 
 
 
