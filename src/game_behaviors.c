@@ -140,10 +140,10 @@ static void behavior_player_update(entity_s *self)
             self->actor.move_x = (s8) player_move_x;
         }
 
-        if (key_hit(KEY_B))
+        if (key_hit(KEY_A))
             self->actor.jump_trigger = 8;
 
-        if (key_hit(KEY_A) &&
+        if (key_hit(KEY_B) &&
             can_move)
         {
             if (data->spit_mode == PLAYER_SPIT_MODE_PLATFORM)
@@ -343,6 +343,7 @@ typedef struct crawler_data
 {
     FIXED max_dist;
     FIXED home_x;
+    s8 health;
 }
 crawler_data_s;
 
@@ -366,13 +367,19 @@ void entity_crawler_init(entity_s *self, FIXED px, FIXED py, FIXED max_dist)
     
     data->max_dist = max_dist;
     data->home_x = px;
-
-    LOG_DBG("max dist: %i", max_dist);
+    data->health = 3;
 }
 
 static void behavior_crawler_update(entity_s *self)
 {
     crawler_data_s *data = (crawler_data_s *)&self->userdata;
+
+    if (data->health < 0)
+    {
+        if (--data->health < -60)
+            entity_queue_free(self);
+        return;
+    }
 
     int face_dir = (int) self->actor.face_dir;
 
@@ -393,13 +400,34 @@ static void behavior_crawler_update(entity_s *self)
 
 static bool behavior_crawler_proj_touch(entity_s *self, projectile_s *proj)
 {
-    if (proj->kind == PROJ_KIND_PLAYER)
+    crawler_data_s *data = (crawler_data_s *)&self->userdata;
+    if (proj->kind != PROJ_KIND_PLAYER) return true;
+
+    if (--data->health == 0)
     {
-        entity_queue_free(self);
-        return false;
+        data->health = -1;
+        self->flags &= ~(ENTITY_FLAG_ACTOR | ENTITY_FLAG_COLLIDE);
+        self->sprite.graphic_id = SPRID_GAME_CRAWLER_DEAD;
+        self->sprite.flags &= ~SPRITE_FLAG_PLAYING;
+        self->sprite.frame = 0;
+        self->sprite.accum = 0;
+        self->col.group = 0;
+        self->col.mask = 0;
+
+        // note: the original unyuland has a bug where the kinematics of fallen
+        // enemies are ticked twice, so the numbers need to be adjusted here
+        // since that bug is not present here.
+        self->vel.x = TO_FIXED(0.5) * sgn(proj->vx);
+        self->vel.y = TO_FIXED(-1.5);
+        self->gmult = TO_FIXED(1.2);
+    }
+    else
+    {
+        self->vel.x = 0;
+        self->vel.y = 0;
     }
 
-    return true;
+    return false;
 }
 
 const behavior_def_s behavior_crawler = {
