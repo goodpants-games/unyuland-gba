@@ -48,6 +48,8 @@ void gfx_set_palette_multiplied(FIXED factor);
 
 void gfx_text_bmap_fill(int oc, int or, int cols, int rows, u32 data[8]);
 void gfx_text_bmap_print(int x, int y, const char *text);
+void gfx_text_bmap_dst_clear(int row, int row_count);
+void gfx_text_bmap_dst_assign(int row, int row_count);
 
 static inline void gfx_text_sync_row(int row) // copy row of tiles to VRAM
 {

@@ -13,10 +13,13 @@
 
 static void text_test(void)
 {
+    gfx_text_bmap_dst_assign(0, 6);
+
     u32 black8[8] = {0x11111111, 0x11111111, 0x11111111, 0x11111111,
                     0x11111111, 0x11111111, 0x11111111, 0x11111111};
     u32 black2[8] = {0x11111111, 0x11111111, 0x00000000, 0x00000000,
                     0x00000000, 0x00000000, 0x00000000, 0x00000000};
+    
     gfx_text_bmap_fill(0, 0, 30, 4, black8);
     gfx_text_bmap_fill(0, 4, 30, 1, black2);
 
@@ -29,6 +32,23 @@ static void text_test(void)
     gfx_text_sync_row(2);
     gfx_text_sync_row(3);
     gfx_text_sync_row(4);
+}
+
+static void text_test2(void)
+{
+    gfx_text_bmap_dst_assign(18, 2);
+
+    u32 bg1[8] = {0x00000000, 0x00000000, 0x00000000, 0x00000000,
+                 0x00000000, 0x00000000, 0x11111111, 0x11111111};
+    u32 bg2[8] = {0x11111111, 0x11111111, 0x11111111, 0x11111111,
+                    0x11111111, 0x11111111, 0x11111111, 0x11111111};
+    gfx_text_bmap_fill(0, 0, GFX_TEXT_BMP_COLS, 1, bg1);
+    gfx_text_bmap_fill(0, 1, GFX_TEXT_BMP_COLS, 1, bg2);
+
+    gfx_text_bmap_print(0, 6, "Hello, world!");
+
+    gfx_text_sync_row(0);
+    gfx_text_sync_row(1);
 }
 
 int main(void)
@@ -44,19 +64,6 @@ int main(void)
     memcpy32(&tile_mem[0][0] + GFX_CHAR_GAME_TILESET + 2, tileset_gfxTiles,
              tileset_gfxTilesLen / sizeof(u32));
     memcpy32(tile_mem_obj[0][0].data, game_sprdb_gfxTiles, game_sprdb_gfxTilesLen / sizeof(u32));
-
-    {
-        int i = 1;
-        int j = 0;
-        for (int y = 0; y < 6; ++y)
-        {
-            for (int x = 0; x < 30; ++x)
-            {
-                se_mem[GFX_BG0_INDEX][j++] = SE_PALBANK(2) | SE_ID(i++);
-            }
-            j += 2;
-        }
-    }
 
     const map_header_s *map = world_rooms[0];
     gfx_load_map(map);
@@ -105,7 +112,8 @@ int main(void)
     }
 
     (void)text_test;
-    // text_test();
+    (void)text_test2;
+    text_test2();
 
     while (true)
     {

@@ -388,3 +388,26 @@ void gfx_text_bmap_fill(int oc, int or, int cols, int rows, u32 data[8])
         }
     }
 }
+
+void gfx_text_bmap_dst_clear(int row, int row_count)
+{
+    int i = row * 32;
+    for (int y = row; y < row + row_count; ++y)
+    {
+        for (int x = 0; x < 30; ++x)
+            se_mem[GFX_BG0_INDEX][i++] = 0;
+        i += 2;
+    }
+}
+
+void gfx_text_bmap_dst_assign(int row, int row_count)
+{
+    int i = 1;
+    int j = row * 32;
+    for (int y = row; y < row + row_count; ++y)
+    {
+        for (int x = 0; x < 30; ++x)
+            se_mem[GFX_BG0_INDEX][j++] = SE_PALBANK(2) | SE_ID(i++);
+        j += 2;
+    }
+}
