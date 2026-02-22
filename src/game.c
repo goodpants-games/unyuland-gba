@@ -472,7 +472,7 @@ void game_render(int *p_last_obj_index)
             projectile_s *proj = (projectile_s *)robj->item;
             draw_x = (proj->px >> FIX_SHIFT) - 4;
             draw_y = (proj->py >> FIX_SHIFT) - 4;
-            sprite_graphic_id = SPRID_GAME_BULLET;
+            sprite_graphic_id = (int) proj->graphic_id;
             sprite_frame = 0;
             sprite_hflip = false;
             sprite_vflip = false;
