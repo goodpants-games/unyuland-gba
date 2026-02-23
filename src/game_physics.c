@@ -601,14 +601,11 @@ static bool physics_substep(FIXED vel_mult)
         detection_time += profile_stop();
         #endif
 
-        if (col_contact_count == 0)
-        {
-            break;
-        }
-
         #ifdef PHYS_PROFILE
         profile_start();
         #endif
+
+        bool break_substep = true;
 
         // resolve contacts
         // for (void *item;
@@ -712,11 +709,15 @@ static bool physics_substep(FIXED vel_mult)
                 if (nx != 0)
                     ent_a->actor.flags |= ACTOR_FLAG_WALL;
             }
+
+            break_substep = true;
         }
 
         #ifdef PHYS_PROFILE
         resolution_time += profile_stop();
         #endif
+
+        if (break_substep) break;
     }
 
     #ifdef PHYS_PROFILE

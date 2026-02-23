@@ -16,6 +16,8 @@
       i think actually it will only need 6 lines. and only the current menu
       will be displayed. controls menu takes more lines though. maybe i can
       cut it out from the pause menu?
+- maybemake substep processing local rather than global, like how it is in the
+  code for the original unyuland.
        
 - BUG: spitting a projectile in water causes a crash. this iss probably because
        the projectile gets immediately destroyed afterward.
