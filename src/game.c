@@ -58,7 +58,18 @@ typedef struct render_obj
 }
 render_obj_s;
 
+typedef struct game_state
+{
+    entity_s entities[MAX_ENTITY_COUNT];
+    projectile_s projectiles[MAX_PROJECTILE_COUNT];
+    int cam_x, cam_y;
+}
+game_state_s;
+
 game_s g_game;
+
+__attribute__((section(".ewram")))
+game_state_s game_saved_state;
 
 static uint render_object_count = 0;
 static render_obj_s render_objects[MAX_RENDER_OBJS];
@@ -68,6 +79,19 @@ static entity_s *ent_free_queue[FREE_QUEUE_MAX_SIZE];
 
 static int proj_free_queue_count = 0;
 static projectile_s *proj_free_queue[FREE_QUEUE_MAX_SIZE];
+
+// this is called by both entity_alloc and game_restore_state
+static void on_entity_alloc(entity_s *ent)
+{
+    if (render_object_count == MAX_RENDER_OBJS)
+        LOG_ERR("render object pool is full!");
+    else
+        render_objects[render_object_count++] = (render_obj_s)
+        {
+            .type = RENDER_OBJ_SPRITE,
+            .item = ent
+        };
+}
 
 entity_s* entity_alloc(void)
 {
@@ -85,15 +109,7 @@ entity_s* entity_alloc(void)
             .col.mask = COLGROUP_ALL
         };
 
-        if (render_object_count == MAX_RENDER_OBJS)
-            LOG_ERR("render object pool is full!");
-        else
-            render_objects[render_object_count++] = (render_obj_s)
-            {
-                .type = RENDER_OBJ_SPRITE,
-                .item = ent
-            };
-
+        on_entity_alloc(ent);
         return ent;
     }
 
@@ -138,6 +154,21 @@ bool entity_queue_free(entity_s *ent)
     return true;
 }
 
+// this is called by both projectile_alloc and game_restore_state
+static void on_projectile_alloc(projectile_s *proj)
+{
+    if (render_object_count == MAX_RENDER_OBJS)
+        LOG_ERR("render object pool is full!");
+    else
+        render_objects[render_object_count++] = (render_obj_s)
+        {
+            .type = RENDER_OBJ_PROJECTILE,
+            .item = proj
+        };
+    
+    game_physics_on_proj_alloc(proj);
+}
+
 projectile_s* projectile_alloc(void)
 {
     for (int i = 0; i < MAX_PROJECTILE_COUNT; ++i)
@@ -150,16 +181,7 @@ projectile_s* projectile_alloc(void)
             .flags = PROJ_FLAG_ACTIVE,
         };
 
-        if (render_object_count == MAX_RENDER_OBJS)
-            LOG_ERR("render object pool is full!");
-        else
-            render_objects[render_object_count++] = (render_obj_s)
-            {
-                .type = RENDER_OBJ_PROJECTILE,
-                .item = proj
-            };
-        
-        game_physics_on_proj_alloc(proj);
+        on_projectile_alloc(proj);
         return proj;
     }
 
@@ -810,4 +832,80 @@ void game_transition_update(entity_s *player)
         room_transition_phase2_update(player);
         break;
     }
+}
+
+void game_save_state(void)
+{
+    // copy entity data
+    const entity_s *src_ent = g_game.entities;
+    entity_s *dst_ent = game_saved_state.entities;
+
+    for (int i = 0; i < MAX_ENTITY_COUNT; ++i)
+    {
+        *dst_ent = *src_ent;
+        ++dst_ent;
+        ++src_ent;
+    }
+
+    // copy projectile data
+    const projectile_s *src_proj = g_game.projectiles;
+    projectile_s *dst_proj = game_saved_state.projectiles;
+
+    for (int i = 0; i < MAX_ENTITY_COUNT; ++i)
+    {
+        *dst_proj = *src_proj;
+        ++dst_proj;
+        ++src_proj;
+    }
+
+    game_saved_state.cam_x = g_game.cam_x;
+    game_saved_state.cam_y = g_game.cam_y;
+}
+
+void game_restore_state(void)
+{
+    // copy entity data, properly freeing newly unallocated slots
+    const entity_s *src_ent = game_saved_state.entities;
+    entity_s *dst_ent = g_game.entities;
+
+    for (int i = 0; i < MAX_ENTITY_COUNT; ++i)
+    {
+        if (!ENTITY_ENABLED(src_ent) && ENTITY_ENABLED(dst_ent))
+        {
+            entity_free(dst_ent);
+        }
+        else
+        {
+            bool need_alloc = !ENTITY_ENABLED(dst_ent);
+            *dst_ent = *src_ent;
+            if (need_alloc) on_entity_alloc(dst_ent);
+        }
+
+        ++dst_ent;
+        ++src_ent;
+    }
+
+    // copy projectile data, properly freeing newly unallocated slots
+    const projectile_s *src_proj = game_saved_state.projectiles;
+    projectile_s *dst_proj = g_game.projectiles;
+
+    for (int i = 0; i < MAX_ENTITY_COUNT; ++i)
+    {
+        if (!IS_PROJ_ACTIVE(src_proj) && IS_PROJ_ACTIVE(dst_proj))
+        {
+            projectile_free(dst_proj);
+        }
+        else
+        {
+            bool need_alloc = !IS_PROJ_ACTIVE(dst_proj);
+            *dst_proj = *src_proj;
+            if (need_alloc) on_projectile_alloc(dst_proj);
+        }
+
+        ++dst_proj;
+        ++src_proj;
+    }
+
+    g_game.cam_x = game_saved_state.cam_x;
+    g_game.cam_y = game_saved_state.cam_y;
 }

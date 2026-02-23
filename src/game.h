@@ -48,6 +48,7 @@
 #define PROJ_FLAG_ACTIVE 1
 #define PROJ_FLAG_QFREE  2 // if projectile is put in free queue
 
+#define ENTITY_ENABLED(ent) ((ent)->flags & ENTITY_FLAG_ENABLED)
 #define IS_PROJ_ACTIVE(proj) ((proj)->flags & PROJ_FLAG_ACTIVE)
 
 typedef enum dir4
@@ -214,6 +215,8 @@ void game_update(void);
 void game_load_room(const map_header_s *map);
 void game_transition_update(entity_s *player);
 void game_render(int *last_obj_index);
+void game_save_state(void);
+void game_restore_state(void);
 
 void game_load_entity(const entity_load_s *load_data);
 
