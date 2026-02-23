@@ -58,13 +58,13 @@ __attribute__((section(".ewram")))
 static u8 mm_memory[8 * (MM_SIZEOF_MODCH
                          + MM_SIZEOF_ACTCH
                          + MM_SIZEOF_MIXCH)
-                         + MM_MIXLEN_16KHZ];
+                         + MM_MIXLEN_21KHZ];
 
 // Mixing buffer (globals should go in IWRAM)
 // Mixing buffer SHOULD be in IWRAM, otherwise the CPU load
 // will _drastially_ increase
 __attribute((aligned(4)))
-static u8 mm_mixing_buf[MM_MIXLEN_16KHZ];
+static u8 mm_mixing_buf[MM_MIXLEN_21KHZ];
 
 int main(void)
 {
@@ -132,7 +132,7 @@ int main(void)
 
     mmInit(&(mm_gba_system)
     {
-        .mixing_mode = MM_MIX_16KHZ,
+        .mixing_mode = MM_MIX_21KHZ,
         .mod_channel_count = 8,
         .mix_channel_count = 8,
         .module_channels   = (mm_addr)(mm_memory+0),
@@ -145,8 +145,8 @@ int main(void)
                                                      + MM_SIZEOF_MIXCH))),
         .soundbank         = (mm_addr)soundbank_bin
     });
-    mmStart(MOD_TESTMUSIC, MM_PLAY_LOOP);
-    mmSetModuleVolume((int)(1024 * 0.5));
+    mmStart(MOD_TESTMOD, MM_PLAY_LOOP);
+    mmSetModuleVolume((int)(1024 * 0.25));
 
     while (true)
     {
