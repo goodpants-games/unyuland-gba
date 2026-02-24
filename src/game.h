@@ -48,6 +48,13 @@
 #define PROJ_FLAG_ACTIVE 1
 #define PROJ_FLAG_QFREE  2 // if projectile is put in free queue
 
+#define GUN_ENEMY_DIRFLAG_L   1
+#define GUN_ENEMY_DIRFLAG_TL  2
+#define GUN_ENEMY_DIRFLAG_T   4
+#define GUN_ENEMY_DIRFLAG_TR  8
+#define GUN_ENEMY_DIRFLAG_R   16
+#define GUN_ENEMY_DIRFLAG_ALL 0x1F
+
 #define ENTITY_ENABLED(ent) ((ent)->flags & ENTITY_FLAG_ENABLED)
 #define IS_PROJ_ACTIVE(proj) ((proj)->flags & PROJ_FLAG_ACTIVE)
 
@@ -233,7 +240,8 @@ extern const behavior_def_s behavior_player_droplet;
 void entity_crawler_init(entity_s *self, FIXED px, FIXED py, FIXED max_dist);
 extern const behavior_def_s behavior_crawler;
 
-void entity_gun_enemy_init(entity_s *self, FIXED px, FIXED py, bool ceil);
+void entity_gun_enemy_init(entity_s *self, FIXED px, FIXED py, bool ceil,
+                           int flags);
 extern const behavior_def_s behavior_gun_enemy;
 
 void entity_ice_block_init(entity_s *self, FIXED px, FIXED py);

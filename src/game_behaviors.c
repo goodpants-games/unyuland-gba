@@ -514,10 +514,12 @@ typedef struct gun_enemy_data
     enemy_base_s base;
     u8 timer;
     bool ceil;
+    int dir_flags;
 }
 gun_enemy_data_s;
 
-void entity_gun_enemy_init(entity_s *self, FIXED px, FIXED py, bool ceil)
+void entity_gun_enemy_init(entity_s *self, FIXED px, FIXED py, bool ceil,
+                           int dir_flags)
 {
     self->flags |= ENTITY_FLAG_COLLIDE;
     self->pos.x = px + int2fx(1);
@@ -546,7 +548,8 @@ void entity_gun_enemy_init(entity_s *self, FIXED px, FIXED py, bool ceil)
     {
         .base.health = 3,
         .timer = GUN_ENEMY_SHOOT_COOLDOWN_LENGTH,
-        .ceil = ceil
+        .ceil = ceil,
+        .dir_flags = dir_flags
     };
 }
 
@@ -577,22 +580,32 @@ static void behavior_gun_enemy_update(entity_s *self)
         FIXED px = self->pos.x + int2fx(3);
         FIXED py = self->pos.y + int2fx(4);
         FIXED yfac = data->ceil ? -1 : 1;
+        int dir_flags = data->dir_flags;
 
-        gun_enemy_shoot(px, py,
-                        TO_FIXED(GUN_ENEMY_PROJ_SPEED),
-                        TO_FIXED(0.0));
-        gun_enemy_shoot(px, py,
-                        TO_FIXED(COS45 * GUN_ENEMY_PROJ_SPEED),
-                        yfac * TO_FIXED(-COS45 * GUN_ENEMY_PROJ_SPEED));
-        gun_enemy_shoot(px, py,
-                        TO_FIXED(0),
-                        yfac * TO_FIXED(-GUN_ENEMY_PROJ_SPEED));
-        gun_enemy_shoot(px, py,
-                        TO_FIXED(-COS45 * GUN_ENEMY_PROJ_SPEED),
-                        yfac * TO_FIXED(-COS45 * GUN_ENEMY_PROJ_SPEED));
-        gun_enemy_shoot(px, py,
-                        TO_FIXED(-GUN_ENEMY_PROJ_SPEED),
-                        TO_FIXED(0.0));
+        if (dir_flags & GUN_ENEMY_DIRFLAG_R)
+            gun_enemy_shoot(px, py,
+                            TO_FIXED(GUN_ENEMY_PROJ_SPEED),
+                            TO_FIXED(0.0));
+
+        if (dir_flags & GUN_ENEMY_DIRFLAG_TR)
+            gun_enemy_shoot(px, py,
+                            TO_FIXED(COS45 * GUN_ENEMY_PROJ_SPEED),
+                            yfac * TO_FIXED(-COS45 * GUN_ENEMY_PROJ_SPEED));
+
+        if (dir_flags & GUN_ENEMY_DIRFLAG_T)
+            gun_enemy_shoot(px, py,
+                            TO_FIXED(0),
+                            yfac * TO_FIXED(-GUN_ENEMY_PROJ_SPEED));
+
+        if (dir_flags & GUN_ENEMY_DIRFLAG_TL)
+            gun_enemy_shoot(px, py,
+                            TO_FIXED(-COS45 * GUN_ENEMY_PROJ_SPEED),
+                            yfac * TO_FIXED(-COS45 * GUN_ENEMY_PROJ_SPEED));
+
+        if (dir_flags & GUN_ENEMY_DIRFLAG_L)
+            gun_enemy_shoot(px, py,
+                            TO_FIXED(-GUN_ENEMY_PROJ_SPEED),
+                            TO_FIXED(0.0));
     }
 }
 

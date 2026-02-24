@@ -42,6 +42,46 @@ bool get_property_decimal(const entity_load_s *load_data, const char *name,
     return false;
 }
 
+static int parse_gun_enemy_flags(const entity_load_s *load_data)
+{
+    const char *str;
+    if (!get_property_string(load_data, "fire_dir", &str))
+        return GUN_ENEMY_DIRFLAG_ALL;
+
+    int flags = 0;
+    for (; *str != 0; ++str)
+    {
+        switch (*str)
+        {
+        case 'L':
+            flags |= GUN_ENEMY_DIRFLAG_L;
+            break;
+        case 'T':
+            switch (*(str + 1))
+            {
+            case 'r':
+                flags |= GUN_ENEMY_DIRFLAG_TR;
+                ++str;
+                break;
+            case 'l':
+                flags |= GUN_ENEMY_DIRFLAG_TL;
+                ++str;
+                break;
+            default:
+                flags |= GUN_ENEMY_DIRFLAG_T;
+                break;
+            }
+            flags |= GUN_ENEMY_DIRFLAG_T;
+            break;
+        case 'R':
+            flags |= GUN_ENEMY_DIRFLAG_R;
+            break;
+        }
+    }
+
+    return flags;
+}
+
 void game_load_entity(const entity_load_s *load_data)
 {
     const char *name = load_data->name;
@@ -64,11 +104,14 @@ void game_load_entity(const entity_load_s *load_data)
     }
     STR_CASE("gun_enemy")
     {
-        entity_gun_enemy_init(ent, load_data->x, load_data->y, false);
+        entity_gun_enemy_init(ent, load_data->x, load_data->y, false,
+                              parse_gun_enemy_flags(load_data));
     }
     STR_CASE("ceil_gun_enemy")
     {
-        entity_gun_enemy_init(ent, load_data->x, load_data->y, true);
+        
+        entity_gun_enemy_init(ent, load_data->x, load_data->y, true,
+                              parse_gun_enemy_flags(load_data));
     }
     STR_CASE("home")
     {
