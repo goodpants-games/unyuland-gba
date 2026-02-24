@@ -1,6 +1,7 @@
 *.elf
 *.gba
 *.sav
+*.tiled-session
 
 .clangd
 build
