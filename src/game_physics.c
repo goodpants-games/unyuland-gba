@@ -7,6 +7,8 @@
 #include "log.h"
 #include "tonc_math.h"
 
+#define PHYS_PROFILE
+
 // in world units (8 units per tile)
 #define PARTGRID_CEL_W 64
 #define PARTGRID_CEL_H 64
@@ -104,6 +106,24 @@ IWRAM_DATA static proj_part_data_s proj_data[MAX_PROJECTILE_COUNT];
 IWRAM_DATA static partgrid_node_s partgrid_node_pool[PARTGRID_NODE_POOL_SIZE];
 IWRAM_DATA static partgrid_node_s *partgrid_node_pool_ffree; // first free
 IWRAM_DATA static part_cell_t partgrid[PARTGRID_ROWS][PARTGRID_COLS];
+
+#ifdef PHYS_PROFILE
+struct phys_profile
+{
+    u32 detection_t;
+    u32 resolution_t;
+    u32 move_t;
+    u32 start_t;
+    u32 projectiles_t;
+} profile;
+
+#define PROFILE_LOG(str, n)  \
+    do  \
+    {  \
+        int v = profile.n * 100;  \
+        LOG_DBG(str ": %i.%02i%%", v / 280896, v % 280896 / 2809);  \
+    } while (false);
+#endif
 
 // static pqueue_entry_s contact_queue[MAX_CONTACT_COUNT];
 
@@ -349,6 +369,10 @@ static bool physics_substep(FIXED vel_mult)
 {
     // size_t contact_queue_size = 0;
 
+    #ifdef PHYS_PROFILE
+    profile_start();
+    #endif
+
     // first move all entities
     for (int i = 0; i < col_ent_count; ++i)
     {
@@ -362,8 +386,7 @@ static bool physics_substep(FIXED vel_mult)
     }
 
     #ifdef PHYS_PROFILE
-    u32 detection_time = 0;
-    u32 resolution_time = 0;
+    profile.move_t += profile_stop();
     #endif
     
     // then, perform collision detection and resolution
@@ -595,7 +618,7 @@ static bool physics_substep(FIXED vel_mult)
         exit_contact_collection:;
 
         #ifdef PHYS_PROFILE
-        detection_time += profile_stop();
+        profile.detection_t += profile_stop();
         #endif
 
         #ifdef PHYS_PROFILE
@@ -717,16 +740,11 @@ static bool physics_substep(FIXED vel_mult)
         }
 
         #ifdef PHYS_PROFILE
-        resolution_time += profile_stop();
+        profile.resolution_t += profile_stop();
         #endif
 
         if (break_substep) break;
     }
-
-    #ifdef PHYS_PROFILE
-    LOG_DBG("detection time: %.2f%%", (float)detection_time / 280896.f * 100.f);
-    LOG_DBG("resolution time: %.2f%%", (float)resolution_time / 280896.f * 100.f);
-    #endif
 
     bool no_movement = true;
 
@@ -905,6 +923,12 @@ void game_physics_init(void)
 
 void game_physics_update(void)
 {
+    profile = (struct phys_profile){0};
+
+    #ifdef PHYS_PROFILE
+    profile_start();
+    #endif
+
     col_contact_count = 0;
     col_ent_count = 0;
     int substeps = 0;
@@ -976,16 +1000,34 @@ void game_physics_update(void)
     ++substeps;
 
     FIXED vel_mult = FIX_ONE / substeps;
+
+    #ifdef PHYS_PROFILE
+    profile.start_t += profile_stop();
+    #endif
+
+    #ifdef PHYS_PROFILE
+    profile_start();
+    #endif
+
+    game_physics_move_projs(FIX_ONE / 2);
+    game_physics_move_projs(FIX_ONE / 2);
+
+    #ifdef PHYS_PROFILE
+    profile.projectiles_t += profile_stop();
+    #endif
+
     for (int i = 0; i < substeps; ++i)
     {
-        game_physics_move_projs(vel_mult);
         if (physics_substep(vel_mult))
-        {
-            for (int j = i + 1; j < substeps; ++j)
-                game_physics_move_projs(vel_mult);
             break;
-        }
     }
+
+    #ifdef PHYS_PROFILE
+    PROFILE_LOG("detection time", detection_t)
+    PROFILE_LOG("resolution time", resolution_t)
+    PROFILE_LOG("ent move time", move_t)
+    PROFILE_LOG("proj move time", projectiles_t)
+    #endif
 }
 
 void game_physics_on_proj_alloc(projectile_s *proj)
