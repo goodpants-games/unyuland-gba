@@ -8,14 +8,7 @@
           tile boundary, then reshow it before the HUD gets rendered.)
     - GBAtek notes that the first 8 scanlines are effectively invisible on
       a real GBA, since they are covered by a shadow.
-- still have to figure out how i can do the pause menu, since that will
-  definitely take more than six lines.
-    - i could have it be in the center and hide game sprites when the menu
-      is active, so that sprite slots can be used for sprite text ??
-    - i could have it be a Window (how to display HUD? HBlank interrupt?)
-      i think actually it will only need 6 lines. and only the current menu
-      will be displayed. controls menu takes more lines though. maybe i can
-      cut it out from the pause menu?
+- better physics engine
 - maybemake substep processing local rather than global, like how it is in the
   code for the original unyuland.
        
