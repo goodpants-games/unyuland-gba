@@ -185,7 +185,7 @@ static void player_bullet_spit(entity_s *self)
 
     proj->kind = PROJ_KIND_PLAYER;
     proj->graphic_id = SPRID_GAME_WATER_DROPLET;
-    proj->life = 60;
+    proj->life = 120;
 }
 
 static void behavior_player_update(entity_s *self)
@@ -582,7 +582,7 @@ static void gun_enemy_shoot(FIXED x, FIXED y, FIXED vx, FIXED vy)
     proj->vy = vy;
     proj->graphic_id = SPRID_GAME_BULLET;
     proj->kind = PROJ_KIND_ENEMY;
-    proj->life = 60;
+    proj->life = 120;
 }
 
 static void behavior_gun_enemy_update(entity_s *self)
@@ -624,6 +624,11 @@ static void behavior_gun_enemy_update(entity_s *self)
             gun_enemy_shoot(px, py,
                             TO_FIXED(-GUN_ENEMY_PROJ_SPEED),
                             TO_FIXED(0.0));
+        
+        self->sprite.graphic_id = SPRID_GAME_GUN_ENEMY_FIRE;
+        self->sprite.frame = 0;
+        self->sprite.accum = 0;
+        self->sprite.flags |= SPRITE_FLAG_PLAYING;
     }
 }
 
