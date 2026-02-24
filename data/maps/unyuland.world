@@ -48,6 +48,97 @@
             "width": 360,
             "x": 120,
             "y": -616
+        },
+        {
+            "fileName": "room02.tmx",
+            "height": 176,
+            "width": 240,
+            "x": -120,
+            "y": -704
+        },
+        {
+            "fileName": "room03.tmx",
+            "height": 264,
+            "width": 120,
+            "x": -120,
+            "y": -968
+        },
+        {
+            "fileName": "room04.tmx",
+            "height": 88,
+            "width": 240,
+            "x": 0,
+            "y": -880
+        },
+        {
+            "fileName": "room12.tmx",
+            "height": 88,
+            "width": 240,
+            "x": 0,
+            "y": -968
+        },
+        {
+            "fileName": "a01.tmx",
+            "height": 176,
+            "width": 240,
+            "x": 720,
+            "y": -352
+        },
+        {
+            "fileName": "b03.tmx",
+            "height": 176,
+            "width": 240,
+            "x": 720,
+            "y": -528
+        },
+        {
+            "fileName": "b05.tmx",
+            "height": 176,
+            "width": 360,
+            "x": 960,
+            "y": -528
+        },
+        {
+            "fileName": "room05.tmx",
+            "height": 176,
+            "width": 120,
+            "x": 120,
+            "y": -792
+        },
+        {
+            "fileName": "room06.tmx",
+            "height": 88,
+            "width": 120,
+            "x": 480,
+            "y": -880
+        },
+        {
+            "fileName": "room07.tmx",
+            "height": 176,
+            "width": 240,
+            "x": 720,
+            "y": -704
+        },
+        {
+            "fileName": "room08.tmx",
+            "height": 176,
+            "width": 360,
+            "x": 240,
+            "y": -792
+        },
+        {
+            "fileName": "room09.tmx",
+            "height": 176,
+            "width": 240,
+            "x": 960,
+            "y": -704
+        },
+        {
+            "fileName": "tall_room.tmx",
+            "height": 352,
+            "width": 120,
+            "x": 600,
+            "y": -1056
         }
     ],
     "onlyShowAdjacentMaps": false,

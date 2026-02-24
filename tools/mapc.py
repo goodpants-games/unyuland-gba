@@ -160,8 +160,9 @@ def parse(ifile_path: str, output_file: BinaryIO, tileset: Tileset,
             ent_name = ent.get('name')
             
             odata = bytearray()
-            odata += struct.pack('<HHHH', int(ent.get('x')), int(ent.get('y')),
-                                int(ent.get('width')), int(ent.get('height')))
+            odata += struct.pack('<HHHH', int(float(ent.get('x'))),
+                                 int(float(ent.get('y'))),
+                                 int(ent.get('width')), int(ent.get('height')))
             name_bytes = bytes(ent_name, 'ascii')
             odata += name_bytes
             odata.append(0)

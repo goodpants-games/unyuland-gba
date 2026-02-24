@@ -26,10 +26,11 @@ id_map: dict[int, int] = dict([
     (0, 0),
 
     # basic edges
-    (1,              1),
-    (1 | ROT1_FLAG,  2),
-    (1 | ROT2_FLAG,  1 | HFLIP_FLAG | VFLIP_FLAG),
-    (1 | ROT3_FLAG,  2 | HFLIP_FLAG | VFLIP_FLAG),
+    (1,                           1),
+    (1 | ROT1_FLAG,               2),
+    (1 | ROT1_FLAG | VFLIP_FLAG,  2 | VFLIP_FLAG),
+    (1 | ROT2_FLAG,               1 | HFLIP_FLAG | VFLIP_FLAG),
+    (1 | ROT3_FLAG,               2 | HFLIP_FLAG | VFLIP_FLAG),
 
     # basic outer corners
     (2,             3),
@@ -80,6 +81,7 @@ id_map: dict[int, int] = dict([
     (82, 34),
     (83, -1),
     (84, 35),
+    (85, 55),
     (98, 36),
     (99, 37),
     (100, 38),
@@ -181,6 +183,11 @@ def convert(ifile_path: str, ofile: TextIO):
         tid = tile_int & TILE_ID_MASK
         tflags = tile_int & TILE_FLAGS_MASK
 
+        if not ((tid - 1) | tflags) in id_map:
+            tx = (i//4) % map_width 
+            ty = (i//4) // map_width
+            raise RuntimeError(f"unrecognized tile at ({tx}, {ty})")
+        
         new_tile_int = id_map[(tid - 1) | tflags]
         if new_tile_int == -1:
             omap_data.append(0)
