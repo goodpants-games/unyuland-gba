@@ -623,6 +623,12 @@ static bool physics_substep(FIXED vel_mult)
             entity_s *const ent_a = col_ent_a->ent;
             entity_s *const ent_b = col_ent_b ? col_ent_b->ent : NULL;
 
+            if ((ent_a->col.flags & COL_FLAG_MONITOR_ONLY) ||
+                (ent_b && ent_b->col.flags & COL_FLAG_MONITOR_ONLY))
+            {
+                continue;
+            }
+
             FIXED rel_vx, rel_vy;
             if (ent_b)
             {

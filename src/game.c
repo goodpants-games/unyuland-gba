@@ -64,6 +64,7 @@ typedef struct game_state
     projectile_s projectiles[MAX_PROJECTILE_COUNT];
     int cam_x, cam_y;
     room_trans_state_s room_trans;
+    entity_s *active_water_tank;
 }
 game_state_s;
 
@@ -810,6 +811,8 @@ static void room_transition_phase1_update(entity_s *player)
     if (g_game.cam_x > x_max) g_game.cam_x = x_max;
     if (g_game.cam_y > y_max) g_game.cam_y = y_max;
 
+    g_game.active_water_tank = NULL;
+
     game_save_state();
 }
 
@@ -875,6 +878,7 @@ void game_save_state(void)
     game_saved_state.cam_x = g_game.cam_x;
     game_saved_state.cam_y = g_game.cam_y;
     game_saved_state.room_trans = g_game.room_trans;
+    game_saved_state.active_water_tank = g_game.active_water_tank;
 }
 
 void game_restore_state(void)
@@ -926,5 +930,7 @@ void game_restore_state(void)
     g_game.cam_x = game_saved_state.cam_x;
     g_game.cam_y = game_saved_state.cam_y;
     g_game.room_trans = game_saved_state.room_trans;
+    g_game.active_water_tank = game_saved_state.active_water_tank;
+
     gfx_mark_scroll_dirty();
 }

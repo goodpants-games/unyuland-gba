@@ -25,8 +25,8 @@
 #define SPRITE_FLAG_FLIP_X    2
 #define SPRITE_FLAG_FLIP_Y    4
 
-#define COL_FLAG_FLOOR_ONLY 1
-// TODO: COL_FLAG_MONITOR_ONLY
+#define COL_FLAG_FLOOR_ONLY   1
+#define COL_FLAG_MONITOR_ONLY 2
 
 #define COLGROUP_DEFAULT           ((1 << 0))
 #define COLGROUP_ENTITY            ((1 << 1))
@@ -59,11 +59,11 @@ typedef enum dir4
     DIR4_DOWN
 } dir4_e;
 
-typedef enum entity_msgid
-{
-    ENTITY_MSG_INTERACT,
-    ENTITY_MSG_ATTACKED
-} entity_msgid_e;
+// typedef enum entity_msgid
+// {
+//     ENTITY_MSG_INTERACT,
+//     ENTITY_MSG_ATTACKED
+// } entity_msgid_e;
 
 typedef enum proj_kind
 {
@@ -88,7 +88,6 @@ typedef struct projectile
 typedef struct behavior_def
 {
     void (*update)(struct entity *self);
-    void (*message)(struct entity *self, entity_msgid_e msg, ...);
     void (*free)(struct entity *self);
 
     // fires on every frame an entity is being touched
@@ -97,6 +96,8 @@ typedef struct behavior_def
     // fires on every frame a projectile is touched.
     // returns true if projectile should not be destroyed.
     bool (*proj_touch)(struct entity *self, projectile_s *other);
+
+    void (*interact)(struct entity *self, struct entity *source);
 } behavior_def_s;
 
 typedef struct entity
@@ -167,6 +168,8 @@ typedef struct game {
     bool input_enabled;
 
     room_trans_state_s room_trans;
+
+    entity_s *active_water_tank;
 } game_s;
 
 typedef enum entity_load_prop_type
@@ -230,11 +233,19 @@ extern const behavior_def_s behavior_player_droplet;
 void entity_crawler_init(entity_s *self, FIXED px, FIXED py, FIXED max_dist);
 extern const behavior_def_s behavior_crawler;
 
+void enttiy_gun_enemy_init(entity_s *self, FIXED px, FIXED py, bool ceil);
+extern const behavior_def_s behavior_gun_enemy;
+
+void entity_ice_block_init(entity_s *self, FIXED px, FIXED py);
+
 void entity_home_init(entity_s *self, FIXED px, FIXED py);
 extern const behavior_def_s behavior_home;
 
 void entity_sign_init(entity_s *self, FIXED px, FIXED py, void *dialogue,
                       bool alt_appearance);
 extern const behavior_def_s behavior_sign;
+
+void entity_water_tank_init(entity_s *self, FIXED px, FIXED py);
+extern const behavior_def_s behavior_water_tank;
 
 #endif

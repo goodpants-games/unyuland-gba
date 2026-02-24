@@ -18,7 +18,8 @@ player_spit_mode_e;
 typedef struct player_data
 {
     bool spitting;
-    int spit_mode;
+    u8 spit_mode;
+    entity_s *interactable;
 } player_data_s;
 
 void entity_player_init(entity_s *self)
@@ -163,7 +164,7 @@ static void behavior_player_update(entity_s *self)
             self->actor.jump_trigger = 8;
 
         if (key_hit(KEY_B) &&
-            can_move)
+            can_move && !data->interactable)
         {
             if (data->spit_mode == PLAYER_SPIT_MODE_PLATFORM)
                 player_platform_spit(self);
@@ -180,6 +181,12 @@ static void behavior_player_update(entity_s *self)
 
     if (g_game.room_trans.override_player_move_x)
         self->actor.move_x = g_game.room_trans.player_move_x;
+
+    if (g_game.input_enabled && data->interactable)
+    {
+        if (key_hit(KEY_B))
+            data->interactable->behavior->interact(data->interactable, self);
+    }
 
     if (self->actor.move_x != 0)
     {
@@ -226,6 +233,16 @@ static void behavior_player_update(entity_s *self)
     }
 
     skip_animation:;
+
+    data->interactable = NULL;
+}
+
+static void behavior_player_ent_touch(entity_s *self, entity_s *other)
+{
+    player_data_s *data = (player_data_s *)self->userdata;
+
+    if (other->behavior && other->behavior->interact)
+        data->interactable = other;
 }
 
 static bool behavior_player_proj_touch(entity_s *self, projectile_s *proj)
@@ -238,7 +255,8 @@ static bool behavior_player_proj_touch(entity_s *self, projectile_s *proj)
 
 const behavior_def_s behavior_player = {
     .update = behavior_player_update,
-    .proj_touch = behavior_player_proj_touch
+    .ent_touch = behavior_player_ent_touch,
+    .proj_touch = behavior_player_proj_touch,
 };
 
 ///////////////////
@@ -481,10 +499,75 @@ void entity_sign_init(entity_s *self, FIXED px, FIXED py, void *dialogue,
 {
     self->pos.x = px;
     self->pos.y = py;
-    self->col.w = 6;
+    self->col.w = 8;
     self->col.h = 8;
     self->sprite.graphic_id = alt_appearance ? SPRID_GAME_HINT_SIGN : SPRID_GAME_SIGN;
     self->sprite.zidx = -20;
 }
 
-extern const behavior_def_s behavior_sign;
+const behavior_def_s behavior_sign = {0};
+
+////////////////
+// water tank //
+////////////////
+
+void entity_water_tank_init(entity_s *self, FIXED px, FIXED py)
+{
+    self->flags |= ENTITY_FLAG_COLLIDE;
+    self->pos.x = px + int2fx(1);
+    self->pos.y = py;
+    self->col.w = 6;
+    self->col.h = 8;
+    self->col.flags = COL_FLAG_MONITOR_ONLY;
+    self->sprite.graphic_id = SPRID_GAME_WATER_TANK_NORMAL_INACTIVE;
+    self->sprite.ox = -1;
+    self->sprite.oy = -8;
+    self->sprite.zidx = -20;
+    self->behavior = &behavior_water_tank;
+}
+
+static void behavior_water_tank_interact(entity_s *self, entity_s *source)
+{
+    if (g_game.active_water_tank)
+        g_game.active_water_tank->sprite.graphic_id
+            = SPRID_GAME_WATER_TANK_NORMAL_INACTIVE;
+
+    g_game.active_water_tank = self;
+    self->sprite.graphic_id = SPRID_GAME_WATER_TANK_NORMAL_ACTIVE;
+
+    // respect "remove on checkpoint" flag
+    for (int i = 0; i < MAX_ENTITY_COUNT; ++i)
+    {
+        entity_s *e = g_game.entities + i;
+        if (!ENTITY_ENABLED(e)) continue;
+
+        if (e->flags & ENTITY_FLAG_REMOVE_ON_CHECKPOINT)
+        {
+            LOG_DBG("Remove a entity");
+            entity_free(e);
+        }
+    }
+    
+    // make sure player is centered perfectly on checkpoint when they respawn
+    // TODO: position camera as well
+    FIXED tmp_x = source->pos.x;
+    FIXED tmp_y = source->pos.y;
+    FIXED tmp_vx = source->vel.x;
+    FIXED tmp_vy = source->vel.y;
+
+    source->pos.x = self->pos.x;
+    source->pos.y = self->pos.y;
+    source->vel.x = 0;
+    source->vel.y = 0;
+
+    game_save_state();
+
+    source->pos.x = tmp_x;
+    source->pos.y = tmp_y;
+    source->vel.x = tmp_vx;
+    source->vel.y = tmp_vy;
+}
+
+const behavior_def_s behavior_water_tank = {
+    .interact = behavior_water_tank_interact
+};
