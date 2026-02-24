@@ -9,6 +9,7 @@ d01
 b03
 b05
 room01
+d01upper
 room02
 room03
 room04

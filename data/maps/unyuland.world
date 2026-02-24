@@ -37,10 +37,10 @@
         },
         {
             "fileName": "d01.tmx",
-            "height": 440,
+            "height": 264,
             "width": 240,
             "x": 480,
-            "y": -616
+            "y": -440
         },
         {
             "fileName": "room01.tmx",
@@ -139,6 +139,13 @@
             "width": 120,
             "x": 600,
             "y": -1056
+        },
+        {
+            "fileName": "d01upper.tmx",
+            "height": 176,
+            "width": 240,
+            "x": 480,
+            "y": -616
         }
     ],
     "onlyShowAdjacentMaps": false,
