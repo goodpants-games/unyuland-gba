@@ -113,6 +113,14 @@ void game_load_entity(const entity_load_s *load_data)
         entity_gun_enemy_init(ent, load_data->x, load_data->y, true,
                               parse_gun_enemy_flags(load_data));
     }
+    STR_CASE("ice_block")
+    {
+        entity_ice_block_init(ent, load_data->x, load_data->y);
+    }
+    STR_CASE("spring")
+    {
+        entity_spring_init(ent, load_data->x, load_data->y);
+    }
     STR_CASE("home")
     {
         entity_home_init(ent, load_data->x, load_data->y);

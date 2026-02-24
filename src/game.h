@@ -245,6 +245,7 @@ void entity_gun_enemy_init(entity_s *self, FIXED px, FIXED py, bool ceil,
 extern const behavior_def_s behavior_gun_enemy;
 
 void entity_ice_block_init(entity_s *self, FIXED px, FIXED py);
+void entity_spring_init(entity_s *self, FIXED px, FIXED py);
 
 void entity_home_init(entity_s *self, FIXED px, FIXED py);
 extern const behavior_def_s behavior_home;

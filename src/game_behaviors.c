@@ -63,6 +63,24 @@ static bool enemy_base_proj_touch(entity_s *self, projectile_s *proj,
     return false;
 }
 
+///////////////////////
+// GENERIC: pushable //
+///////////////////////
+
+static void behavior_pushable_update(entity_s *self)
+{
+    const FIXED move_accel = TO_FIXED(1.0 / 16.0);
+    const FIXED max_vel = TO_FIXED(1.0);
+    if (self->vel.x > 0)
+        self->vel.x = clamp(self->vel.x - move_accel, 0, max_vel);
+    else if (self->vel.x < 0)
+        self->vel.x = clamp(self->vel.x + move_accel, -max_vel, 0);
+}
+
+static behavior_def_s behavior_pushable = {
+    .update = behavior_pushable_update
+};
+
 /////////////////////
 // player_behavior //
 /////////////////////
@@ -623,6 +641,38 @@ const behavior_def_s behavior_gun_enemy = {
     .update = behavior_gun_enemy_update,
     .proj_touch = behavior_gun_enemy_proj_touch
 };
+
+///////////////
+// ice_block //
+///////////////
+
+void entity_ice_block_init(entity_s *self, FIXED px, FIXED py)
+{
+    self->flags |= ENTITY_FLAG_COLLIDE | ENTITY_FLAG_MOVING;
+    self->pos.x = px;
+    self->pos.y = py;
+    self->col.w = 8;
+    self->col.h = 8;
+    self->mass = 4;
+    self->sprite.graphic_id = SPRID_GAME_ICE_BLOCK;
+    self->behavior = &behavior_pushable;
+}
+
+////////////
+// spring //
+////////////
+
+void entity_spring_init(entity_s *self, FIXED px, FIXED py)
+{
+    self->flags |= ENTITY_FLAG_COLLIDE | ENTITY_FLAG_MOVING;
+    self->pos.x = px;
+    self->pos.y = py;
+    self->col.w = 8;
+    self->col.h = 8;
+    self->mass = 4;
+    self->sprite.graphic_id = SPRID_GAME_SPRING;
+    self->behavior = &behavior_pushable;
+}
 
 //////////
 // home //

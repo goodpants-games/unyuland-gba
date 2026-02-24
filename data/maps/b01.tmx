@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="45" height="11" tilewidth="8" tileheight="8" infinite="0" nextlayerid="1" nextobjectid="1">
+<map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="45" height="11" tilewidth="8" tileheight="8" infinite="0" nextlayerid="1" nextobjectid="3">
  <tileset firstgid="1" source="tileset.tsx"/>
  <layer id="1" name="Tiles" width="45" height="11">
   <data encoding="base64">
@@ -20,5 +20,7 @@
    </properties>
   </object>
   <object id="5" name="home" type="entity" x="40" y="64" width="8" height="8"/>
+  <object id="1" name="ice_block" type="entity" x="40" y="32" width="8" height="8"/>
+  <object id="2" name="ice_block" type="entity" x="56" y="32" width="8" height="8"/>
  </objectgroup>
 </map>
