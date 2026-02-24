@@ -236,7 +236,7 @@ static void col_ent_removed(int col_ent_idx)
     }
 }
 
-static void sort_edge_list(col_bp_edge_s *const list,
+static inline void sort_edge_list(col_bp_edge_s *const list,
                            const int list_count,
                            u8 contact_pairs[ENTITY_PAIR_SIZE],
                            col_bp_overlap_s *overlaps, int *overlap_count)
@@ -323,8 +323,7 @@ static void update_edge_lists(void)
     for (int i = 0; i < x_edge_count; ++i)
     {
         col_bp_edge_s *edge = x_edges + i;
-        const entity_coldata_s *col_ent = col_ent_map + edge->eid;
-        const entity_s *ent = col_ent->ent;
+        const entity_s *ent = (col_ent_map + edge->eid)->ent;
 
         if (edge->left)
             edge->pos = ent->pos.x;
@@ -336,8 +335,7 @@ static void update_edge_lists(void)
     for (int i = 0; i < y_edge_count; ++i)
     {
         col_bp_edge_s *edge = y_edges + i;
-        const entity_coldata_s *col_ent = col_ent_map + edge->eid;
-        const entity_s *ent = col_ent->ent;
+        const entity_s *ent = (col_ent_map + edge->eid)->ent;
 
         if (edge->left)
             edge->pos = ent->pos.y;
@@ -1009,8 +1007,8 @@ void game_physics_update(void)
     #ifdef PHYS_PROFILE
     PROFILE_LOG("detection time", detection_t)
     PROFILE_LOG("resolution time", resolution_t)
-    PROFILE_LOG("ent move time", move_t)
-    PROFILE_LOG("proj move time", projectiles_t)
+    // PROFILE_LOG("ent move time", move_t)
+    // PROFILE_LOG("proj move time", projectiles_t)
     #endif
 }
 
