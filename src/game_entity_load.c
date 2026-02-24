@@ -62,6 +62,14 @@ void game_load_entity(const entity_load_s *load_data)
         entity_crawler_init(ent, load_data->x, load_data->y,
                             max_dist * WORLD_TILE_SIZE);
     }
+    STR_CASE("gun_enemy")
+    {
+        entity_gun_enemy_init(ent, load_data->x, load_data->y, false);
+    }
+    STR_CASE("ceil_gun_enemy")
+    {
+        entity_gun_enemy_init(ent, load_data->x, load_data->y, true);
+    }
     STR_CASE("home")
     {
         entity_home_init(ent, load_data->x, load_data->y);

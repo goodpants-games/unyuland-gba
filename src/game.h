@@ -233,7 +233,7 @@ extern const behavior_def_s behavior_player_droplet;
 void entity_crawler_init(entity_s *self, FIXED px, FIXED py, FIXED max_dist);
 extern const behavior_def_s behavior_crawler;
 
-void enttiy_gun_enemy_init(entity_s *self, FIXED px, FIXED py, bool ceil);
+void entity_gun_enemy_init(entity_s *self, FIXED px, FIXED py, bool ceil);
 extern const behavior_def_s behavior_gun_enemy;
 
 void entity_ice_block_init(entity_s *self, FIXED px, FIXED py);

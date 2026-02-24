@@ -13,7 +13,7 @@
 #include "log.h"
 #include "menu.h"
 
-// #define MAIN_PROFILE
+#define MAIN_PROFILE
 
 static void text_test(void)
 {

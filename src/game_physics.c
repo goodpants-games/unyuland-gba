@@ -469,8 +469,6 @@ static bool physics_substep(FIXED vel_mult)
             entity_coldata_s *const col_ent = col_ents[i];
             entity_s *entity = col_ent->ent;
 
-            if (!(entity->flags & ENTITY_FLAG_MOVING)) continue;
-
             const FIXED col_w = int2fx((int)entity->col.w);
             const FIXED col_h = int2fx((int)entity->col.h);
             // const uint col_group = (uint)entity->col.group;
@@ -480,6 +478,58 @@ static bool physics_substep(FIXED vel_mult)
             const int et = entity->pos.y;
             const int er = (entity->pos.x + col_w);
             const int eb = (entity->pos.y + col_h);
+
+            if (col_mask & COLGROUP_PROJECTILE)
+            {
+                int min_px = el / (FIX_ONE * PARTGRID_CEL_W);
+                int min_py = et / (FIX_ONE * PARTGRID_CEL_H);
+                int max_px = er / (FIX_ONE * PARTGRID_CEL_W);
+                int max_py = eb / (FIX_ONE * PARTGRID_CEL_H);
+
+                // clamp bounds to partition grid
+                if      (min_px < 0)              min_px = 0;
+                else if (min_px >= PARTGRID_COLS) min_px = PARTGRID_COLS - 1;
+                if      (max_px < 0)              max_px = 0;
+                else if (max_px >= PARTGRID_COLS) max_px = PARTGRID_COLS - 1;
+
+                if      (min_py < 0)              min_py = 0;
+                else if (min_py >= PARTGRID_ROWS) min_py = PARTGRID_ROWS - 1;
+                if      (max_py < 0)              max_py = 0;
+                else if (max_py >= PARTGRID_ROWS) max_py = PARTGRID_ROWS - 1;
+
+                for (int y = min_py; y <= max_py; ++y)
+                    for (int x = min_px; x <= max_px; ++x)
+                    {
+                        for (partgrid_node_s *node = partgrid[y][x]; node;
+                            node = node->next)
+                        {
+                            projectile_s *proj = node->projectile;
+                            if (proj->flags & PROJ_FLAG_QFREE) continue;
+
+                            FIXED px = proj->px;
+                            FIXED py = proj->py;
+
+                            if (!(px > el && px < er && py > et && py < eb))
+                                continue;
+
+                            bool keep;
+                            if (entity->behavior &&
+                                entity->behavior->proj_touch)
+                            {
+                                keep = entity->behavior->proj_touch(entity, proj);
+                            }
+                            else
+                            {
+                                keep = false;
+                            }
+                            
+                            if (!keep)
+                                projectile_queue_free(proj);
+                        }
+                    }
+            }
+
+            if (!(entity->flags & ENTITY_FLAG_MOVING)) continue;
 
             if (col_mask & COLGROUP_DEFAULT)
             {
@@ -540,59 +590,6 @@ static bool physics_substep(FIXED vel_mult)
                     ++col_contact_count;
                 }
             }
-
-            if (col_mask & COLGROUP_PROJECTILE)
-            {
-                int min_px = el / (FIX_ONE * PARTGRID_CEL_W);
-                int min_py = et / (FIX_ONE * PARTGRID_CEL_H);
-                int max_px = er / (FIX_ONE * PARTGRID_CEL_W);
-                int max_py = eb / (FIX_ONE * PARTGRID_CEL_H);
-
-                // clamp bounds to partition grid
-                if      (min_px < 0)              min_px = 0;
-                else if (min_px >= PARTGRID_COLS) min_px = PARTGRID_COLS - 1;
-                if      (max_px < 0)              max_px = 0;
-                else if (max_px >= PARTGRID_COLS) max_px = PARTGRID_COLS - 1;
-
-                if      (min_py < 0)              min_py = 0;
-                else if (min_py >= PARTGRID_ROWS) min_py = PARTGRID_ROWS - 1;
-                if      (max_py < 0)              max_py = 0;
-                else if (max_py >= PARTGRID_ROWS) max_py = PARTGRID_ROWS - 1;
-
-                for (int y = min_py; y <= max_py; ++y)
-                    for (int x = min_px; x <= max_px; ++x)
-                    {
-                        for (partgrid_node_s *node = partgrid[y][x]; node;
-                            node = node->next)
-                        {
-                            projectile_s *proj = node->projectile;
-                            if (proj->flags & PROJ_FLAG_QFREE) continue;
-
-                            FIXED px = proj->px;
-                            FIXED py = proj->py;
-
-                            if (!(px > el && px < er && py > et && py < eb))
-                                continue;
-
-                            LOG_DBG("projectile collision!");
-
-                            bool keep;
-                            if (entity->behavior &&
-                                entity->behavior->proj_touch)
-                            {
-                                keep = entity->behavior->proj_touch(entity, proj);
-                            }
-                            else
-                            {
-                                keep = false;
-                            }
-                            
-                            if (!keep)
-                                projectile_queue_free(proj);
-                        }
-                    }
-            }
-
         }
 
         exit_contact_collection:;
@@ -856,7 +853,7 @@ void game_physics_move_projs(FIXED vel_mult)
         part_cell_t *new_part_cell = &partgrid[new_py][new_px];
         if (pdata->part_cell != new_part_cell)
         {
-            LOG_DBG("location in partition grid changed");
+            // LOG_DBG("location in partition grid changed");
 
             // remove from linked list of old cell
             partgrid_node_s *node = pdata->part_cell
@@ -864,7 +861,7 @@ void game_physics_move_projs(FIXED vel_mult)
                 : NULL;
             if (!node)
             {
-                LOG_DBG("old partition cell had no data");
+                // LOG_DBG("old partition cell had no data");
                 node = partgrid_node_alloc(proj);
             }
 
@@ -994,7 +991,6 @@ void game_physics_update(void)
 void game_physics_on_proj_alloc(projectile_s *proj)
 {
     intptr_t idx = proj - g_game.projectiles; // does this do division??
-    LOG_DBG("projectile %i allocated", (int) idx);
     proj_data[idx] = (proj_part_data_s)
     {
         .part_cell = NULL
@@ -1004,14 +1000,18 @@ void game_physics_on_proj_alloc(projectile_s *proj)
 void game_physics_on_proj_free(projectile_s *proj)
 {
     intptr_t idx = proj - g_game.projectiles; // does this do division??
-    LOG_DBG("projectile %i freed", (int) idx);
 
-    partgrid_node_s *cell = partgrid_cell_remove(proj_data[idx].part_cell, proj);
-    if (!cell)
+    if (proj_data[idx].part_cell)
     {
-        LOG_WRN("game_physics_on_proj_free: projectile is not in partgrid?");
-        return;
+        partgrid_node_s *cell = partgrid_cell_remove(proj_data[idx].part_cell,
+                                                     proj);
+        if (!cell)
+        {
+            LOG_WRN("game_physics_on_proj_free: projectile is not in partgrid?");
+            return;
+        }
+
+        partgrid_node_free(cell);
     }
 
-    partgrid_node_free(cell);
 }

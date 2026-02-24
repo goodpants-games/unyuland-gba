@@ -4,6 +4,65 @@
 #include "tonc_input.h"
 #include "math_util.h"
 
+////////////////////
+// GENERIC: enemy //
+////////////////////
+
+typedef struct enemy_base
+{
+    s8 health;
+}
+enemy_base_s;
+
+// if true, the calling function should return
+static bool enemy_base_update(entity_s *self)
+{
+    enemy_base_s *data = (enemy_base_s *)&self->userdata;
+
+    if (data->health < 0)
+    {
+        if (--data->health < -60)
+            entity_queue_free(self);
+        return true;
+    }
+
+    return false;
+}
+
+static bool enemy_base_proj_touch(entity_s *self, projectile_s *proj,
+                                  sprid_game_e dead_gfx)
+{
+    enemy_base_s *data = (enemy_base_s *)&self->userdata;
+    if (proj->kind != PROJ_KIND_PLAYER) return true;
+
+    if (--data->health == 0)
+    {
+        data->health = -1;
+        self->flags &= ~(ENTITY_FLAG_ACTOR | ENTITY_FLAG_COLLIDE);
+        self->flags |= ENTITY_FLAG_MOVING;
+        self->sprite.graphic_id = dead_gfx;
+        self->sprite.flags &= ~SPRITE_FLAG_PLAYING;
+        self->sprite.frame = 0;
+        self->sprite.accum = 0;
+        self->col.group = 0;
+        self->col.mask = 0;
+
+        // note: the original unyuland has a bug where the kinematics of fallen
+        // enemies are ticked twice, so the numbers need to be adjusted here
+        // since that bug is not present here.
+        self->vel.x = TO_FIXED(0.5) * sgn(proj->vx);
+        self->vel.y = TO_FIXED(-1.5);
+        self->gmult = TO_FIXED(1.2);
+    }
+    else
+    {
+        self->vel.x = 0;
+        self->vel.y = 0;
+    }
+
+    return false;
+}
+
 /////////////////////
 // player_behavior //
 /////////////////////
@@ -378,9 +437,9 @@ const behavior_def_s behavior_player_droplet = {
 
 typedef struct crawler_data
 {
+    enemy_base_s base;
     FIXED max_dist;
     FIXED home_x;
-    s8 health;
 }
 crawler_data_s;
 
@@ -402,21 +461,18 @@ void entity_crawler_init(entity_s *self, FIXED px, FIXED py, FIXED max_dist)
     self->actor.move_speed = TO_FIXED(0.5);
     self->actor.move_accel = TO_FIXED(1.0 / 8.0);
     
-    data->max_dist = max_dist;
-    data->home_x = px;
-    data->health = 3;
+    *data = (crawler_data_s)
+    {
+        .base.health = 3,
+        .max_dist = max_dist,
+        .home_x = px
+    };
 }
 
 static void behavior_crawler_update(entity_s *self)
 {
     crawler_data_s *data = (crawler_data_s *)&self->userdata;
-
-    if (data->health < 0)
-    {
-        if (--data->health < -60)
-            entity_queue_free(self);
-        return;
-    }
+    if (enemy_base_update(self)) return;
 
     int face_dir = (int) self->actor.face_dir;
 
@@ -437,39 +493,122 @@ static void behavior_crawler_update(entity_s *self)
 
 static bool behavior_crawler_proj_touch(entity_s *self, projectile_s *proj)
 {
-    crawler_data_s *data = (crawler_data_s *)&self->userdata;
-    if (proj->kind != PROJ_KIND_PLAYER) return true;
-
-    if (--data->health == 0)
-    {
-        data->health = -1;
-        self->flags &= ~(ENTITY_FLAG_ACTOR | ENTITY_FLAG_COLLIDE);
-        self->sprite.graphic_id = SPRID_GAME_CRAWLER_DEAD;
-        self->sprite.flags &= ~SPRITE_FLAG_PLAYING;
-        self->sprite.frame = 0;
-        self->sprite.accum = 0;
-        self->col.group = 0;
-        self->col.mask = 0;
-
-        // note: the original unyuland has a bug where the kinematics of fallen
-        // enemies are ticked twice, so the numbers need to be adjusted here
-        // since that bug is not present here.
-        self->vel.x = TO_FIXED(0.5) * sgn(proj->vx);
-        self->vel.y = TO_FIXED(-1.5);
-        self->gmult = TO_FIXED(1.2);
-    }
-    else
-    {
-        self->vel.x = 0;
-        self->vel.y = 0;
-    }
-
-    return false;
+    return enemy_base_proj_touch(self, proj, SPRID_GAME_CRAWLER_DEAD);
 }
 
 const behavior_def_s behavior_crawler = {
     .update = behavior_crawler_update,
     .proj_touch = behavior_crawler_proj_touch
+};
+
+///////////////
+// gun_enemy //
+///////////////
+
+#define COS45 0.7071067811865475
+#define GUN_ENEMY_SHOOT_COOLDOWN_LENGTH 50
+#define GUN_ENEMY_PROJ_SPEED 2.0
+
+typedef struct gun_enemy_data
+{
+    enemy_base_s base;
+    u8 timer;
+    bool ceil;
+}
+gun_enemy_data_s;
+
+void entity_gun_enemy_init(entity_s *self, FIXED px, FIXED py, bool ceil)
+{
+    self->flags |= ENTITY_FLAG_COLLIDE;
+    self->pos.x = px + int2fx(1);
+    self->pos.y = py;
+    self->col.w = 6;
+    self->col.h = 8;
+    self->col.group = COLGROUP_ENTITY;
+    self->col.mask = COLGROUP_DEFAULT | COLGROUP_PROJECTILE;
+    self->sprite.graphic_id = SPRID_GAME_GUN_ENEMY_IDLE;
+    self->sprite.ox = -1;
+
+    if (ceil)
+    {
+        self->sprite.flags |= SPRITE_FLAG_FLIP_Y;
+    }
+    else
+    {
+        self->flags |= ENTITY_FLAG_MOVING;
+        self->sprite.oy = -4;
+    }
+
+    self->behavior = &behavior_gun_enemy;
+
+    gun_enemy_data_s *data = (gun_enemy_data_s *)self->userdata;
+    *data = (gun_enemy_data_s)
+    {
+        .base.health = 3,
+        .timer = GUN_ENEMY_SHOOT_COOLDOWN_LENGTH,
+        .ceil = ceil
+    };
+}
+
+static void gun_enemy_shoot(FIXED x, FIXED y, FIXED vx, FIXED vy)
+{
+    projectile_s *proj = projectile_alloc();
+    if (!proj) return;
+
+    proj->px = x;
+    proj->py = y;
+    proj->vx = vx;
+    proj->vy = vy;
+    proj->graphic_id = SPRID_GAME_BULLET;
+    proj->kind = PROJ_KIND_ENEMY;
+    proj->life = 60;
+}
+
+static void behavior_gun_enemy_update(entity_s *self)
+{
+    gun_enemy_data_s *data = (gun_enemy_data_s *)&self->userdata;
+    if (enemy_base_update(self)) return;
+
+    --data->timer;
+    if (data->timer == 0)
+    {
+        data->timer = GUN_ENEMY_SHOOT_COOLDOWN_LENGTH;
+
+        FIXED px = self->pos.x + int2fx(3);
+        FIXED py = self->pos.y + int2fx(4);
+        FIXED yfac = data->ceil ? -1 : 1;
+
+        gun_enemy_shoot(px, py,
+                        TO_FIXED(GUN_ENEMY_PROJ_SPEED),
+                        TO_FIXED(0.0));
+        gun_enemy_shoot(px, py,
+                        TO_FIXED(COS45 * GUN_ENEMY_PROJ_SPEED),
+                        yfac * TO_FIXED(-COS45 * GUN_ENEMY_PROJ_SPEED));
+        gun_enemy_shoot(px, py,
+                        TO_FIXED(0),
+                        yfac * TO_FIXED(-GUN_ENEMY_PROJ_SPEED));
+        gun_enemy_shoot(px, py,
+                        TO_FIXED(-COS45 * GUN_ENEMY_PROJ_SPEED),
+                        yfac * TO_FIXED(-COS45 * GUN_ENEMY_PROJ_SPEED));
+        gun_enemy_shoot(px, py,
+                        TO_FIXED(-GUN_ENEMY_PROJ_SPEED),
+                        TO_FIXED(0.0));
+    }
+}
+
+static bool behavior_gun_enemy_proj_touch(entity_s *self, projectile_s *proj)
+{
+    gun_enemy_data_s *data = (gun_enemy_data_s *)&self->userdata;
+    bool res = enemy_base_proj_touch(self, proj, SPRID_GAME_GUN_ENEMY_DEAD);
+    if (data->base.health < 0)
+        self->sprite.flags &= ~SPRITE_FLAG_FLIP_Y;
+
+    return res;
+}
+
+const behavior_def_s behavior_gun_enemy = {
+    .update = behavior_gun_enemy_update,
+    .proj_touch = behavior_gun_enemy_proj_touch
 };
 
 //////////
@@ -542,10 +681,7 @@ static void behavior_water_tank_interact(entity_s *self, entity_s *source)
         if (!ENTITY_ENABLED(e)) continue;
 
         if (e->flags & ENTITY_FLAG_REMOVE_ON_CHECKPOINT)
-        {
-            LOG_DBG("Remove a entity");
             entity_free(e);
-        }
     }
     
     // make sure player is centered perfectly on checkpoint when they respawn
