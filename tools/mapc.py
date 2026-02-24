@@ -75,12 +75,11 @@ def parse(ifile_path: str, output_file: BinaryIO, tileset: Tileset,
     output_file.write(struct.pack('<HHBBxx', map_width, map_height,
                                   room_data['x'], room_data['y']))
 
-    # write collision data
-    byte_accum: list[int] = []
-    col_data = bytearray()
+    # get collision matrix
+    col_data: list[int] = []
     for i in range(0, map_width * map_height * 4, 4):
         tile_int = (data[i] | (data[i+1] << 8) |
-                    (data[i+2] << 16) | (data[i+3] << 24))
+                   (data[i+2] << 16) | (data[i+3] << 24))
         tid = tile_int & 0x0FFFFFFF
         cid = 0
 
@@ -97,11 +96,27 @@ def parse(ifile_path: str, output_file: BinaryIO, tileset: Tileset,
                     cid = 1
 
         assert cid <= 4
-        byte_accum.append(cid)
+        col_data.append(cid)
+    
+    # extend water downwards into air
+    for y in range(0, map_height - 1):
+        for x in range(0, map_width):
+            i1 = y * map_width + x
+            i2 = (y + 1) * map_width + x
+            if (col_data[i1] == 2
+               and col_data[i2] == 0):
+                col_data[i2] = 2
+
+    # write collision data into a packed byte array. 2 bits per cell.
+    byte_accum: list[int] = []
+    col_bytes = bytearray()
+    for i in range(0, map_width * map_height):
+        cid = col_data[i]
+        byte_accum.append(cid & 0x3)
 
         if len(byte_accum) == 4:
             out_byte = byte_accum[0] | (byte_accum[1] << 2) | (byte_accum[2] << 4) | (byte_accum[3] << 6)
-            col_data += struct.pack('<B', out_byte)
+            col_bytes += struct.pack('<B', out_byte)
             byte_accum.clear()
     
     if len(byte_accum) > 0:
@@ -109,7 +124,7 @@ def parse(ifile_path: str, output_file: BinaryIO, tileset: Tileset,
             byte_accum.append(0)
 
         out_byte = byte_accum[0] | (byte_accum[1] << 2) | (byte_accum[2] << 4) | (byte_accum[3] << 6)
-        col_data += struct.pack('<B', out_byte)
+        col_bytes += struct.pack('<B', out_byte)
         byte_accum.clear()
     
     # write graphics data
@@ -201,7 +216,7 @@ def parse(ifile_path: str, output_file: BinaryIO, tileset: Tileset,
     
     section_offset = 20
     output_file.write(struct.pack('<I', section_offset)) # col offset
-    section_offset += align(len(col_data), 4)
+    section_offset += align(len(col_bytes), 4)
     output_file.write(struct.pack('<I', section_offset)) # gfx offset
     section_offset += align(len(gfx_data), 4)
 
@@ -212,8 +227,8 @@ def parse(ifile_path: str, output_file: BinaryIO, tileset: Tileset,
 
     bytes_written = 0
 
-    output_file.write(col_data)
-    bytes_written += len(col_data)
+    output_file.write(col_bytes)
+    bytes_written += len(col_bytes)
     while bytes_written % 4 != 0:
         output_file.write(bytes([0]))
         bytes_written += 1
