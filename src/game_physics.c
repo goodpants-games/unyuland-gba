@@ -7,7 +7,7 @@
 #include "log.h"
 #include "tonc_math.h"
 
-#define PHYS_PROFILE
+// #define PHYS_PROFILE
 
 // in world units (8 units per tile)
 #define PARTGRID_CEL_W 64
@@ -126,21 +126,6 @@ struct phys_profile
 #endif
 
 // static pqueue_entry_s contact_queue[MAX_CONTACT_COUNT];
-
-static inline int map_col_get_bounded(int x, int y)
-{
-    if (x < 0)
-        x = 0;
-    else if (x >= g_game.room_width)
-        x = g_game.room_width - 1;
-
-    if (y < 0)
-        y = 0;
-    else if (y >= g_game.room_height)
-        y = g_game.room_height - 1;
-
-    return map_collision_get(g_game.room_collision, g_game.room_width, x, y);
-}
 
 static col_overlap_res_s rect_collision(FIXED x0, FIXED y0, FIXED w0, FIXED h0,
                                         FIXED x1, FIXED y1, FIXED w1, FIXED h1)
@@ -578,7 +563,7 @@ static bool physics_substep(FIXED vel_mult)
                 for (int y = min_y; y <= max_y; ++y)
                     for (int x = min_x; x <= max_x; ++x)
                     {
-                        if (map_col_get_bounded(x, y) != 1) continue;
+                        if (game_get_col_clamped(x, y) != 1) continue;
                         
                         col_overlap_res_s overlap_res = 
                             rect_collision(entity->pos.x, entity->pos.y, col_w,
@@ -849,7 +834,7 @@ void game_physics_move_projs(FIXED vel_mult)
         if (tx < 0) --tx;
         if (ty < 0) --ty;
 
-        int map_col = map_col_get_bounded(tx, ty);
+        int map_col = game_get_col_clamped(tx, ty);
         if (map_col == 1 || map_col == 2)
         {
             // it was Destroyed.
@@ -922,10 +907,9 @@ void game_physics_init(void)
 }
 
 void game_physics_update(void)
-{
-    profile = (struct phys_profile){0};
-
+{    
     #ifdef PHYS_PROFILE
+    profile = (struct phys_profile){0};
     profile_start();
     #endif
 

@@ -27,6 +27,7 @@
 
 #define COL_FLAG_FLOOR_ONLY   1
 #define COL_FLAG_MONITOR_ONLY 2
+#define COL_FLAG_IN_WATER     4
 
 #define COLGROUP_DEFAULT           ((1 << 0))
 #define COLGROUP_ENTITY            ((1 << 1))
@@ -229,6 +230,26 @@ void game_save_state(void);
 void game_restore_state(void);
 
 void game_load_entity(const entity_load_s *load_data);
+
+static inline int game_get_col(int tx, int ty)
+{
+    return map_collision_get(g_game.room_collision, g_game.room_width, tx, ty);
+}
+
+static inline int game_get_col_clamped(int tx, int ty)
+{
+    if (tx < 0)
+        tx = 0;
+    else if (tx >= g_game.room_width)
+        tx = g_game.room_width - 1;
+
+    if (ty < 0)
+        ty = 0;
+    else if (ty >= g_game.room_height)
+        ty = g_game.room_height - 1;
+
+    return map_collision_get(g_game.room_collision, g_game.room_width, tx, ty);
+}
 
 void entity_player_init(entity_s *self);
 extern const behavior_def_s behavior_player;

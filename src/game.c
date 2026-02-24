@@ -290,6 +290,37 @@ static void update_entities(void)
             FIXED g = fxmul(GRAVITY, entity->gmult);
             entity->vel.y += g;
 
+            // water buoyancy
+            if (entity->flags & ENTITY_FLAG_COLLIDE)
+            {
+                int cflags = entity->col.flags;
+                cflags &= ~COL_FLAG_IN_WATER;
+
+                FIXED cx = entity->pos.x + int2fx(entity->col.w) / 2;
+                FIXED cy = entity->pos.y + int2fx(entity->col.h) / 2;
+                int tx = cx / (WORLD_TILE_SIZE * FIX_ONE);
+                int ty = cy / (WORLD_TILE_SIZE * FIX_ONE);
+
+                if (game_get_col_clamped(tx, ty) == 2)
+                {
+                    cflags |= COL_FLAG_IN_WATER;
+                    int ty2 = (cy - int2fx(1)) / (WORLD_TILE_SIZE * FIX_ONE);
+
+                    if (game_get_col_clamped(tx, ty2) != 2 &&
+                        abs(entity->vel.y) < TO_FIXED(0.125))
+                    {
+                        entity->vel.y = 0;
+                    }
+                    else
+                    {
+                        entity->vel.y = fxmul(entity->vel.y, TO_FIXED(0.8));
+                        entity->vel.y -= g + TO_FIXED(0.09375) / entity->mass;
+                    }
+                }
+
+                entity->col.flags = cflags;
+            }
+
             if (entity->vel.y > terminal_vel)
                 entity->vel.y = terminal_vel;
 
