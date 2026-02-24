@@ -29,7 +29,18 @@ menu_status_e menu_update(menu_s *menu, int *result)
     const int text_x = dot_x + TEXT_OFFSET;
     int text_y = menu->selected * 12 + menu->origin_y;
     
-    if (key_hit(KEY_DOWN))
+    if (key_hit(KEY_A))
+    {
+        *result = menu->selected;
+        status = MENU_STATUS_SELECT;
+        goto no_sync;
+    }
+    else if (key_hit(KEY_B))
+    {
+        status = MENU_STATUS_BACK;
+        goto no_sync;
+    }
+    else if (key_hit(KEY_DOWN))
     {
         gfx_text_bmap_print(text_x, text_y,
                             menu->selection_labels[menu->selected],

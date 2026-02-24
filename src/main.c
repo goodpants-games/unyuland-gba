@@ -64,7 +64,7 @@ static void setup_game_hud(void)
 
 #define PAUSE_MENU_OPTION_COUNT 4
 static const char *pause_menu_options[PAUSE_MENU_OPTION_COUNT] =
-    {"RESUME", "RESPAWN", "MAP", "EXIT"};
+    {"RESUME", "RESPAWN", "MAP", "QUIT"};
 
 static bool game_paused = false;
 static menu_s pause_menu = (menu_s)
@@ -115,10 +115,51 @@ static void close_pause_menu(void)
     gfx_text_sync_rows(0, 8);
 }
 
+static void pause_game(void)
+{
+    game_paused = true;
+    open_pause_menu();
+    mmSetModuleVolume((int)(1024 * 0.1));
+    gfx_set_palette_multiplied(TO_FIXED(0.55));
+}
+
+static void unpause_game(void)
+{
+    game_paused = false;
+    close_pause_menu();
+    mmSetModuleVolume((int)(1024 * 0.25));
+    gfx_set_palette_multiplied(FIX_ONE);
+}
+
 static void update_pause_menu(void)
 {
     int menu_result;
-    menu_update(&pause_menu, &menu_result);
+    switch (menu_update(&pause_menu, &menu_result))
+    {
+        case MENU_STATUS_SELECT:
+            switch (menu_result)
+            {
+                case 0: // resume
+                    unpause_game();
+                    break;
+                case 1: // respawn
+                    game_restore_state();
+                    break;
+                case 2: // map
+                    game_save_state();
+                    break;
+                case 3: // quit
+                    SoftReset();
+                    break;
+            }
+            break;
+
+        case MENU_STATUS_BACK:
+            unpause_game();
+            break;
+
+        default: break;
+    }
 }
 
 __attribute__((section(".ewram")))
@@ -228,17 +269,11 @@ int main(void)
         {
             if (!game_paused)
             {
-                game_paused = true;
-                open_pause_menu();
-                mmSetModuleVolume((int)(1024 * 0.1));
-                gfx_set_palette_multiplied(TO_FIXED(0.55));
+                pause_game();
             }
             else
             {
-                game_paused = false;
-                close_pause_menu();
-                mmSetModuleVolume((int)(1024 * 0.25));
-                gfx_set_palette_multiplied(FIX_ONE);
+                unpause_game();
             }
         }
 

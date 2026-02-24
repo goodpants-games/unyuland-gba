@@ -6,7 +6,8 @@
 typedef enum menu_status
 {
     MENU_STATUS_NORMAL,
-    MENU_STATUS_SELECT
+    MENU_STATUS_SELECT,
+    MENU_STATUS_BACK,
 }
 menu_status_e;
 
