@@ -15,12 +15,21 @@
 
 #define GFX_CHAR_GAME_TILESET 0
 
-// 270 is how many tiles i think i need for six lines (240)/8 * (12*6)/8
-// 12*6 is also a multiple of 8 so that's pretty neat as well.
-#define GFX_TEXT_BMP_SIZE  270 // in tiles
 #define GFX_TEXT_BMP_COLS  30  // tiles per column
+#define GFX_TEXT_BMP_ROWS  12 // in tiles; (12 * 8) / 8, where 12 is the size in
+                              // pixels of each line
+#define GFX_TEXT_BMP_SIZE  (GFX_TEXT_BMP_COLS * GFX_TEXT_BMP_ROWS) // in tiles
 #define GFX_TEXT_BMP_BLOCK 2
 #define GFX_TEXT_BMP_VRAM  (&(tile_mem[GFX_TEXT_BMP_BLOCK][1]))
+
+typedef enum text_color
+{
+    TEXT_COLOR_WHITE,
+    TEXT_COLOR_BLUE,
+    TEXT_COLOR_YELLOW,
+    TEXT_COLOR_BLACK,
+}
+text_color_e;
 
 extern OBJ_ATTR gfx_oam_buffer[128];
 extern int gfx_scroll_x;
@@ -47,16 +56,19 @@ void gfx_reset_palette(void);
 void gfx_set_palette_multiplied(FIXED factor);
 
 void gfx_text_bmap_fill(int oc, int or, int cols, int rows, u32 data[8]);
-void gfx_text_bmap_print(int x, int y, const char *text);
+void gfx_text_bmap_print(int x, int y, const char *text, text_color_e color);
 void gfx_text_bmap_dst_clear(int row, int row_count);
-void gfx_text_bmap_dst_assign(int row, int row_count);
+void gfx_text_bmap_dst_assign(int row, int row_count, int src_row);
 
-static inline void gfx_text_sync_row(int row) // copy row of tiles to VRAM
+static inline void gfx_text_sync_rows(int row, int count) // copy row of tiles to VRAM
 {
     // TODO: gfx_text_sync_row DMA copy?
-    int ofs = row * GFX_TEXT_BMP_COLS;
-    memcpy32(GFX_TEXT_BMP_VRAM + ofs, gfx_text_bmp + ofs,
-             GFX_TEXT_BMP_COLS * sizeof(TILE) / 4);
+    for (int r = row; r < row + count; ++r)
+    {
+        int ofs = r * GFX_TEXT_BMP_COLS;
+        memcpy32(GFX_TEXT_BMP_VRAM + ofs, gfx_text_bmp + ofs,
+                GFX_TEXT_BMP_COLS * sizeof(TILE) / 4);
+    }
 }
 
 #endif

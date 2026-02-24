@@ -12,11 +12,11 @@
 #include "gfx.h"
 #include "log.h"
 
-// #define MAIN_PROFILE
+#define MAIN_PROFILE
 
 static void text_test(void)
 {
-    gfx_text_bmap_dst_assign(0, 6);
+    gfx_text_bmap_dst_assign(0, 6, 0);
 
     u32 black8[8] = {0x11111111, 0x11111111, 0x11111111, 0x11111111,
                     0x11111111, 0x11111111, 0x11111111, 0x11111111};
@@ -26,32 +26,169 @@ static void text_test(void)
     gfx_text_bmap_fill(0, 0, 30, 4, black8);
     gfx_text_bmap_fill(0, 4, 30, 1, black2);
 
-    gfx_text_bmap_print(0, 0, "Hello, world!");
-    gfx_text_bmap_print(0, 12, "lorem ipsum dolor");
-    gfx_text_bmap_print(2, 24, "sit amet");
+    gfx_text_bmap_print(0, 0, "Hello, world!", TEXT_COLOR_WHITE);
+    gfx_text_bmap_print(0, 12, "lorem ipsum dolor", TEXT_COLOR_WHITE);
+    gfx_text_bmap_print(2, 24, "sit amet", TEXT_COLOR_WHITE);
 
-    gfx_text_sync_row(0);
-    gfx_text_sync_row(1);
-    gfx_text_sync_row(2);
-    gfx_text_sync_row(3);
-    gfx_text_sync_row(4);
+    gfx_text_sync_rows(0, 5);
 }
 
-static void text_test2(void)
+// DURING GAMEPLAY OR WHEN PAUSED:
+//   (0-7)  ->(0-7): pause menu
+//   (10-11)->(18->19): HUD
+// DURING DIALOGUE:
+//   everything: dialogue
+
+static void setup_game_hud(void)
 {
-    gfx_text_bmap_dst_assign(18, 2);
+    // set up pause menu display
+    gfx_text_bmap_dst_assign(0, 8, 0);
+
+    // set up HUD display
+    int row_origin = GFX_TEXT_BMP_ROWS - 2;
+    int y_origin = row_origin * 8 + 6;
+    gfx_text_bmap_dst_assign(18, 2, row_origin);
 
     u32 bg1[8] = {0x00000000, 0x00000000, 0x00000000, 0x00000000,
                  0x00000000, 0x00000000, 0x11111111, 0x11111111};
     u32 bg2[8] = {0x11111111, 0x11111111, 0x11111111, 0x11111111,
                     0x11111111, 0x11111111, 0x11111111, 0x11111111};
-    gfx_text_bmap_fill(0, 0, GFX_TEXT_BMP_COLS, 1, bg1);
-    gfx_text_bmap_fill(0, 1, GFX_TEXT_BMP_COLS, 1, bg2);
+    gfx_text_bmap_fill(0, row_origin + 0, GFX_TEXT_BMP_COLS, 1, bg1);
+    gfx_text_bmap_fill(0, row_origin + 1, GFX_TEXT_BMP_COLS, 1, bg2);
 
-    gfx_text_bmap_print(0, 6, "Hello, world!");
+    gfx_text_bmap_print(0, y_origin, "Hello, world!", TEXT_COLOR_WHITE);
 
-    gfx_text_sync_row(0);
-    gfx_text_sync_row(1);
+    gfx_text_sync_rows(row_origin, 2);
+}
+
+#define PAUSE_MENU_TEXT_X 10
+#define PAUSE_MENU_TEXT_Y 16
+#define PAUSE_MENU_DOT_X (PAUSE_MENU_TEXT_X - 8)
+#define PAUSE_MENU_OPTION_COUNT 4
+
+static const char *pause_menu_options[PAUSE_MENU_OPTION_COUNT] =
+    {"RESUME", "RESPAWN", "MAP", "EXIT"};
+static int pause_menu_sel = 0;
+static int pause_menu_timer = 0;
+static bool pause_menu_shown = false;
+
+static void open_pause_menu(void)
+{
+    // background fill
+    u32 bg_t[8] =  {0x00000000, 0x00000000, 0x11111111, 0x11111111,
+                    0x11111111, 0x11111111, 0x11111111, 0x11111111};
+    u32 bg_r[8] =  {0x00001111, 0x00001111, 0x00001111, 0x00001111,
+                    0x00001111, 0x00001111, 0x00001111, 0x00001111};
+    u32 bg_tr[8] = {0x00000000, 0x00000000, 0x00001111, 0x00001111,
+                    0x00001111, 0x00001111, 0x00001111, 0x00001111};
+    u32 bg_l[8] =  {0x11111100, 0x11111100, 0x11111100, 0x11111100,
+                    0x11111100, 0x11111100, 0x11111100, 0x11111100};
+    u32 bg_tl[8] = {0x00000000, 0x00000000, 0x11111100, 0x11111100,
+                    0x11111100, 0x11111100, 0x11111100, 0x11111100};
+    u32 bg_f[8] =  {0x11111111, 0x11111111, 0x11111111, 0x11111111,
+                    0x11111111, 0x11111111, 0x11111111, 0x11111111};
+    gfx_text_bmap_fill(1, 1, 11, 7, bg_f);
+    gfx_text_bmap_fill(0, 0, 12, 1, bg_t);
+    gfx_text_bmap_fill(12, 0, 1, 1, bg_tr);
+    gfx_text_bmap_fill(12, 1, 1, 7, bg_r);
+    gfx_text_bmap_fill(0, 1, 1, 7, bg_l);
+    gfx_text_bmap_fill(0, 0, 1, 1, bg_tl);
+
+    // print text
+    gfx_text_bmap_print(4, 0 + 4, "PAUSED", TEXT_COLOR_BLUE);
+
+    for (int i = 0, yp = PAUSE_MENU_TEXT_Y; i < 4; ++i, yp += 12)
+    {
+        const text_color_e col = i == pause_menu_sel ? TEXT_COLOR_YELLOW : TEXT_COLOR_WHITE;
+        gfx_text_bmap_print(PAUSE_MENU_TEXT_X, yp, pause_menu_options[i], col);
+
+        if (i == pause_menu_sel)
+            gfx_text_bmap_print(PAUSE_MENU_DOT_X, yp, "*", TEXT_COLOR_YELLOW);
+    }
+
+    // copy to vram
+    gfx_text_sync_rows(0, 8);
+
+    pause_menu_timer = 0;
+}
+
+static void close_pause_menu(void)
+{
+    u32 t[8] =  {0x00000000, 0x00000000, 0x00000000, 0x00000000,
+                 0x00000000, 0x00000000, 0x00000000, 0x00000000};
+    gfx_text_bmap_fill(0, 0, 13, 8, t);
+    gfx_text_sync_rows(0, 8);
+}
+
+static void update_pause_menu(void)
+{
+    int text_y = pause_menu_sel * 12 + PAUSE_MENU_TEXT_Y;
+    
+    if (key_hit(KEY_DOWN))
+    {
+        gfx_text_bmap_print(PAUSE_MENU_TEXT_X, text_y,
+                            pause_menu_options[pause_menu_sel],
+                            TEXT_COLOR_WHITE);
+        gfx_text_bmap_print(PAUSE_MENU_DOT_X, text_y, "*", TEXT_COLOR_BLACK);
+
+        if (++pause_menu_sel == PAUSE_MENU_OPTION_COUNT)
+        {
+            text_y = PAUSE_MENU_TEXT_Y;
+            pause_menu_sel = 0;
+        }
+        else
+        {
+            text_y += 12;
+        }
+
+        pause_menu_timer = 0;
+
+        gfx_text_bmap_print(PAUSE_MENU_TEXT_X, text_y,
+                            pause_menu_options[pause_menu_sel],
+                            TEXT_COLOR_YELLOW);
+        gfx_text_bmap_print(PAUSE_MENU_DOT_X, text_y, "*", TEXT_COLOR_YELLOW);
+    }
+    else if (key_hit(KEY_UP))
+    {
+        gfx_text_bmap_print(PAUSE_MENU_TEXT_X, text_y,
+                            pause_menu_options[pause_menu_sel],
+                            TEXT_COLOR_WHITE);
+        gfx_text_bmap_print(PAUSE_MENU_DOT_X, text_y, "*", TEXT_COLOR_BLACK);
+
+        if (pause_menu_sel == 0)
+        {
+            pause_menu_sel = PAUSE_MENU_OPTION_COUNT - 1;
+            text_y = (PAUSE_MENU_OPTION_COUNT - 1) * 12 + PAUSE_MENU_TEXT_Y;
+        }
+        else
+        {
+            --pause_menu_sel;
+            text_y -= 12;
+        }
+
+        pause_menu_timer = 0;
+
+        gfx_text_bmap_print(PAUSE_MENU_TEXT_X, text_y,
+                            pause_menu_options[pause_menu_sel],
+                            TEXT_COLOR_YELLOW);
+        gfx_text_bmap_print(PAUSE_MENU_DOT_X, text_y, "*", TEXT_COLOR_YELLOW);
+    }
+    else if (pause_menu_timer == 20)
+    {
+        gfx_text_bmap_print(PAUSE_MENU_DOT_X, text_y, "*",
+                            TEXT_COLOR_BLACK);
+    }
+    else if (pause_menu_timer == 40)
+    {
+        gfx_text_bmap_print(PAUSE_MENU_DOT_X, text_y, "*",
+                            TEXT_COLOR_YELLOW);
+        pause_menu_timer = 0;
+    }
+    else goto done;
+    
+    gfx_text_sync_rows(0, 8);
+    done:;
+    ++pause_menu_timer;
 }
 
 __attribute__((section(".ewram")))
@@ -127,8 +264,6 @@ int main(void)
     }
 
     (void)text_test;
-    (void)text_test2;
-    text_test2();
 
     mmInit(&(mm_gba_system)
     {
@@ -145,6 +280,8 @@ int main(void)
                                                      + MM_SIZEOF_MIXCH))),
         .soundbank         = (mm_addr)soundbank_bin
     });
+
+    setup_game_hud();
     mmStart(MOD_TESTMOD, MM_PLAY_LOOP);
     mmSetModuleVolume((int)(1024 * 0.25));
 
@@ -156,19 +293,45 @@ int main(void)
         // screen_print(&se_mat[GFX_BG0_INDEX][18][0], "Hello, world!");
 
         key_poll();
-        game_update();
-        game_transition_update(player);
 
-        g_game.cam_x = (player->pos.x >> FIX_SHIFT) - SCREEN_WIDTH / 4;
-        g_game.cam_y = (player->pos.y >> FIX_SHIFT) - SCREEN_HEIGHT / 4;
+        if (key_hit(KEY_START))
+        {
+            if (!pause_menu_shown)
+            {
+                pause_menu_shown = true;
+                open_pause_menu();
+                mmPause();
+                gfx_set_palette_multiplied(TO_FIXED(0.55));
+            }
+            else
+            {
+                pause_menu_shown = false;
+                close_pause_menu();
+                mmResume();
+                gfx_set_palette_multiplied(FIX_ONE);
+            }
+        }
 
-        int x_max = gfx_map_width * 8 - SCREEN_WIDTH / 2;
-        int y_max = gfx_map_height * 8 - SCREEN_HEIGHT / 2;
+        if (!pause_menu_shown)
+        {
+            game_update();
+            game_transition_update(player);
 
-        if (g_game.cam_x < 0)     g_game.cam_x = 0;
-        if (g_game.cam_y < 0)     g_game.cam_y = 0;
-        if (g_game.cam_x > x_max) g_game.cam_x = x_max;
-        if (g_game.cam_y > y_max) g_game.cam_y = y_max;
+            g_game.cam_x = (player->pos.x >> FIX_SHIFT) - SCREEN_WIDTH / 4;
+            g_game.cam_y = (player->pos.y >> FIX_SHIFT) - SCREEN_HEIGHT / 4;
+
+            int x_max = gfx_map_width * 8 - SCREEN_WIDTH / 2;
+            int y_max = gfx_map_height * 8 - SCREEN_HEIGHT / 2;
+
+            if (g_game.cam_x < 0)     g_game.cam_x = 0;
+            if (g_game.cam_y < 0)     g_game.cam_y = 0;
+            if (g_game.cam_x > x_max) g_game.cam_x = x_max;
+            if (g_game.cam_y > y_max) g_game.cam_y = y_max;
+        }
+        else
+        {
+            update_pause_menu();
+        }
 
         game_render(&last_obj_index);
 

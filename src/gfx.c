@@ -14,9 +14,7 @@ uint gfx_map_width = 0;
 uint gfx_map_height = 0;
 const map_header_s *gfx_loaded_map = NULL;
 
-// put in ewram as the buffer takes 8.4 KiB
-// TODO: should i have gfx_text_bmp in iwram, ewram, or modify vram directly??
-// (probably not modify vram directly)
+// put in ewram as the buffer takes 11.25 KiB
 __attribute__((section(".ewram")))
 TILE gfx_text_bmp[GFX_TEXT_BMP_SIZE];
 
@@ -220,7 +218,7 @@ void gfx_reset_palette(void)
     // 16: black (if on 16-bit color mode, this will be the start of the 2nd bank)
     // 17-31: regular palette, with idx15 (peach) swapped out for black.
     // will not be darkened during room trans. used for UI (presumably).
-    // 32-47: #15 - white. used for the dialogue text bitmap.
+    // 32-47: 1-black, 2-yellow, 3-light blue, 15-white. used for text.
     for (int i = 0; i < 16; ++i)
         pal_bg_mem[i] = gfx_palette[i];
     pal_bg_mem[16] = gfx_palette[0];
@@ -229,6 +227,9 @@ void gfx_reset_palette(void)
         pal_bg_mem[16 + i] = gfx_palette[i];
     pal_bg_mem[31] = gfx_palette[0];
 
+    pal_bg_mem[33] = gfx_palette[0];
+    pal_bg_mem[34] = gfx_palette[10];
+    pal_bg_mem[35] = gfx_palette[12];
     pal_bg_mem[47] = gfx_palette[7];
 
     // pal bank 0: regular palette, may be darkened for room transition
@@ -287,37 +288,119 @@ void gfx_set_palette_multiplied(FIXED factor)
         pal_obj_bank[0][i] = new_palette[i];
 }
 
-static inline u32* get_pixel_row(const uint x, const uint y)
-{
-    return &gfx_text_bmp[((y >> 3) * GFX_TEXT_BMP_COLS + (x >> 3))].data[y & 7];
-}
+// static inline u32* get_pixel_row(const int x, const int y)
+// {
+//     return &gfx_text_bmp[(y >> 3) * GFX_TEXT_BMP_COLS + (x >> 3)].data[y & 7];
+// }
 
-static void blit_tile(int x, int y, const TILE4 *src_tile)
+static inline void blit_tile(uint x, uint y, const TILE4 *src_tile)
 {
-    const int dx = x;
-    int dy = y;
-    for (int r = 0; r < 8; ++r)
+    const uint shf = (x & 7) << 2;
+    uint ry = y & 7;
+    u32 *row = &gfx_text_bmp[(y >> 3) * GFX_TEXT_BMP_COLS + (x >> 3)].data[ry];
+    const u32 *src_row = src_tile->data;
+    
+    if (shf)
     {
-        u32 src_row = src_tile->data[r];
-
-        u32 *row = get_pixel_row(dx, dy);
-        int shf = (dx & 7) << 2;
-        *row |= src_row << shf;
-
-        if (shf) // shf > 0
+        for (int r = 0; r < 8; ++r)
         {
-            row = get_pixel_row(dx + 8, dy);
-            shf = 32 - shf;
-            *row |= src_row >> shf;
-        }
+            u32 src = *src_row;
+            *row |= src << shf;
+            *(row + 8) |= src >> (32 - shf);
 
-        ++dy;
+            ++row;
+            ++src_row;
+            if (++ry == 8)
+                row += (GFX_TEXT_BMP_COLS - 1) * 8;
+        }
+    }
+    else
+    {
+        for (int r = 0; r < 8; ++r)
+        {
+            u32 src = *src_row;
+            *row |= src;
+
+            ++row;
+            ++src_row;
+            if (++ry == 8)
+                row += (GFX_TEXT_BMP_COLS - 1) * 8;
+        }
     }
 }
 
-void gfx_text_bmap_print(int x, int y, const char *text)
+static inline void blit_tile_colored(uint x, uint y, const TILE4 *src_tile,
+                              u32 color_bits)
 {
-    const TILE4 *const text_data = (const TILE4 *)font_gfxTiles;
+    const uint shf = (x & 7) << 2;
+    uint ry = y & 7;
+    u32 *row = &gfx_text_bmp[(y >> 3) * GFX_TEXT_BMP_COLS + (x >> 3)].data[ry];
+    const u32 *src_row = src_tile->data;
+    
+    if (shf)
+    {
+        for (int r = 0; r < 8; ++r)
+        {
+            u32 src = *src_row;
+            u32 blit = src << shf;
+            *row = (*row & ~blit) | (blit & color_bits);
+
+            row += 8;
+            blit = src >> (32 - shf);
+            *row = (*row & ~blit) | (blit & color_bits);
+
+            row -= 7;
+            ++src_row;
+            if (++ry == 8)
+                row += (GFX_TEXT_BMP_COLS - 1) * 8;
+        }
+    }
+    else
+    {
+        for (int r = 0; r < 8; ++r)
+        {
+            u32 src = *src_row;
+            *row = (*row & ~src) | (src & color_bits);
+
+            ++row;
+            ++src_row;
+            if (++ry == 8)
+                row += (GFX_TEXT_BMP_COLS - 1) * 8;
+        }
+    }
+    
+    // for (int r = 0; r < 8; ++r)
+    // {
+    //     u32 src_row = src_tile->data[r];
+    //     u32 *row = get_pixel_row(dx, dy);
+    //     uint shf = (dx & 7) << 2;
+    //     u32 blit = src_row << shf;
+    //     *row = (*row & ~blit) | (blit & color_bits);
+
+    //     if (shf) // shf > 0
+    //     {
+    //         row = get_pixel_row(dx + 8, dy);
+    //         shf = 32 - shf;
+    //         blit = src_row >> shf;
+    //         *row = (*row & ~blit) | (blit & color_bits);
+    //     }
+
+    //     ++dy;
+    // }
+}
+
+void gfx_text_bmap_print(int x, int y, const char *text, text_color_e text_color)
+{
+    const TILE *const text_data = (const TILE *)font_gfxTiles;
+
+    bool is_white = text_color == TEXT_COLOR_WHITE;
+    u32 color_bits = 0;
+    if (text_color == TEXT_COLOR_BLUE)
+        color_bits = 0x33333333;
+    else if (text_color == TEXT_COLOR_YELLOW)
+        color_bits = 0x22222222;
+    else if (text_color == TEXT_COLOR_BLACK)
+        color_bits = 0x11111111;
 
     for (; *text != '\0'; ++text)
     {
@@ -370,10 +453,22 @@ void gfx_text_bmap_print(int x, int y, const char *text)
                 id = TEXT_CHAR_ID(toupper(ch) - 'A');
         }
 
-        blit_tile(x , y, &text_data[id]);
-        blit_tile(x + 8, y, &text_data[id + 1]);
-        blit_tile(x, y + 8, &text_data[id + 2]);
-        blit_tile(x + 8, y + 8, &text_data[id + 3]);
+        const TILE *src_tile = text_data + id;
+
+        if (is_white)
+        {
+            blit_tile(x, y, src_tile);
+            blit_tile(x + 8, y, ++src_tile);
+            blit_tile(x, y + 8, ++src_tile);
+            blit_tile(x + 8, y + 8, ++src_tile);
+        }
+        else
+        {
+            blit_tile_colored(x, y, src_tile, color_bits);
+            blit_tile_colored(x + 8, y, ++src_tile, color_bits);
+            blit_tile_colored(x, y + 8, ++src_tile, color_bits);
+            blit_tile_colored(x + 8, y + 8, ++src_tile, color_bits);
+        }
 
         next_char:;
         x += 12;
@@ -384,7 +479,7 @@ void gfx_text_bmap_fill(int oc, int or, int cols, int rows, u32 data[8])
 {
     for (int r = or; r < or + rows; ++r)
     {
-        TILE *t = &gfx_text_bmp[r * GFX_TEXT_BMP_COLS];
+        TILE *t = &gfx_text_bmp[r * GFX_TEXT_BMP_COLS + oc];
         TILE *end_tile = t + cols;
         for (; t != end_tile; ++t)
         {
@@ -405,9 +500,9 @@ void gfx_text_bmap_dst_clear(int row, int row_count)
     }
 }
 
-void gfx_text_bmap_dst_assign(int row, int row_count)
+void gfx_text_bmap_dst_assign(int row, int row_count, int src_row)
 {
-    int i = 1;
+    int i = src_row * GFX_TEXT_BMP_COLS + 1;
     int j = row * 32;
     for (int y = row; y < row + row_count; ++y)
     {
