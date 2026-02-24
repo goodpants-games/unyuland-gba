@@ -55,7 +55,7 @@ INLINE void gfx_unload_map(void)
 void gfx_reset_palette(void);
 void gfx_set_palette_multiplied(FIXED factor);
 
-void gfx_text_bmap_fill(int oc, int or, int cols, int rows, u32 data[8]);
+void gfx_text_bmap_fill(int oc, int or_, int cols, int rows, u32 data[8]);
 void gfx_text_bmap_print(int x, int y, const char *text, text_color_e color);
 void gfx_text_bmap_dst_clear(int row, int row_count);
 void gfx_text_bmap_dst_assign(int row, int row_count, int src_row);
