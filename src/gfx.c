@@ -204,6 +204,11 @@ void gfx_new_frame(void)
     REG_BG1VOFS = gfx_scroll_y;
 }
 
+void gfx_mark_scroll_dirty()
+{
+    screen_dirty = true;
+}
+
 void gfx_load_map(const map_header_s *map)
 {
     gfx_loaded_map = map;

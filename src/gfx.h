@@ -45,6 +45,7 @@ extern TILE gfx_text_bmp[GFX_TEXT_BMP_SIZE];
 void gfx_init(void);
 void gfx_new_frame(void);
 void gfx_load_map(const map_header_s *map);
+void gfx_mark_scroll_dirty(void);
 INLINE void gfx_unload_map(void)
 {
     gfx_loaded_map = NULL;

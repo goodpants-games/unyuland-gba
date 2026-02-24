@@ -63,6 +63,7 @@ typedef struct game_state
     entity_s entities[MAX_ENTITY_COUNT];
     projectile_s projectiles[MAX_PROJECTILE_COUNT];
     int cam_x, cam_y;
+    room_trans_state_s room_trans;
 }
 game_state_s;
 
@@ -797,6 +798,19 @@ static void room_transition_phase1_update(entity_s *player)
         .player_move_x = player_mx,
         .override_player_move_x = true,
     };
+
+    g_game.cam_x = (player->pos.x >> FIX_SHIFT) - SCREEN_WIDTH / 4;
+    g_game.cam_y = (player->pos.y >> FIX_SHIFT) - SCREEN_HEIGHT / 4;
+
+    int x_max = gfx_map_width * 8 - SCREEN_WIDTH / 2;
+    int y_max = gfx_map_height * 8 - SCREEN_HEIGHT / 2;
+
+    if (g_game.cam_x < 0)     g_game.cam_x = 0;
+    if (g_game.cam_y < 0)     g_game.cam_y = 0;
+    if (g_game.cam_x > x_max) g_game.cam_x = x_max;
+    if (g_game.cam_y > y_max) g_game.cam_y = y_max;
+
+    game_save_state();
 }
 
 static void room_transition_phase2_update(entity_s *player)
@@ -860,6 +874,7 @@ void game_save_state(void)
 
     game_saved_state.cam_x = g_game.cam_x;
     game_saved_state.cam_y = g_game.cam_y;
+    game_saved_state.room_trans = g_game.room_trans;
 }
 
 void game_restore_state(void)
@@ -876,7 +891,8 @@ void game_restore_state(void)
         }
         else
         {
-            bool need_alloc = !ENTITY_ENABLED(dst_ent);
+            bool need_alloc = !ENTITY_ENABLED(dst_ent) &&
+                              ENTITY_ENABLED(src_ent);
             *dst_ent = *src_ent;
             if (need_alloc) on_entity_alloc(dst_ent);
         }
@@ -897,7 +913,8 @@ void game_restore_state(void)
         }
         else
         {
-            bool need_alloc = !IS_PROJ_ACTIVE(dst_proj);
+            bool need_alloc = !IS_PROJ_ACTIVE(dst_proj) &&
+                              IS_PROJ_ACTIVE(src_proj);
             *dst_proj = *src_proj;
             if (need_alloc) on_projectile_alloc(dst_proj);
         }
@@ -908,4 +925,6 @@ void game_restore_state(void)
 
     g_game.cam_x = game_saved_state.cam_x;
     g_game.cam_y = game_saved_state.cam_y;
+    g_game.room_trans = game_saved_state.room_trans;
+    gfx_mark_scroll_dirty();
 }

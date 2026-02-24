@@ -13,7 +13,7 @@
 #include "log.h"
 #include "menu.h"
 
-#define MAIN_PROFILE
+// #define MAIN_PROFILE
 
 static void text_test(void)
 {
@@ -144,6 +144,7 @@ static void update_pause_menu(void)
                     break;
                 case 1: // respawn
                     game_restore_state();
+                    unpause_game();
                     break;
                 case 2: // map
                     game_save_state();
