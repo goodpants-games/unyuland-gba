@@ -11,6 +11,7 @@
 #include "game.h"
 #include "gfx.h"
 #include "log.h"
+#include "menu.h"
 
 #define MAIN_PROFILE
 
@@ -61,16 +62,21 @@ static void setup_game_hud(void)
     gfx_text_sync_rows(row_origin, 2);
 }
 
-#define PAUSE_MENU_TEXT_X 10
-#define PAUSE_MENU_TEXT_Y 16
-#define PAUSE_MENU_DOT_X (PAUSE_MENU_TEXT_X - 8)
 #define PAUSE_MENU_OPTION_COUNT 4
-
 static const char *pause_menu_options[PAUSE_MENU_OPTION_COUNT] =
     {"RESUME", "RESPAWN", "MAP", "EXIT"};
-static int pause_menu_sel = 0;
-static int pause_menu_timer = 0;
-static bool pause_menu_shown = false;
+
+static bool game_paused = false;
+static menu_s pause_menu = (menu_s)
+{
+    .selection_count = PAUSE_MENU_OPTION_COUNT,
+    .selection_labels = pause_menu_options,
+
+    .origin_x = 2,
+    .origin_y = 16,
+    .vram_row_base = 0,
+    .vram_row_count = 8,
+};
 
 static void open_pause_menu(void)
 {
@@ -97,19 +103,8 @@ static void open_pause_menu(void)
     // print text
     gfx_text_bmap_print(4, 0 + 4, "PAUSED", TEXT_COLOR_BLUE);
 
-    for (int i = 0, yp = PAUSE_MENU_TEXT_Y; i < 4; ++i, yp += 12)
-    {
-        const text_color_e col = i == pause_menu_sel ? TEXT_COLOR_YELLOW : TEXT_COLOR_WHITE;
-        gfx_text_bmap_print(PAUSE_MENU_TEXT_X, yp, pause_menu_options[i], col);
-
-        if (i == pause_menu_sel)
-            gfx_text_bmap_print(PAUSE_MENU_DOT_X, yp, "*", TEXT_COLOR_YELLOW);
-    }
-
-    // copy to vram
-    gfx_text_sync_rows(0, 8);
-
-    pause_menu_timer = 0;
+    menu_show(&pause_menu);
+    menu_vram_refresh(&pause_menu);
 }
 
 static void close_pause_menu(void)
@@ -122,73 +117,8 @@ static void close_pause_menu(void)
 
 static void update_pause_menu(void)
 {
-    int text_y = pause_menu_sel * 12 + PAUSE_MENU_TEXT_Y;
-    
-    if (key_hit(KEY_DOWN))
-    {
-        gfx_text_bmap_print(PAUSE_MENU_TEXT_X, text_y,
-                            pause_menu_options[pause_menu_sel],
-                            TEXT_COLOR_WHITE);
-        gfx_text_bmap_print(PAUSE_MENU_DOT_X, text_y, "*", TEXT_COLOR_BLACK);
-
-        if (++pause_menu_sel == PAUSE_MENU_OPTION_COUNT)
-        {
-            text_y = PAUSE_MENU_TEXT_Y;
-            pause_menu_sel = 0;
-        }
-        else
-        {
-            text_y += 12;
-        }
-
-        pause_menu_timer = 0;
-
-        gfx_text_bmap_print(PAUSE_MENU_TEXT_X, text_y,
-                            pause_menu_options[pause_menu_sel],
-                            TEXT_COLOR_YELLOW);
-        gfx_text_bmap_print(PAUSE_MENU_DOT_X, text_y, "*", TEXT_COLOR_YELLOW);
-    }
-    else if (key_hit(KEY_UP))
-    {
-        gfx_text_bmap_print(PAUSE_MENU_TEXT_X, text_y,
-                            pause_menu_options[pause_menu_sel],
-                            TEXT_COLOR_WHITE);
-        gfx_text_bmap_print(PAUSE_MENU_DOT_X, text_y, "*", TEXT_COLOR_BLACK);
-
-        if (pause_menu_sel == 0)
-        {
-            pause_menu_sel = PAUSE_MENU_OPTION_COUNT - 1;
-            text_y = (PAUSE_MENU_OPTION_COUNT - 1) * 12 + PAUSE_MENU_TEXT_Y;
-        }
-        else
-        {
-            --pause_menu_sel;
-            text_y -= 12;
-        }
-
-        pause_menu_timer = 0;
-
-        gfx_text_bmap_print(PAUSE_MENU_TEXT_X, text_y,
-                            pause_menu_options[pause_menu_sel],
-                            TEXT_COLOR_YELLOW);
-        gfx_text_bmap_print(PAUSE_MENU_DOT_X, text_y, "*", TEXT_COLOR_YELLOW);
-    }
-    else if (pause_menu_timer == 20)
-    {
-        gfx_text_bmap_print(PAUSE_MENU_DOT_X, text_y, "*",
-                            TEXT_COLOR_BLACK);
-    }
-    else if (pause_menu_timer == 40)
-    {
-        gfx_text_bmap_print(PAUSE_MENU_DOT_X, text_y, "*",
-                            TEXT_COLOR_YELLOW);
-        pause_menu_timer = 0;
-    }
-    else goto done;
-    
-    gfx_text_sync_rows(0, 8);
-    done:;
-    ++pause_menu_timer;
+    int menu_result;
+    menu_update(&pause_menu, &menu_result);
 }
 
 __attribute__((section(".ewram")))
@@ -296,23 +226,23 @@ int main(void)
 
         if (key_hit(KEY_START))
         {
-            if (!pause_menu_shown)
+            if (!game_paused)
             {
-                pause_menu_shown = true;
+                game_paused = true;
                 open_pause_menu();
-                mmPause();
+                mmSetModuleVolume((int)(1024 * 0.1));
                 gfx_set_palette_multiplied(TO_FIXED(0.55));
             }
             else
             {
-                pause_menu_shown = false;
+                game_paused = false;
                 close_pause_menu();
-                mmResume();
+                mmSetModuleVolume((int)(1024 * 0.25));
                 gfx_set_palette_multiplied(FIX_ONE);
             }
         }
 
-        if (!pause_menu_shown)
+        if (!game_paused)
         {
             game_update();
             game_transition_update(player);
