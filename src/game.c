@@ -68,6 +68,7 @@ typedef struct game_state
 }
 game_state_s;
 
+__attribute__((section(".iwram")))
 game_s g_game;
 
 __attribute__((section(".ewram")))

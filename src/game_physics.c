@@ -80,30 +80,30 @@ typedef struct proj_part_data
 }
 proj_part_data_s;
 
-static int col_ent_count = 0;
-static entity_coldata_s col_ent_map[MAX_ENTITY_COUNT];
-static entity_coldata_s *col_ents[MAX_ENTITY_COUNT];
+IWRAM_DATA static int col_ent_count = 0;
+IWRAM_DATA static entity_coldata_s col_ent_map[MAX_ENTITY_COUNT];
+IWRAM_DATA static entity_coldata_s *col_ents[MAX_ENTITY_COUNT];
 
-static uint col_contact_count = 0;
-static col_contact_s col_contacts[MAX_CONTACT_COUNT];
+IWRAM_DATA static uint col_contact_count = 0;
+IWRAM_DATA static col_contact_s col_contacts[MAX_CONTACT_COUNT];
 // static u8 contact_pairs[ENTITY_PAIR_SIZE];
 
-static int x_overlap_count = 0;
-static col_bp_overlap_s x_overlaps[MAX_ENTITY_COUNT * 2];
+IWRAM_DATA static int x_overlap_count = 0;
+IWRAM_DATA static col_bp_overlap_s x_overlaps[MAX_ENTITY_COUNT * 2];
 
-static int x_edge_count = 0;
-static col_bp_edge_s x_edges[EDGE_LIST_MAX_COUNT];
+IWRAM_DATA static int x_edge_count = 0;
+IWRAM_DATA static col_bp_edge_s x_edges[EDGE_LIST_MAX_COUNT];
 
-static int y_edge_count = 0;
-static col_bp_edge_s y_edges[EDGE_LIST_MAX_COUNT];
+IWRAM_DATA static int y_edge_count = 0;
+IWRAM_DATA static col_bp_edge_s y_edges[EDGE_LIST_MAX_COUNT];
 
-static u8 x_contact_pairs[ENTITY_PAIR_SIZE];
-static u8 y_contact_pairs[ENTITY_PAIR_SIZE];
+IWRAM_DATA static u8 x_contact_pairs[ENTITY_PAIR_SIZE];
+IWRAM_DATA static u8 y_contact_pairs[ENTITY_PAIR_SIZE];
 
-static proj_part_data_s proj_data[MAX_PROJECTILE_COUNT];
-static partgrid_node_s partgrid_node_pool[PARTGRID_NODE_POOL_SIZE];
-static partgrid_node_s *partgrid_node_pool_ffree; // first free
-static part_cell_t partgrid[PARTGRID_ROWS][PARTGRID_COLS];
+IWRAM_DATA static proj_part_data_s proj_data[MAX_PROJECTILE_COUNT];
+IWRAM_DATA static partgrid_node_s partgrid_node_pool[PARTGRID_NODE_POOL_SIZE];
+IWRAM_DATA static partgrid_node_s *partgrid_node_pool_ffree; // first free
+IWRAM_DATA static part_cell_t partgrid[PARTGRID_ROWS][PARTGRID_COLS];
 
 // static pqueue_entry_s contact_queue[MAX_CONTACT_COUNT];
 
