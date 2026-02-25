@@ -7,7 +7,7 @@
 #include "log.h"
 #include "tonc_math.h"
 
-#define PHYS_PROFILE
+// #define PHYS_PROFILE
 
 // in world units (8 units per tile)
 #define PARTGRID_CEL_W 64
@@ -33,6 +33,7 @@ typedef struct entity_coldata
     FIXED inv_mass;
     FIXED width, height;
     FIXED half_width, half_height;
+    bool dirty;
 }
 entity_coldata_s;
 
@@ -421,6 +422,8 @@ static bool physics_substep(FIXED vel_mult)
         FIXED s_vy = fxmul(entity->vel.y, vel_mult);
         entity->pos.x += s_vx;
         entity->pos.y += s_vy;
+
+        col_ent->dirty = true;
     }
 
     #ifdef PHYS_PROFILE
@@ -515,7 +518,6 @@ static bool physics_substep(FIXED vel_mult)
         }
 
         // collect tile contacts
-        // also projectile detection and handling
         for (int i = 0; i < col_ent_count; ++i)
         {
             if (col_contact_count >= MAX_CONTACT_COUNT)
@@ -526,6 +528,10 @@ static bool physics_substep(FIXED vel_mult)
 
             entity_coldata_s *const col_ent = col_ents[i];
             entity_s *entity = col_ent->ent;
+
+            if (!(entity->flags & ENTITY_FLAG_MOVING)) goto _continue;
+            if (!col_ent->dirty) goto _continue;
+            col_ent->dirty = false;
 
             const FIXED col_w = col_ent->width;
             const FIXED col_h = col_ent->height;
@@ -539,58 +545,6 @@ static bool physics_substep(FIXED vel_mult)
             const int et = entity->pos.y;
             const int er = (entity->pos.x + col_w);
             const int eb = (entity->pos.y + col_h);
-
-            if (col_mask & COLGROUP_PROJECTILE)
-            {
-                int min_px = el / (FIX_ONE * PARTGRID_CEL_W);
-                int min_py = et / (FIX_ONE * PARTGRID_CEL_H);
-                int max_px = er / (FIX_ONE * PARTGRID_CEL_W);
-                int max_py = eb / (FIX_ONE * PARTGRID_CEL_H);
-
-                // clamp bounds to partition grid
-                if      (min_px < 0)              min_px = 0;
-                else if (min_px >= PARTGRID_COLS) min_px = PARTGRID_COLS - 1;
-                if      (max_px < 0)              max_px = 0;
-                else if (max_px >= PARTGRID_COLS) max_px = PARTGRID_COLS - 1;
-
-                if      (min_py < 0)              min_py = 0;
-                else if (min_py >= PARTGRID_ROWS) min_py = PARTGRID_ROWS - 1;
-                if      (max_py < 0)              max_py = 0;
-                else if (max_py >= PARTGRID_ROWS) max_py = PARTGRID_ROWS - 1;
-
-                for (int y = min_py; y <= max_py; ++y)
-                    for (int x = min_px; x <= max_px; ++x)
-                    {
-                        for (partgrid_node_s *node = partgrid[y][x]; node;
-                            node = node->next)
-                        {
-                            projectile_s *proj = node->projectile;
-                            if (proj->flags & PROJ_FLAG_QFREE) continue;
-
-                            FIXED px = proj->px;
-                            FIXED py = proj->py;
-
-                            if (!(px > el && px < er && py > et && py < eb))
-                                continue;
-
-                            bool keep;
-                            if (entity->behavior &&
-                                entity->behavior->proj_touch)
-                            {
-                                keep = entity->behavior->proj_touch(entity, proj);
-                            }
-                            else
-                            {
-                                keep = false;
-                            }
-                            
-                            if (!keep)
-                                projectile_queue_free(proj);
-                        }
-                    }
-            }
-
-            if (!(entity->flags & ENTITY_FLAG_MOVING)) goto _continue;
 
             #ifdef PHYS_PROFILE
             profile_start();
@@ -658,11 +612,10 @@ static bool physics_substep(FIXED vel_mult)
                 }
             }
 
+            _continue:;
             #ifdef PHYS_PROFILE
             profile.detection_t += profile_stop();
             #endif
-
-            _continue:;
         }
 
         exit_contact_collection:;
@@ -672,7 +625,6 @@ static bool physics_substep(FIXED vel_mult)
         #endif
 
         bool break_substep = true;
-        int resolved_contacts = 0;
 
         // resolve contacts
         // for (void *item;
@@ -733,6 +685,9 @@ static bool physics_substep(FIXED vel_mult)
             
             if (col_ent_b && ent_b->flags & ENTITY_FLAG_MOVING)
             {
+                col_ent_a->dirty = true;
+                col_ent_b->dirty = true;
+
                 FIXED inv_mass1 = col_ent_a->inv_mass;
                 FIXED inv_mass2 = col_ent_b->inv_mass;
 
@@ -767,7 +722,9 @@ static bool physics_substep(FIXED vel_mult)
                 }
             }
             else
-            {   
+            {
+                col_ent_a->dirty = true;
+
                 FIXED px = fxmul(nx, pd);
                 FIXED py = fxmul(ny, pd);
 
@@ -786,7 +743,6 @@ static bool physics_substep(FIXED vel_mult)
                     ent_a->actor.flags |= ACTOR_FLAG_WALL;
             }
 
-            ++resolved_contacts;
             break_substep = false;
         }
 
@@ -1065,8 +1021,73 @@ void game_physics_update(void)
     profile_start();
     #endif
 
-    game_physics_move_projs(FIX_ONE / 2);
-    game_physics_move_projs(FIX_ONE / 2);
+    game_physics_move_projs(FIX_ONE);
+
+    // projectile detection and handling
+    for (int i = 0; i < col_ent_count; ++i)
+    {
+        entity_coldata_s *const col_ent = col_ents[i];
+        entity_s *entity = col_ent->ent;
+
+        const uint col_mask = (uint)entity->col.mask;
+        if (col_mask & COLGROUP_PROJECTILE)
+        {
+            const FIXED col_w = col_ent->width;
+            const FIXED col_h = col_ent->height;
+
+            const int el = entity->pos.x;
+            const int et = entity->pos.y;
+            const int er = (entity->pos.x + col_w);
+            const int eb = (entity->pos.y + col_h);
+
+            int min_px = el / (FIX_ONE * PARTGRID_CEL_W);
+            int min_py = et / (FIX_ONE * PARTGRID_CEL_H);
+            int max_px = er / (FIX_ONE * PARTGRID_CEL_W);
+            int max_py = eb / (FIX_ONE * PARTGRID_CEL_H);
+
+            // clamp bounds to partition grid
+            if      (min_px < 0)              min_px = 0;
+            else if (min_px >= PARTGRID_COLS) min_px = PARTGRID_COLS - 1;
+            if      (max_px < 0)              max_px = 0;
+            else if (max_px >= PARTGRID_COLS) max_px = PARTGRID_COLS - 1;
+
+            if      (min_py < 0)              min_py = 0;
+            else if (min_py >= PARTGRID_ROWS) min_py = PARTGRID_ROWS - 1;
+            if      (max_py < 0)              max_py = 0;
+            else if (max_py >= PARTGRID_ROWS) max_py = PARTGRID_ROWS - 1;
+
+            for (int y = min_py; y <= max_py; ++y)
+                for (int x = min_px; x <= max_px; ++x)
+                {
+                    for (partgrid_node_s *node = partgrid[y][x]; node;
+                        node = node->next)
+                    {
+                        projectile_s *proj = node->projectile;
+                        if (proj->flags & PROJ_FLAG_QFREE) continue;
+
+                        FIXED px = proj->px;
+                        FIXED py = proj->py;
+
+                        if (!(px > el && px < er && py > et && py < eb))
+                            continue;
+
+                        bool keep;
+                        if (entity->behavior &&
+                            entity->behavior->proj_touch)
+                        {
+                            keep = entity->behavior->proj_touch(entity, proj);
+                        }
+                        else
+                        {
+                            keep = false;
+                        }
+                        
+                        if (!keep)
+                            projectile_queue_free(proj);
+                    }
+                }
+        }
+    }
 
     #ifdef PHYS_PROFILE
     profile.projectiles_t += profile_stop();
