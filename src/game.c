@@ -12,6 +12,9 @@
 #define MAX_RENDER_OBJS ((MAX_ENTITY_COUNT + MAX_PROJECTILE_COUNT))
 #define FREE_QUEUE_MAX_SIZE 16
 
+// 1 KiB for the copy of the map collision. stored in ewram.
+#define GAME_COLLISION_MAP_SIZE (1024)
+
 typedef enum render_obj_t
 {
     RENDER_OBJ_SPRITE,
@@ -68,11 +71,9 @@ typedef struct game_state
 }
 game_state_s;
 
-__attribute__((section(".iwram")))
-game_s g_game;
-
-__attribute__((section(".ewram")))
-game_state_s game_saved_state;
+IWRAM_DATA game_s g_game;
+EWRAM_DATA game_state_s game_saved_state;
+EWRAM_DATA static u8 game_room_collision[GAME_COLLISION_MAP_SIZE];
 
 static uint render_object_count = 0;
 static render_obj_s render_objects[MAX_RENDER_OBJS];
@@ -394,9 +395,19 @@ void game_update(void)
 void game_load_room(const map_header_s *map)
 {
     g_game.map = map;
-    g_game.room_collision = map_collision_data(map);
+    g_game.room_collision = game_room_collision;
     g_game.room_width = (int) map->width;
     g_game.room_height = (int) map->height;
+
+    const u8 *col_data = map_collision_data(map);
+    const int col_data_size = map_collision_data_size(map);
+    if (col_data_size > GAME_COLLISION_MAP_SIZE)
+    {
+        LOG_ERR("map collision too large to copy to iwram!");
+        DBG_CRASH();
+    }
+
+    memcpy32(game_room_collision, col_data, CEIL_DIV(col_data_size, 4));
 
     u32 accum;
 

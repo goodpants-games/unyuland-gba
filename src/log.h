@@ -11,6 +11,7 @@
 #define LOG_INF(fmt, ...) mgba_printf(MGBA_LOG_INFO, fmt, ## __VA_ARGS__)
 #define LOG_WRN(fmt, ...) mgba_printf(MGBA_LOG_WARN, fmt, ## __VA_ARGS__)
 #define LOG_ERR(fmt, ...) mgba_printf(MGBA_LOG_ERROR, fmt, ## __VA_ARGS__)
+#define DBG_CRASH() __builtin_trap()
 
 #else
 
@@ -19,6 +20,7 @@
 #define LOG_INF(fmt, ...)
 #define LOG_WRN(fmt, ...)
 #define LOG_ERR(fmt, ...)
+#define DBG_CRASH()
 
 #endif
 

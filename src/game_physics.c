@@ -7,7 +7,7 @@
 #include "log.h"
 #include "tonc_math.h"
 
-// #define PHYS_PROFILE
+#define PHYS_PROFILE
 
 // in world units (8 units per tile)
 #define PARTGRID_CEL_W 64
@@ -31,6 +31,8 @@ typedef struct entity_coldata
 {
     entity_s *ent;
     FIXED inv_mass;
+    FIXED width, height;
+    FIXED half_width, half_height;
 }
 entity_coldata_s;
 
@@ -127,55 +129,86 @@ struct phys_profile
 
 // static pqueue_entry_s contact_queue[MAX_CONTACT_COUNT];
 
-static col_overlap_res_s rect_collision(FIXED x0, FIXED y0, FIXED w0, FIXED h0,
-                                        FIXED x1, FIXED y1, FIXED w1, FIXED h1)
+// (w, h) = half-extents
+static col_overlap_res_s rect_collision(FIXED x0, FIXED y0, FIXED hw0, FIXED hh0,
+                                        FIXED x1, FIXED y1, FIXED hw1, FIXED hh1)
 {
-    const FIXED l0 = x0;
-    const FIXED t0 = y0;
-    const FIXED r0 = x0 + w0;
-    const FIXED b0 = y0 + h0;
-
-    const FIXED l1 = x1;
-    const FIXED t1 = y1;
-    const FIXED r1 = x1 + w1;
-    const FIXED b1 = y1 + h1;
-
     col_overlap_res_s res;
     res.overlap = false;
 
-    FIXED pl = r0 - l1;
-    FIXED pt = b0 - t1;
-    FIXED pr = r1 - l0;
-    FIXED pb = b1 - t0;
-    FIXED mp = min(pr, min(pt, min(pl, pb)));
-    if (mp <= 0)
+    FIXED nx = (x1 + hw1) - (x0 + hw0);
+    FIXED x_overlap = hw0 + hw1 - ABS(nx);
+    if (x_overlap <= 0) goto ret;
+
+    FIXED ny = (y1 + hh1) - (y0 + hh0);
+    FIXED y_overlap = hh0 + hh1 - ABS(ny);
+    if (y_overlap <= 0) goto ret;
+
+    res.overlap = true;
+    if (x_overlap < y_overlap)
+    {
+        res.nx = int2fx(SGN(-nx));
+        res.ny = 0;
+        res.pd = -x_overlap;
+    }
+    else
+    {
+        res.nx = 0;
+        res.ny = int2fx(SGN(-ny));
+        res.pd = -y_overlap;
+    }
+
+    ret:
         return res;
 
-    if (mp == pl)
-    {
-        res.nx = int2fx(-1);
-        res.ny = int2fx(0);
-    }
-    else if (mp == pt)
-    {
-        res.nx = int2fx(0);
-        res.ny = int2fx(-1);
-    }
-    else if (mp == pr)
-    {
-        res.nx = int2fx(1);
-        res.ny = int2fx(0);
-    }
-    else if (mp == pb)
-    {
-        res.nx = int2fx(0);
-        res.ny = int2fx(1);
-    }
-    else return res;
 
-    res.pd = -mp;
-    res.overlap = true;
-    return res;
+    // res
+    // const FIXED l0 = x0;
+    // const FIXED t0 = y0;
+    // const FIXED r0 = x0 + w0;
+    // const FIXED b0 = y0 + h0;
+
+    // const FIXED l1 = x1;
+    // const FIXED t1 = y1;
+    // const FIXED r1 = x1 + w1;
+    // const FIXED b1 = y1 + h1;
+
+    // col_overlap_res_s res;
+    // res.overlap = false;
+
+    // FIXED pl = r0 - l1;
+    // FIXED pt = b0 - t1;
+    // FIXED pr = r1 - l0;
+    // FIXED pb = b1 - t0;
+    // FIXED mp = min(pr, min(pt, min(pl, pb)));
+    // if (mp <= 0)
+    //     return res;
+
+    // if (mp == pl)
+    // {
+    //     res.nx = int2fx(-1);
+    //     res.ny = int2fx(0);
+    // }
+    // else if (mp == pt)
+    // {
+    //     res.nx = int2fx(0);
+    //     res.ny = int2fx(-1);
+    // }
+    // else if (mp == pr)
+    // {
+    //     res.nx = int2fx(1);
+    //     res.ny = int2fx(0);
+    // }
+    // else if (mp == pb)
+    // {
+    //     res.nx = int2fx(0);
+    //     res.ny = int2fx(1);
+    // }
+    // else return res;
+
+    // res.pd = -mp;
+    // res.overlap = true;
+    // return res;
 }
 
 void game_physics_move_projs(FIXED vel_mult);
@@ -228,11 +261,31 @@ static void col_ent_removed(int col_ent_idx)
             DYNARR_REMOVE(x_edges, x_edge_count, i);
     }
 
+    // remove x overlaps
+    for (int i = x_overlap_count - 1; i >= 0; --i)
+    {
+        col_bp_overlap_s *const overlap = &x_overlaps[i];
+        if (overlap->eid_a == col_ent_idx ||
+            overlap->eid_b == col_ent_idx)
+        {
+            uint pair = upair2u(overlap->eid_a, overlap->eid_b);
+            ENTITY_PAIR_CLEAR(x_contact_pairs, pair);
+            DYNARR_REMOVE(x_overlaps, x_overlap_count, i);
+        }
+    }
+
     // remove y edge
     for (int i = y_edge_count - 1; i >= 0; --i)
     {
         if (y_edges[i].eid == col_ent_idx)
             DYNARR_REMOVE(y_edges, y_edge_count, i);
+    }
+
+    // remove y overlaps umm
+    for (int i = 0; i < MAX_ENTITY_COUNT; ++i)
+    {
+        uint pair = upair2u(col_ent_idx, i);
+        ENTITY_PAIR_CLEAR(x_contact_pairs, pair);
     }
 }
 
@@ -323,24 +376,26 @@ static void update_edge_lists(void)
     for (int i = 0; i < x_edge_count; ++i)
     {
         col_bp_edge_s *edge = x_edges + i;
-        const entity_s *ent = (col_ent_map + edge->eid)->ent;
+        const entity_coldata_s *col = col_ent_map + edge->eid;
+        const entity_s *ent = col->ent;
 
         if (edge->left)
             edge->pos = ent->pos.x;
         else
-            edge->pos = ent->pos.x + int2fx(ent->col.w);
+            edge->pos = ent->pos.x + col->width;
     }
 
     // sync y edges
     for (int i = 0; i < y_edge_count; ++i)
     {
         col_bp_edge_s *edge = y_edges + i;
-        const entity_s *ent = (col_ent_map + edge->eid)->ent;
+        const entity_coldata_s *col = col_ent_map + edge->eid;
+        const entity_s *ent = col->ent;
 
         if (edge->left)
             edge->pos = ent->pos.y;
         else
-            edge->pos = ent->pos.y + int2fx(ent->col.h);
+            edge->pos = ent->pos.y + col->height;
     }
 
     sort_edge_list(x_edges, x_edge_count, x_contact_pairs, x_overlaps,
@@ -381,12 +436,10 @@ static bool physics_substep(FIXED vel_mult)
             break;
         }
 
-        #ifdef PHYS_PROFILE
-        profile_start();
-        #endif
-
         update_edge_lists();
         col_contact_count = 0;
+
+        // LOG_DBG("x overlaps: %i", x_overlap_count);
 
         // collect entity contacts
         for (int i = 0; i < x_overlap_count; ++i)
@@ -420,21 +473,20 @@ static bool physics_substep(FIXED vel_mult)
                 !(ent2->flags & ENTITY_FLAG_MOVING))
                 continue;
 
-            const FIXED col_w = int2fx((int)entity->col.w);
-            const FIXED col_h = int2fx((int)entity->col.h);
-
             if (col_ent == entc2)
             {
                 LOG_WRN("entity contact is with itself? how tf?");
                 continue;
             }
 
-            const FIXED c2_w = int2fx((int)ent2->col.w);
-            const FIXED c2_h = int2fx((int)ent2->col.h);
+            const FIXED hw0 = col_ent->half_width;
+            const FIXED hh0 = col_ent->half_height;
+            const FIXED hw1 = entc2->half_width;
+            const FIXED hh1 = entc2->half_height;
             
             col_overlap_res_s overlap_res =
-                rect_collision(entity->pos.x, entity->pos.y, col_w, col_h,
-                                ent2->pos.x, ent2->pos.y, c2_w, c2_h);
+                rect_collision(entity->pos.x, entity->pos.y, hw0, hh0,
+                               ent2->pos.x, ent2->pos.y, hw1, hh1);
 
             if (!overlap_res.overlap) continue;
             if (overlap_res.ny >= 0 && ent2->col.flags & COL_FLAG_FLOOR_ONLY)
@@ -475,8 +527,11 @@ static bool physics_substep(FIXED vel_mult)
             entity_coldata_s *const col_ent = col_ents[i];
             entity_s *entity = col_ent->ent;
 
-            const FIXED col_w = int2fx((int)entity->col.w);
-            const FIXED col_h = int2fx((int)entity->col.h);
+            const FIXED col_w = col_ent->width;
+            const FIXED col_h = col_ent->height;
+            const FIXED col_half_w = col_ent->half_width;
+            const FIXED col_half_h = col_ent->half_height;
+
             // const uint col_group = (uint)entity->col.group;
             const uint col_mask = (uint)entity->col.mask;
 
@@ -535,7 +590,11 @@ static bool physics_substep(FIXED vel_mult)
                     }
             }
 
-            if (!(entity->flags & ENTITY_FLAG_MOVING)) continue;
+            if (!(entity->flags & ENTITY_FLAG_MOVING)) goto _continue;
+
+            #ifdef PHYS_PROFILE
+            profile_start();
+            #endif
 
             if (col_mask & COLGROUP_DEFAULT)
             {
@@ -561,14 +620,16 @@ static bool physics_substep(FIXED vel_mult)
                 for (int y = min_y; y <= max_y; ++y)
                     for (int x = min_x; x <= max_x; ++x)
                     {
-                        if (game_get_col_clamped(x, y) != 1) continue;
-                        
+                        if (game_get_col_clamped(x, y) != 1)
+                            continue;
+
                         col_overlap_res_s overlap_res = 
-                            rect_collision(entity->pos.x, entity->pos.y, col_w,
-                                        col_h, int2fx(x * WORLD_TILE_SIZE),
-                                        int2fx(y * WORLD_TILE_SIZE),
-                                        int2fx(WORLD_TILE_SIZE),
-                                        int2fx(WORLD_TILE_SIZE));
+                            rect_collision(entity->pos.x, entity->pos.y,
+                                          col_half_w, col_half_h,
+                                          x * FIX_ONE * WORLD_TILE_SIZE,
+                                          y * FIX_ONE * WORLD_TILE_SIZE,
+                                          int2fx(WORLD_TILE_SIZE) / 2,
+                                          int2fx(WORLD_TILE_SIZE) / 2);
                         
                         if (overlap_res.overlap && overlap_res.pd < final_pd)
                         {
@@ -596,19 +657,22 @@ static bool physics_substep(FIXED vel_mult)
                     ++col_contact_count;
                 }
             }
+
+            #ifdef PHYS_PROFILE
+            profile.detection_t += profile_stop();
+            #endif
+
+            _continue:;
         }
 
         exit_contact_collection:;
-
-        #ifdef PHYS_PROFILE
-        profile.detection_t += profile_stop();
-        #endif
 
         #ifdef PHYS_PROFILE
         profile_start();
         #endif
 
         bool break_substep = true;
+        int resolved_contacts = 0;
 
         // resolve contacts
         // for (void *item;
@@ -712,6 +776,9 @@ static bool physics_substep(FIXED vel_mult)
                 ent_a->vel.x = ent_a->vel.x - fxmul(nx, vdot);
                 ent_a->vel.y = ent_a->vel.y - fxmul(ny, vdot);
 
+                // LOG_DBG("pos: %i, %i", ent_a->pos.x, ent_a->pos.y);
+                // LOG_DBG("vel: %i, %i", ent_a->vel.x, ent_a->vel.y);
+
                 if (ny < 0)
                     ent_a->actor.flags |= ACTOR_FLAG_GROUNDED;
 
@@ -719,13 +786,15 @@ static bool physics_substep(FIXED vel_mult)
                     ent_a->actor.flags |= ACTOR_FLAG_WALL;
             }
 
-            break_substep = true;
+            ++resolved_contacts;
+            break_substep = false;
         }
 
         #ifdef PHYS_PROFILE
         profile.resolution_t += profile_stop();
         #endif
 
+        // LOG_DBG("iteration %i: %i", subsubstep, resolved_contacts);
         if (break_substep) break;
     }
 
@@ -948,10 +1017,15 @@ void game_physics_update(void)
         
         if (!(entity->flags & ENTITY_FLAG_COLLIDE)) continue;
         
-        col_ent_map[i].inv_mass = fxdiv(FIX_ONE * 2, int2fx((int)entity->mass));
+        entity_coldata_s *col_ent = &col_ent_map[i];
+        col_ent->inv_mass = fxdiv(FIX_ONE * 2, int2fx((int)entity->mass));
+        col_ent->width = int2fx((int) entity->col.w);
+        col_ent->height = int2fx((int) entity->col.h);
+        col_ent->half_width = col_ent->width / 2;
+        col_ent->half_height = col_ent->height / 2;
 
         int speed = max(abs(entity->vel.x), abs(entity->vel.y));
-        int subst = ceil_div(speed, FIX_ONE * 2);
+        int subst = ceil_div(speed, FIX_ONE * 4);
         if (subst > substeps)
             substeps = subst;
 
@@ -964,7 +1038,7 @@ void game_physics_update(void)
         if (!IS_PROJ_ACTIVE(proj)) continue;
 
         int speed = max(abs(proj->vx), abs(proj->vy));
-        int subst = ceil_div(speed, FIX_ONE * 2);
+        int subst = ceil_div(speed, FIX_ONE * 4);
         if (subst > substeps)
             substeps = subst;
     }
