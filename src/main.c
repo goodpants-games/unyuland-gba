@@ -13,7 +13,7 @@
 #include "log.h"
 #include "menu.h"
 
-// #define MAIN_PROFILE
+#define MAIN_PROFILE
 
 static void text_test(void)
 {
@@ -292,13 +292,13 @@ int main(void)
         }
 
         game_render();
+        mmFrame();
         
         #ifdef MAIN_PROFILE
         frame_len = profile_stop();
         LOG_DBG("frame usage: %.1f%%", (float)frame_len / 280896.f * 100.f);
         #endif
 
-        mmFrame();
         VBlankIntrWait();
         gfx_new_frame();
     }

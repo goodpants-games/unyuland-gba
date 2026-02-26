@@ -133,8 +133,9 @@ struct phys_profile
 // static pqueue_entry_s contact_queue[MAX_CONTACT_COUNT];
 
 // (w, h) = half-extents
-static col_overlap_res_s rect_collision(FIXED x0, FIXED y0, FIXED hw0, FIXED hh0,
-                                        FIXED x1, FIXED y1, FIXED hw1, FIXED hh1)
+static inline col_overlap_res_s rect_collision(FIXED x0, FIXED y0, FIXED hw0,
+                                               FIXED hh0, FIXED x1, FIXED y1,
+                                               FIXED hw1, FIXED hh1)
 {
     col_overlap_res_s res;
     res.overlap = false;
@@ -291,6 +292,7 @@ static void col_ent_removed(int col_ent_idx)
     }
 }
 
+IWRAM_CODE
 static inline void sort_edge_list(col_bp_edge_s *const list,
                            const int list_count,
                            u8 contact_pairs[ENTITY_PAIR_SIZE],
@@ -359,6 +361,7 @@ static inline void sort_edge_list(col_bp_edge_s *const list,
     }
 }
 
+IWRAM_CODE
 static void update_edge_lists(void)
 {
     // sync x edges
@@ -400,6 +403,7 @@ static inline bool is_body_anchored(entity_coldata_s *col_ent, FIXED nx,
     return false;
 }
 
+IWRAM_CODE
 static bool physics_substep(FIXED vel_mult)
 {
     // size_t contact_queue_size = 0;
