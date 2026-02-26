@@ -20,7 +20,5 @@
    </properties>
   </object>
   <object id="5" name="home" type="entity" x="40" y="64" width="8" height="8"/>
-  <object id="1" name="ice_block" type="entity" x="220.563" y="45.1875" width="8" height="8"/>
-  <object id="2" name="ice_block" type="entity" x="264" y="56" width="8" height="8"/>
  </objectgroup>
 </map>
