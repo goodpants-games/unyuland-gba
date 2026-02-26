@@ -93,8 +93,6 @@ void game_load_entity(const entity_load_s *load_data)
     STR_CASE_START(name)
     STR_CASE("crawler")
     {
-        LOG_DBG("spawn crawler at (%f, %f)", fx2float(load_data->x), fx2float(load_data->y));
-
         FIXED max_dist;
         if (!get_property_decimal(load_data, "max_dist", &max_dist))
             max_dist = 0;

@@ -227,7 +227,6 @@ bool projectile_queue_free(projectile_s *proj);
 void game_init(void);
 void game_update(void);
 void game_load_room(const map_header_s *map);
-void game_transition_update(entity_s *player);
 void game_render(void);
 void game_save_state(void);
 void game_restore_state(void);

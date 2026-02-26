@@ -63,6 +63,8 @@ static const char *pause_menu_options[PAUSE_MENU_OPTION_COUNT] =
     {"RESUME", "RESPAWN", "MAP", "QUIT"};
 
 static bool game_paused = false;
+static bool queue_pause_show = false;
+
 static menu_s pause_menu = (menu_s)
 {
     .selection_count = PAUSE_MENU_OPTION_COUNT,
@@ -110,9 +112,7 @@ static void close_pause_menu(void)
 static void pause_game(void)
 {
     game_paused = true;
-    open_pause_menu();
-    mmSetModuleVolume((int)(1024 * 0.1));
-    gfx_set_palette_multiplied(TO_FIXED(0.55));
+    queue_pause_show = true;
 }
 
 static void unpause_game(void)
@@ -185,11 +185,6 @@ int main(void)
     gfx_load_map(map);
     game_init();
 
-    entity_s *player = entity_alloc();
-    entity_player_init(player);
-    player->pos.x = int2fx(16);
-    player->pos.y = int2fx(16);
-
     game_load_room(map);
     LOG_DBG("room pos: %i %i", (int) map->px, (int) map->py);
 
@@ -258,6 +253,14 @@ int main(void)
 
         key_poll();
 
+        if (queue_pause_show)
+        {
+            open_pause_menu();
+            mmSetModuleVolume((int)(1024 * 0.1));
+            gfx_set_palette_multiplied(TO_FIXED(0.55));
+            queue_pause_show = false;
+        }
+
         if (key_hit(KEY_START))
         {
             if (!game_paused)
@@ -273,18 +276,6 @@ int main(void)
         if (!game_paused)
         {
             game_update();
-            game_transition_update(player);
-
-            g_game.cam_x = (player->pos.x >> FIX_SHIFT) - SCREEN_WIDTH / 4;
-            g_game.cam_y = (player->pos.y >> FIX_SHIFT) - SCREEN_HEIGHT / 4;
-
-            int x_max = gfx_map_width * 8 - SCREEN_WIDTH / 2;
-            int y_max = gfx_map_height * 8 - SCREEN_HEIGHT / 2;
-
-            if (g_game.cam_x < 0)     g_game.cam_x = 0;
-            if (g_game.cam_y < 0)     g_game.cam_y = 0;
-            if (g_game.cam_x > x_max) g_game.cam_x = x_max;
-            if (g_game.cam_y > y_max) g_game.cam_y = y_max;
         }
         else
         {

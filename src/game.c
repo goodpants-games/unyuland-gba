@@ -86,6 +86,8 @@ static projectile_s *proj_free_queue[FREE_QUEUE_MAX_SIZE];
 
 static int last_obj_index = 0;
 
+static bool game_transition_update(entity_s *player);
+
 // this is called by both entity_alloc and game_restore_state
 static void on_entity_alloc(entity_s *ent)
 {
@@ -381,13 +383,32 @@ void game_init(void)
     };
 
     game_physics_init();
+
+    entity_s *player = entity_alloc();
+    entity_player_init(player);
+    player->pos.x = int2fx(16);
+    player->pos.y = int2fx(16);
 }
 
 void game_update(void)
 {
+    entity_s *player = &g_game.entities[0];
+    if (!game_transition_update(player)) return;
+
     update_entities();
     update_projectiles();
     game_physics_update();
+
+    g_game.cam_x = (player->pos.x >> FIX_SHIFT) - SCREEN_WIDTH / 4;
+    g_game.cam_y = (player->pos.y >> FIX_SHIFT) - SCREEN_HEIGHT / 4;
+
+    int x_max = gfx_map_width * 8 - SCREEN_WIDTH / 2;
+    int y_max = gfx_map_height * 8 - SCREEN_HEIGHT / 2;
+
+    if (g_game.cam_x < 0)     g_game.cam_x = 0;
+    if (g_game.cam_y < 0)     g_game.cam_y = 0;
+    if (g_game.cam_x > x_max) g_game.cam_x = x_max;
+    if (g_game.cam_y > y_max) g_game.cam_y = y_max;
 
     for (int i = 0; i < proj_free_queue_count; ++i)
         projectile_free(proj_free_queue[i]);
@@ -794,14 +815,17 @@ static void room_transition_inactive_update(entity_s *player)
     };
 }
 
-static void room_transition_phase1_update(entity_s *player)
+static bool room_transition_phase1_update(entity_s *player)
 {
     if (g_game.room_trans.dir == DIR4_UP)
         player->vel.y = TO_FIXED(-1);
 
-    FIXED fac = g_game.room_trans.ticks * (FIX_ONE / 20);
-    gfx_set_palette_multiplied(FIX_ONE - fac);
-    if (++g_game.room_trans.ticks < 30) return;
+    if (++g_game.room_trans.ticks < 30)
+    {
+        FIXED fac = g_game.room_trans.ticks * (FIX_ONE / 20);
+        gfx_set_palette_multiplied(FIX_ONE - fac);
+        return true;
+    }
 
     const map_header_s *old_room = g_game.map;
     const map_header_s *new_room = g_game.room_trans.new_room;
@@ -874,6 +898,8 @@ static void room_transition_phase1_update(entity_s *player)
     g_game.active_water_tank = NULL;
 
     game_save_state();
+
+    return false;
 }
 
 static void room_transition_phase2_update(entity_s *player)
@@ -893,22 +919,23 @@ static void room_transition_phase2_update(entity_s *player)
     }
 }
 
-void game_transition_update(entity_s *player)
+static bool game_transition_update(entity_s *player)
 {
     switch (g_game.room_trans.phase)
     {
     case 0:
         room_transition_inactive_update(player);
-        break;
+        return true;
 
     case 1:
-        room_transition_phase1_update(player);
-        break;
+        return room_transition_phase1_update(player);
 
     case 2:
         room_transition_phase2_update(player);
-        break;
+        return true;
     }
+
+    return true;
 }
 
 void game_save_state(void)
