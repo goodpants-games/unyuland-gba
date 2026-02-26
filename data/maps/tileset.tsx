@@ -25,7 +25,7 @@
  <tile id="36" type="decor"/>
  <tile id="37" type="decor"/>
  <tile id="38" type="decor"/>
- <tile id="39" type="decor"/>
+ <tile id="39" type="heat"/>
  <tile id="40" type="decor"/>
  <tile id="41" type="decor"/>
  <tile id="42" type="decor"/>
