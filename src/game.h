@@ -36,7 +36,7 @@
 #define COLGROUP_ALL               UINT16_MAX
 
 #define MAX_ENTITY_COUNT 32
-#define MAX_PROJECTILE_COUNT 128
+#define MAX_PROJECTILE_COUNT 64
 #define MAX_CONTACT_COUNT 64
 
 // not the actual tile rendered tile size, which is 16. but tiles are supposed
