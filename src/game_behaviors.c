@@ -69,12 +69,16 @@ static bool enemy_base_proj_touch(entity_s *self, projectile_s *proj,
 
 static void behavior_pushable_update(entity_s *self)
 {
-    const FIXED move_accel = TO_FIXED(1.0 / 16.0);
-    const FIXED max_vel = TO_FIXED(1.0);
+    const FIXED move_accel = TO_FIXED(1.0 / 20.0);
     if (self->vel.x > 0)
-        self->vel.x = clamp(self->vel.x - move_accel, 0, max_vel);
-    else if (self->vel.x < 0)
-        self->vel.x = clamp(self->vel.x + move_accel, -max_vel, 0);
+        self->vel.x = max(self->vel.x - move_accel, 0);
+    else
+        self->vel.x = min(self->vel.x + move_accel, 0);
+    // const FIXED max_vel = TO_FIXED(1.0);
+    // if (self->vel.x > 0)
+    //     self->vel.x = clamp(self->vel.x - move_accel, 0, max_vel);
+    // else if (self->vel.x < 0)
+    //     self->vel.x = clamp(self->vel.x + move_accel, -max_vel, 0);
 }
 
 static behavior_def_s behavior_pushable = {

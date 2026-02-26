@@ -40,8 +40,6 @@ extern const map_header_s *gfx_loaded_map;
 
 extern u16 gfx_palette[16];
 
-extern TILE gfx_text_bmp[GFX_TEXT_BMP_SIZE];
-
 void gfx_init(void);
 void gfx_new_frame(void);
 void gfx_load_map(const map_header_s *map);
@@ -60,16 +58,5 @@ void gfx_text_bmap_fill(int oc, int or_, int cols, int rows, u32 data[8]);
 void gfx_text_bmap_print(int x, int y, const char *text, text_color_e color);
 void gfx_text_bmap_dst_clear(int row, int row_count);
 void gfx_text_bmap_dst_assign(int row, int row_count, int src_row);
-
-static inline void gfx_text_sync_rows(int row, int count) // copy row of tiles to VRAM
-{
-    // TODO: gfx_text_sync_row DMA copy?
-    for (int r = row; r < row + count; ++r)
-    {
-        int ofs = r * GFX_TEXT_BMP_COLS;
-        memcpy32(GFX_TEXT_BMP_VRAM + ofs, gfx_text_bmp + ofs,
-                GFX_TEXT_BMP_COLS * sizeof(TILE) / 4);
-    }
-}
 
 #endif

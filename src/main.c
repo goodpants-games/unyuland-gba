@@ -13,7 +13,7 @@
 #include "log.h"
 #include "menu.h"
 
-#define MAIN_PROFILE
+// #define MAIN_PROFILE
 
 static void text_test(void)
 {
@@ -30,8 +30,6 @@ static void text_test(void)
     gfx_text_bmap_print(0, 0, "Hello, world!", TEXT_COLOR_WHITE);
     gfx_text_bmap_print(0, 12, "lorem ipsum dolor", TEXT_COLOR_WHITE);
     gfx_text_bmap_print(2, 24, "sit amet", TEXT_COLOR_WHITE);
-
-    gfx_text_sync_rows(0, 5);
 }
 
 // DURING GAMEPLAY OR WHEN PAUSED:
@@ -58,8 +56,6 @@ static void setup_game_hud(void)
     gfx_text_bmap_fill(0, row_origin + 1, GFX_TEXT_BMP_COLS, 1, bg2);
 
     gfx_text_bmap_print(0, y_origin, "Hello, world!", TEXT_COLOR_WHITE);
-
-    gfx_text_sync_rows(row_origin, 2);
 }
 
 #define PAUSE_MENU_OPTION_COUNT 4
@@ -74,8 +70,6 @@ static menu_s pause_menu = (menu_s)
 
     .origin_x = 2,
     .origin_y = 16,
-    .vram_row_base = 0,
-    .vram_row_count = 8,
 };
 
 static void open_pause_menu(void)
@@ -104,7 +98,6 @@ static void open_pause_menu(void)
     gfx_text_bmap_print(4, 0 + 4, "PAUSED", TEXT_COLOR_BLUE);
 
     menu_show(&pause_menu);
-    menu_vram_refresh(&pause_menu);
 }
 
 static void close_pause_menu(void)
@@ -112,7 +105,6 @@ static void close_pause_menu(void)
     u32 t[8] =  {0x00000000, 0x00000000, 0x00000000, 0x00000000,
                  0x00000000, 0x00000000, 0x00000000, 0x00000000};
     gfx_text_bmap_fill(0, 0, 13, 8, t);
-    gfx_text_sync_rows(0, 8);
 }
 
 static void pause_game(void)
@@ -260,8 +252,10 @@ int main(void)
     while (true)
     {
         #ifdef MAIN_PROFILE
+        uint frame_len = 0;
         profile_start();
         #endif
+
         // screen_print(&se_mat[GFX_BG0_INDEX][18][0], "Hello, world!");
 
         key_poll();
@@ -300,9 +294,9 @@ int main(void)
         }
 
         game_render(&last_obj_index);
-
+        
         #ifdef MAIN_PROFILE
-        uint frame_len = profile_stop();
+        frame_len = profile_stop();
         LOG_DBG("frame usage: %.1f%%", (float)frame_len / 280896.f * 100.f);
         #endif
 

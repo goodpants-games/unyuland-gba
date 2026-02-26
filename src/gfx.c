@@ -14,10 +14,6 @@ uint gfx_map_width = 0;
 uint gfx_map_height = 0;
 const map_header_s *gfx_loaded_map = NULL;
 
-// put in ewram as the buffer takes 11.25 KiB
-__attribute__((section(".ewram")))
-TILE gfx_text_bmp[GFX_TEXT_BMP_SIZE];
-
 static uint old_scroll_x = 0;
 static uint old_scroll_y = 0;
 static bool screen_dirty = false;
@@ -302,7 +298,7 @@ static inline void blit_tile(uint x, uint y, const TILE4 *src_tile)
 {
     const uint shf = (x & 7) << 2;
     uint ry = y & 7;
-    u32 *row = &gfx_text_bmp[(y >> 3) * GFX_TEXT_BMP_COLS + (x >> 3)].data[ry];
+    u32 *row = &GFX_TEXT_BMP_VRAM[(y >> 3) * GFX_TEXT_BMP_COLS + (x >> 3)].data[ry];
     const u32 *src_row = src_tile->data;
     
     if (shf)
@@ -339,7 +335,7 @@ static inline void blit_tile_colored(uint x, uint y, const TILE4 *src_tile,
 {
     const uint shf = (x & 7) << 2;
     uint ry = y & 7;
-    u32 *row = &gfx_text_bmp[(y >> 3) * GFX_TEXT_BMP_COLS + (x >> 3)].data[ry];
+    u32 *row = &GFX_TEXT_BMP_VRAM[(y >> 3) * GFX_TEXT_BMP_COLS + (x >> 3)].data[ry];
     const u32 *src_row = src_tile->data;
     
     if (shf)
@@ -484,7 +480,7 @@ void gfx_text_bmap_fill(int oc, int or, int cols, int rows, u32 data[8])
 {
     for (int r = or; r < or + rows; ++r)
     {
-        TILE *t = &gfx_text_bmp[r * GFX_TEXT_BMP_COLS + oc];
+        TILE *t = &GFX_TEXT_BMP_VRAM[r * GFX_TEXT_BMP_COLS + oc];
         TILE *end_tile = t + cols;
         for (; t != end_tile; ++t)
         {

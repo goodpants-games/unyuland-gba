@@ -98,16 +98,9 @@ menu_status_e menu_update(menu_s *menu, int *result)
         gfx_text_bmap_print(dot_x, text_y, "*", TEXT_COLOR_YELLOW);
         menu->timer = 0;
     }
-    else goto no_sync;
-    
-    gfx_text_sync_rows(menu->vram_row_base, menu->vram_row_count);
+    else goto no_sync;    
     
     no_sync:;
     ++menu->timer;
     return status;
-}
-
-void menu_vram_refresh(menu_s *menu)
-{
-    gfx_text_sync_rows(menu->vram_row_base, menu->vram_row_count);
 }
