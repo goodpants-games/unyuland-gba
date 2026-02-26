@@ -1114,64 +1114,63 @@ void game_physics_update(void)
         entity_coldata_s *const col_ent = col_ents[i];
         entity_s *entity = col_ent->ent;
 
-        const uint col_mask = (uint)entity->col.mask;
-        if (col_mask & COLGROUP_PROJECTILE)
-        {
-            const FIXED col_w = col_ent->width;
-            const FIXED col_h = col_ent->height;
+        if (!(entity->col.mask & COLGROUP_PROJECTILE)) continue;
+        if (entity->col.flags & COL_FLAG_MONITOR_ONLY) continue;
 
-            const int el = entity->pos.x;
-            const int et = entity->pos.y;
-            const int er = (entity->pos.x + col_w);
-            const int eb = (entity->pos.y + col_h);
+        const FIXED col_w = col_ent->width;
+        const FIXED col_h = col_ent->height;
 
-            int min_px = el / (FIX_ONE * PARTGRID_CEL_W);
-            int min_py = et / (FIX_ONE * PARTGRID_CEL_H);
-            int max_px = er / (FIX_ONE * PARTGRID_CEL_W);
-            int max_py = eb / (FIX_ONE * PARTGRID_CEL_H);
+        const int el = entity->pos.x;
+        const int et = entity->pos.y;
+        const int er = (entity->pos.x + col_w);
+        const int eb = (entity->pos.y + col_h);
 
-            // clamp bounds to partition grid
-            if      (min_px < 0)              min_px = 0;
-            else if (min_px >= PARTGRID_COLS) min_px = PARTGRID_COLS - 1;
-            if      (max_px < 0)              max_px = 0;
-            else if (max_px >= PARTGRID_COLS) max_px = PARTGRID_COLS - 1;
+        int min_px = el / (FIX_ONE * PARTGRID_CEL_W);
+        int min_py = et / (FIX_ONE * PARTGRID_CEL_H);
+        int max_px = er / (FIX_ONE * PARTGRID_CEL_W);
+        int max_py = eb / (FIX_ONE * PARTGRID_CEL_H);
 
-            if      (min_py < 0)              min_py = 0;
-            else if (min_py >= PARTGRID_ROWS) min_py = PARTGRID_ROWS - 1;
-            if      (max_py < 0)              max_py = 0;
-            else if (max_py >= PARTGRID_ROWS) max_py = PARTGRID_ROWS - 1;
+        // clamp bounds to partition grid
+        if      (min_px < 0)              min_px = 0;
+        else if (min_px >= PARTGRID_COLS) min_px = PARTGRID_COLS - 1;
+        if      (max_px < 0)              max_px = 0;
+        else if (max_px >= PARTGRID_COLS) max_px = PARTGRID_COLS - 1;
 
-            for (int y = min_py; y <= max_py; ++y)
-                for (int x = min_px; x <= max_px; ++x)
+        if      (min_py < 0)              min_py = 0;
+        else if (min_py >= PARTGRID_ROWS) min_py = PARTGRID_ROWS - 1;
+        if      (max_py < 0)              max_py = 0;
+        else if (max_py >= PARTGRID_ROWS) max_py = PARTGRID_ROWS - 1;
+
+        for (int y = min_py; y <= max_py; ++y)
+            for (int x = min_px; x <= max_px; ++x)
+            {
+                for (partgrid_node_s *node = partgrid[y][x]; node;
+                    node = node->next)
                 {
-                    for (partgrid_node_s *node = partgrid[y][x]; node;
-                        node = node->next)
+                    projectile_s *proj = node->projectile;
+                    if (proj->flags & PROJ_FLAG_QFREE) continue;
+
+                    FIXED px = proj->px;
+                    FIXED py = proj->py;
+
+                    if (!(px > el && px < er && py > et && py < eb))
+                        continue;
+
+                    bool keep;
+                    if (entity->behavior &&
+                        entity->behavior->proj_touch)
                     {
-                        projectile_s *proj = node->projectile;
-                        if (proj->flags & PROJ_FLAG_QFREE) continue;
-
-                        FIXED px = proj->px;
-                        FIXED py = proj->py;
-
-                        if (!(px > el && px < er && py > et && py < eb))
-                            continue;
-
-                        bool keep;
-                        if (entity->behavior &&
-                            entity->behavior->proj_touch)
-                        {
-                            keep = entity->behavior->proj_touch(entity, proj);
-                        }
-                        else
-                        {
-                            keep = false;
-                        }
-                        
-                        if (!keep)
-                            projectile_queue_free(proj);
+                        keep = entity->behavior->proj_touch(entity, proj);
                     }
+                    else
+                    {
+                        keep = false;
+                    }
+                    
+                    if (!keep)
+                        projectile_queue_free(proj);
                 }
-        }
+            }
     }
 
     #ifdef PHYS_PROFILE

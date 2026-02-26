@@ -6,9 +6,40 @@
 
 #define DEFAULT_DAMP TO_FIXED(0.88)
 
+#define PLAYER_SIDE_SPIT_VX           TO_FIXED(0.50)
+#define PLAYER_SIDE_SPIT_CLOSE_VX     TO_FIXED(0.25)
+#define PLAYER_SIDE_SPIT_VY           TO_FIXED(3.00)
+#define PLAYER_SIDE_SPIT_TARGET_Y_OFF TO_FIXED(5.00)
+#define PLAYER_UP_SPIT_VY             TO_FIXED(3.00)
+#define PLAYER_SPIT_G_MULT            TO_FIXED(2.00)
+
+static bool droplet_check_tile(FIXED x, FIXED y)
+{
+    int tx = x / (WORLD_TILE_SIZE * FIX_ONE);
+    int ty = y / (WORLD_TILE_SIZE * FIX_ONE);
+    if (tx < 0) --tx;
+    if (ty < 0) --ty;
+
+    int col = game_get_col_clamped(tx, ty);
+    if (col == 2)
+        col = game_get_col_clamped(tx, ty - 1);
+
+    return col == 0 || col == 2;
+}
+
+
+
+
+
+
+
+
+
+
 ////////////////////
 // GENERIC: enemy //
 ////////////////////
+#pragma region G_enemy
 
 typedef struct enemy_base
 {
@@ -40,7 +71,7 @@ static bool enemy_base_proj_touch(entity_s *self, projectile_s *proj,
     if (--data->health == 0)
     {
         data->health = -1;
-        self->flags &= ~(ENTITY_FLAG_ACTOR | ENTITY_FLAG_COLLIDE);
+        self->flags &= ~(ENTITY_FLAG_ACTOR | ENTITY_FLAG_COLLIDE | ENTITY_FLAG_DAMPING);
         self->flags |= ENTITY_FLAG_MOVING;
         self->sprite.graphic_id = dead_gfx;
         self->sprite.flags &= ~SPRITE_FLAG_PLAYING;
@@ -65,9 +96,19 @@ static bool enemy_base_proj_touch(entity_s *self, projectile_s *proj,
     return false;
 }
 
+#pragma endregion G_enemy
+
+
+
+
+
+
+
+
 /////////////////////
 // player_behavior //
 /////////////////////
+#pragma region player
 
 typedef enum player_spit_mode
 {
@@ -112,6 +153,8 @@ void entity_player_init(entity_s *self)
     cursor->flags |= ENTITY_FLAG_KEEP_ON_ROOM_CHANGE;
     cursor->sprite.graphic_id = SPRID_GAME_PLATFORM_OUTLINE;
     cursor->sprite.palette = 1;
+    cursor->sprite.ox = -1;
+    cursor->sprite.zidx = -9;
 
     data->cursor = cursor;
 }
@@ -120,6 +163,73 @@ static void behavior_player_free(entity_s *self)
 {
     player_data_s *data = (player_data_s *)self->userdata;
     entity_free(data->cursor);
+}
+
+static bool player_simulate_droplet(int droplet_type, int dir, FIXED player_x,
+                                    FIXED player_y, FIXED *out_x, FIXED *out_y)
+{
+    FIXED target_y = 0;
+    FIXED vx = 0;
+    FIXED vy = 0;
+
+    FIXED px = player_x - int2fx(4);
+    FIXED py = player_y - int2fx(4);
+
+    if (droplet_type == PLAYER_DROPLET_TYPE_SIDE)
+    {
+        vx = PLAYER_SIDE_SPIT_VX * dir;
+        vy = -PLAYER_SIDE_SPIT_VY;
+
+        target_y = player_y + PLAYER_SIDE_SPIT_TARGET_Y_OFF;
+    }
+    else if (droplet_type == PLAYER_DROPLET_TYPE_SIDE_SLOW)
+    {
+        vx = PLAYER_SIDE_SPIT_CLOSE_VX * dir;
+        vy = -PLAYER_SIDE_SPIT_VY;
+
+        target_y = player_y + PLAYER_SIDE_SPIT_TARGET_Y_OFF;
+    }
+    else if (droplet_type == PLAYER_DROPLET_TYPE_UP)
+    {
+        vx = 0;
+        vy = -PLAYER_UP_SPIT_VY;
+
+        target_y = player_y - int2fx(8);
+    }
+    else LOG_ERR("invalid droplet type %i", droplet_type);
+
+    target_y = fxmul(FX_FLOOR(fxdiv(target_y, WORLD_TILE_SIZE)), WORLD_TILE_SIZE);
+
+    while (true)
+    {
+        vy += fxmul(WORLD_GRAVITY, PLAYER_SPIT_G_MULT);
+        px += vx;
+        py += vy;
+
+        FIXED cx = FX_FLOOR(px + int2fx(4) + FIX_ONE / 2);
+        FIXED cy = FX_FLOOR(py + int2fx(4) + FIX_ONE / 2);
+
+        if (vy > 0 && cy >= target_y)
+        {
+            const FIXED x_snap = int2fx(WORLD_TILE_SIZE / 2);
+            const FIXED tile_size = int2fx(WORLD_TILE_SIZE);
+            
+            FIXED plat_x = fxmul(FX_FLOOR(fxdiv(cx, x_snap) - FIX_ONE / 2 - 1), x_snap);
+            FIXED plat_y = fxmul(FX_FLOOR(fxdiv(target_y, tile_size)), tile_size);
+            plat_x = FX_FLOOR(plat_x) + FIX_ONE;
+            plat_y = FX_FLOOR(plat_y);
+
+            *out_x = plat_x;
+            *out_y = plat_y;
+
+            FIXED test_x = plat_x + int2fx(3);
+            FIXED test_y = plat_y + int2fx(1);
+
+            return (droplet_check_tile(test_x,             test_y) &&
+                   droplet_check_tile(test_x + int2fx(3), test_y) &&
+                   droplet_check_tile(test_x - int2fx(3), test_y));
+        }
+    }
 }
 
 static void player_platform_spit(entity_s *self)
@@ -244,7 +354,8 @@ static void behavior_player_update(entity_s *self)
 
         if (can_move && !data->interactable)
         {
-            show_cursor = self->actor.flags & ACTOR_FLAG_GROUNDED;
+            show_cursor = (self->actor.flags & ACTOR_FLAG_GROUNDED) &&
+                          data->spit_mode == PLAYER_SPIT_MODE_PLATFORM;
             if (key_hit(KEY_B))
             {
                 if (data->spit_mode == PLAYER_SPIT_MODE_PLATFORM)
@@ -321,18 +432,40 @@ static void behavior_player_update(entity_s *self)
     entity_s *cursor = data->cursor;
     if (cursor)
     {
+        bool valid_placement = false;
+
         if (show_cursor)
         {
-            cursor->pos.x = self->pos.x;
-            cursor->pos.y = self->pos.y;
+            FIXED x = self->pos.x + int2fx(3);
+            FIXED y = self->pos.y + int2fx(4);
+            int type, dir;
+            
+            if (key_is_down(KEY_UP))
+            {
+                type = PLAYER_DROPLET_TYPE_UP;
+                dir = 0;
+            }
+            else
+            {
+                dir = (int) self->actor.face_dir;
+
+                type = key_is_down(KEY_DOWN) ? PLAYER_DROPLET_TYPE_SIDE_SLOW
+                                            : PLAYER_DROPLET_TYPE_SIDE;
+            }
+
+            valid_placement =
+                (player_simulate_droplet(type, dir, x, y, &cursor->pos.x,
+                                         &cursor->pos.y));
+
+            cursor->sprite.palette = valid_placement ? 1 : 0;
         }
 
         cursor->sprite.flags |= SPRITE_FLAG_HIDDEN;
-        if (show_cursor && data->cursor_frame)
+        if (show_cursor && (valid_placement || data->cursor_frame == 0))
             cursor->sprite.flags &= ~SPRITE_FLAG_HIDDEN;
     }
 
-    data->cursor_frame = (data->cursor_frame + 1) & 1;
+    data->cursor_frame = (data->cursor_frame + 1) % 3;
 }
 
 static void behavior_player_ent_touch(entity_s *self, entity_s *other, int nx,
@@ -359,16 +492,21 @@ const behavior_def_s behavior_player = {
     .proj_touch = behavior_player_proj_touch,
 };
 
-///////////////////
-// player_bullet //
-///////////////////
+#pragma endregion player
 
-#define PLAYER_SIDE_SPIT_VX           TO_FIXED(0.50)
-#define PLAYER_SIDE_SPIT_CLOSE_VX     TO_FIXED(0.25)
-#define PLAYER_SIDE_SPIT_VY           TO_FIXED(3.00)
-#define PLAYER_SIDE_SPIT_TARGET_Y_OFF TO_FIXED(5.00)
-#define PLAYER_UP_SPIT_VY             TO_FIXED(3.00)
-#define PLAYER_SPIT_G_MULT            TO_FIXED(2.00)
+
+
+
+
+
+
+
+
+
+////////////////////
+// player_droplet //
+////////////////////
+#pragma region player_bullet
 
 typedef struct player_bullet_data
 {
@@ -394,6 +532,13 @@ void entity_player_droplet_init(entity_s *self, FIXED px, FIXED py, int type,
     if (type == PLAYER_DROPLET_TYPE_SIDE)
     {
         self->vel.x = PLAYER_SIDE_SPIT_VX * dir;
+        self->vel.y = -PLAYER_SIDE_SPIT_VY;
+
+        target_y = py + PLAYER_SIDE_SPIT_TARGET_Y_OFF;
+    }
+    else if (type == PLAYER_DROPLET_TYPE_SIDE_SLOW)
+    {
+        self->vel.x = PLAYER_SIDE_SPIT_CLOSE_VX * dir;
         self->vel.y = -PLAYER_SIDE_SPIT_VY;
 
         target_y = py + PLAYER_SIDE_SPIT_TARGET_Y_OFF;
@@ -447,22 +592,32 @@ static void behavior_player_droplet_update(entity_s *self)
         px = FX_FLOOR(px) + FIX_ONE;
         py = FX_FLOOR(py);
 
+        FIXED test_x = px + int2fx(3);
+        FIXED test_y = py + int2fx(1);
+
+        bool valid = (droplet_check_tile(test_x,             test_y) &&
+                     droplet_check_tile(test_x + int2fx(3), test_y) &&
+                     droplet_check_tile(test_x - int2fx(3), test_y));
+
         // newly created platform is free to override this entity slot.
         // obviously, self is now an invalid pointer, so don't dereference it
         // from this point forward.
         entity_free(self);
-        
-        entity_s *platf = entity_alloc();
-        platf->flags |= ENTITY_FLAG_COLLIDE | ENTITY_FLAG_REMOVE_ON_CHECKPOINT;
-        platf->pos.x = px;
-        platf->pos.y = py;
-        platf->col.w = 6;
-        platf->col.h = 2;
-        platf->col.group = COLGROUP_DEFAULT;
-        platf->col.flags |= COL_FLAG_FLOOR_ONLY;
-        platf->sprite.graphic_id = SPRID_GAME_ICE_PLATFORM;
-        platf->sprite.ox = -1;
-        platf->sprite.zidx = -10;
+
+        if (valid)
+        {
+            entity_s *platf = entity_alloc();
+            platf->flags |= ENTITY_FLAG_COLLIDE | ENTITY_FLAG_REMOVE_ON_CHECKPOINT;
+            platf->pos.x = px;
+            platf->pos.y = py;
+            platf->col.w = 6;
+            platf->col.h = 2;
+            platf->col.group = COLGROUP_DEFAULT;
+            platf->col.flags |= COL_FLAG_FLOOR_ONLY;
+            platf->sprite.graphic_id = SPRID_GAME_ICE_PLATFORM;
+            platf->sprite.ox = -1;
+            platf->sprite.zidx = -10;
+        }
 
         return;
     }
@@ -472,9 +627,21 @@ const behavior_def_s behavior_player_droplet = {
     .update = behavior_player_droplet_update
 };
 
+#pragma endregion player_bullet
+
+
+
+
+
+
+
+
+
+
 /////////////
 // crawler //
 /////////////
+#pragma region crawler
 
 typedef struct crawler_data
 {
@@ -542,9 +709,21 @@ const behavior_def_s behavior_crawler = {
     .proj_touch = behavior_crawler_proj_touch
 };
 
+#pragma endregion crawler
+
+
+
+
+
+
+
+
+
+
 ///////////////
 // gun_enemy //
 ///////////////
+#pragma region gun_enemy
 
 #define COS45 0.7071067811865475
 #define GUN_ENEMY_SHOOT_COOLDOWN_LENGTH 50
@@ -671,9 +850,21 @@ const behavior_def_s behavior_gun_enemy = {
     .proj_touch = behavior_gun_enemy_proj_touch
 };
 
+#pragma endregion gun_enemy
+
+
+
+
+
+
+
+
+
+
 ///////////////
 // ice_block //
 ///////////////
+#pragma region ice_block
 
 void entity_ice_block_init(entity_s *self, FIXED px, FIXED py)
 {
@@ -689,9 +880,21 @@ void entity_ice_block_init(entity_s *self, FIXED px, FIXED py)
     self->sprite.graphic_id = SPRID_GAME_ICE_BLOCK;
 }
 
+#pragma endregion ice_block
+
+
+
+
+
+
+
+
+
+
 ////////////
 // spring //
 ////////////
+#pragma region spring
 
 static void behavior_spring_ent_touch(entity_s *self, entity_s *other, int nx,
                                       int ny)
@@ -718,9 +921,21 @@ const behavior_def_s behavior_spring = {
     .ent_touch = behavior_spring_ent_touch
 };
 
+#pragma endregion spring
+
+
+
+
+
+
+
+
+
+
 //////////
 // home //
 //////////
+#pragma region home
 
 void entity_home_init(entity_s *self, FIXED px, FIXED py)
 {
@@ -736,10 +951,21 @@ void entity_home_init(entity_s *self, FIXED px, FIXED py)
 
 const behavior_def_s behavior_home = {0};
 
+#pragma endregion home
+
+
+
+
+
+
+
+
+
+
 //////////
 // sign //
 //////////
-
+#pragma region sign
 void entity_sign_init(entity_s *self, FIXED px, FIXED py, void *dialogue,
                       bool alt_appearance)
 {
@@ -753,9 +979,21 @@ void entity_sign_init(entity_s *self, FIXED px, FIXED py, void *dialogue,
 
 const behavior_def_s behavior_sign = {0};
 
+#pragma endregion sign
+
+
+
+
+
+
+
+
+
+
 ////////////////
 // water tank //
 ////////////////
+#pragma region water_tank
 
 void entity_water_tank_init(entity_s *self, FIXED px, FIXED py)
 {
@@ -814,3 +1052,5 @@ static void behavior_water_tank_interact(entity_s *self, entity_s *source)
 const behavior_def_s behavior_water_tank = {
     .interact = behavior_water_tank_interact
 };
+
+#pragma endregion water_tank

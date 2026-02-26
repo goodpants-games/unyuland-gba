@@ -8,7 +8,6 @@
 #include "gfx.h"
 #include "math_util.h"
 
-#define GRAVITY TO_FIXED(0.1)
 #define MAX_RENDER_OBJS ((MAX_ENTITY_COUNT + MAX_PROJECTILE_COUNT))
 #define FREE_QUEUE_MAX_SIZE 16
 
@@ -309,7 +308,7 @@ static void update_entities(void)
 
         if (entity->flags & ENTITY_FLAG_MOVING)
         {
-            FIXED g = fxmul(GRAVITY, entity->gmult);
+            FIXED g = fxmul(WORLD_GRAVITY, entity->gmult);
             entity->vel.y += g;
 
             // water buoyancy

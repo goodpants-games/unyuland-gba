@@ -7,6 +7,10 @@
 
 #define WORLD_SUBPX_SHIFT 4
 #define WORLD_SUBPX_SCALE 16
+#define WORLD_GRAVITY TO_FIXED(0.1)
+// not the actual tile rendered tile size, which is 16. but tiles are supposed
+// to be 8x8.
+#define WORLD_TILE_SIZE 8
 
 #define ENTITY_FLAG_ENABLED              1
 #define ENTITY_FLAG_MOVING               2
@@ -39,10 +43,6 @@
 #define MAX_ENTITY_COUNT 32
 #define MAX_PROJECTILE_COUNT 64
 #define MAX_CONTACT_COUNT 64
-
-// not the actual tile rendered tile size, which is 16. but tiles are supposed
-// to be 8x8.
-#define WORLD_TILE_SIZE 8
 
 #define PLAYER_DROPLET_TYPE_SIDE      0
 #define PLAYER_DROPLET_TYPE_SIDE_SLOW 1
