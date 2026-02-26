@@ -20,8 +20,8 @@ static inline int ceil_div(int a, int b)
 static inline uint upair2u(uint a, uint b)
 {
     uint x, y;
-    if (a < b) x = a, y = b;
-    else       x = b, y = a;
+    if (a < b) x = b, y = a;
+    else       x = a, y = b;
     return ((x * x + x) >> 1) + y;
 }
 
