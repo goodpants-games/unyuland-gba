@@ -14,9 +14,9 @@
     } while (false);
 
 #define DYNARR_REMOVE(list, size, idx) do {  \
+    --(size);  \
     for (int _i = (idx); _i < (size); ++_i)  \
         (list)[_i] = (list)[_i+1];  \
-    --(size);  \
     } while (false);
 
 typedef struct pqueue_entry

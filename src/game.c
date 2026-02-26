@@ -97,6 +97,8 @@ static void on_entity_alloc(entity_s *ent)
             .type = RENDER_OBJ_SPRITE,
             .item = ent
         };
+    
+    game_physics_on_entity_alloc(ent);
 }
 
 entity_s* entity_alloc(void)
@@ -127,6 +129,8 @@ void entity_free(entity_s *entity)
 {
     // given entity is already free, don't do anything
     if (!(entity->flags & ENTITY_FLAG_ENABLED)) return;
+
+    game_physics_on_entity_free(entity);
 
     if (entity->behavior && entity->behavior->free)
         entity->behavior->free(entity);

@@ -287,7 +287,7 @@ static void col_ent_removed(int col_ent_idx)
     for (int i = 0; i < MAX_ENTITY_COUNT; ++i)
     {
         uint pair = upair2u(col_ent_idx, i);
-        ENTITY_PAIR_CLEAR(x_contact_pairs, pair);
+        ENTITY_PAIR_CLEAR(y_contact_pairs, pair);
     }
 }
 
@@ -324,18 +324,6 @@ static inline void sort_edge_list(col_bp_edge_s *const list,
 
                 if (overlaps)
                 {
-                    // LOG_DBG("new X overlap %i %i", eid1, eid2);
-
-                    // for (int k = 0; k < *overlap_count; ++k)
-                    // {
-                    //     if ((overlaps[k].eid_a == eid1 && overlaps[k].eid_b == eid2) ||
-                    //         (overlaps[k].eid_a == eid2 && overlaps[k].eid_b == eid1))
-                    //     {
-                    //         LOG_ERR("overlap already exists in list!");
-                    //         break;
-                    //     }
-                    // }
-
                     overlaps[(*overlap_count)++] = (col_bp_overlap_s)
                     {
                         .eid_a = eid1,
@@ -350,7 +338,6 @@ static inline void sort_edge_list(col_bp_edge_s *const list,
 
                 if (overlaps)
                 {
-                    // LOG_DBG("delete X overlap %i %i", eid1, eid2);
                     int count = *overlap_count;
                     for (int k = 0; k < count; ++k)
                     {
@@ -997,6 +984,19 @@ void game_physics_init(void)
     memset32(y_contact_pairs, 0, ENTITY_PAIR_SIZE / 4);
 }
 
+void game_physics_on_entity_alloc(entity_s *ent) {}
+void game_physics_on_entity_free(entity_s *ent)
+{
+    uintptr_t i = ent - g_game.entities;
+    entity_coldata_s *col = col_ent_map + i;
+
+    if (!col->ent) return;
+    if (col->ent != ent) DBG_CRASH();
+    
+    col_ent_removed(i);
+    col->ent = NULL;
+}
+
 void game_physics_update(void)
 {    
     #ifdef PHYS_PROFILE
@@ -1053,7 +1053,7 @@ void game_physics_update(void)
         if (subst > substeps)
             substeps = subst;
 
-        col_ents[col_ent_count++] = col_ent_map + i;
+        col_ents[col_ent_count++] = col_ent;
     }
 
     for (int i = 0; i < MAX_PROJECTILE_COUNT; ++i)
