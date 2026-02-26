@@ -13,7 +13,7 @@
 #include "log.h"
 #include "menu.h"
 
-#define MAIN_PROFILE
+// #define MAIN_PROFILE
 
 static void text_test(void)
 {
@@ -184,13 +184,13 @@ int main(void)
     const map_header_s *map = world_rooms[0];
     gfx_load_map(map);
     game_init();
-    game_load_room(map);
 
     entity_s *player = entity_alloc();
     entity_player_init(player);
     player->pos.x = int2fx(16);
     player->pos.y = int2fx(16);
 
+    game_load_room(map);
     LOG_DBG("room pos: %i %i", (int) map->px, (int) map->py);
 
     if (false)
