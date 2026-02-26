@@ -658,8 +658,8 @@ void entity_ice_block_init(entity_s *self, FIXED px, FIXED py)
 static void behavior_spring_ent_touch(entity_s *self, entity_s *other, int nx,
                                       int ny)
 {
-    LOG_DBG("Spring touch %i", ny);
-    if (ny == -1) other->vel.y = TO_FIXED(-3.0) / (other->mass * 2) * 4;
+    if (ny == -1)
+        other->vel.y = TO_FIXED(-3.0) / (other->mass * 2) * 4;
 }
 
 void entity_spring_init(entity_s *self, FIXED px, FIXED py)
