@@ -628,17 +628,17 @@ static bool physics_substep(FIXED vel_mult)
         bool break_substep = true;
 
         // sort contacts TODO: is it faster to use a heap priority queue?
-        // for (int i = 1; i < col_contact_count; ++i)
-        // {
-        //     for (int j = i - 1; j >= 0; --j)
-        //     {
-        //         if (col_contacts[j-1].pd < col_contacts[j].pd)
-        //         {
-        //             col_contact_s tmp;
-        //             SWAP3(col_contacts[j-1], col_contacts[j], tmp);
-        //         }
-        //     }
-        // }
+        for (int i = 1; i < col_contact_count; ++i)
+        {
+            for (int j = i - 1; j >= 0; --j)
+            {
+                if (col_contacts[j+1].pd > col_contacts[j].pd)
+                {
+                    col_contact_s tmp;
+                    SWAP3(col_contacts[j], col_contacts[j+1], tmp);
+                }
+            }
+        }
 
         // resolve contacts
         // for (void *item;
