@@ -1,11 +1,11 @@
 #include <stdlib.h>
+#include <tonc_math.h>
 
 #include "game.h"
 #include "game_physics.h"
 #include "datastruct.h"
 #include "math_util.h"
 #include "log.h"
-#include "tonc_math.h"
 
 // #define PHYS_PROFILE
 
@@ -34,6 +34,8 @@ typedef struct entity_coldata
     FIXED width, height;
     FIXED half_width, half_height;
     bool dirty;
+    bool x_anchor;
+    bool y_anchor;
 }
 entity_coldata_s;
 
@@ -249,7 +251,6 @@ static void col_ent_added(int col_ent_idx)
         .left = false
     };
 }
-        
 
 static void col_ent_removed(int col_ent_idx)
 {
@@ -404,6 +405,14 @@ static void update_edge_lists(void)
     sort_edge_list(y_edges, y_edge_count, y_contact_pairs, NULL, NULL);
 }
 
+static inline bool is_body_anchored(entity_coldata_s *col_ent, FIXED nx,
+                                    FIXED ny)
+{
+    if (nx != 0 && col_ent->x_anchor) return true;
+    if (ny != 0 && col_ent->y_anchor) return true;
+    return false;
+}
+
 static bool physics_substep(FIXED vel_mult)
 {
     // size_t contact_queue_size = 0;
@@ -424,6 +433,8 @@ static bool physics_substep(FIXED vel_mult)
         entity->pos.y += s_vy;
 
         col_ent->dirty = true;
+        col_ent->x_anchor = false;
+        col_ent->y_anchor = false;
     }
 
     #ifdef PHYS_PROFILE
@@ -435,7 +446,7 @@ static bool physics_substep(FIXED vel_mult)
     {
         if (subsubstep >= 8)
         {
-            // LOG_WRN("exceeded max iterations");
+            LOG_WRN("exceeded max iterations");
             break;
         }
 
@@ -648,6 +659,23 @@ static bool physics_substep(FIXED vel_mult)
                 continue;
             }
 
+            if (col_ent_a->dirty && !col_ent_b) continue;
+            if (col_ent_b && (col_ent_a->dirty || col_ent_b->dirty))
+            {
+                col_overlap_res_s test_overlap =
+                    rect_collision(ent_a->pos.x, ent_a->pos.y,
+                                   col_ent_a->half_width,
+                                   col_ent_a->half_height,
+                                   ent_b->pos.x, ent_b->pos.y,
+                                   col_ent_b->half_width,
+                                   col_ent_b->half_height);
+                
+                if (!test_overlap.overlap) continue;
+                nx = test_overlap.nx;
+                ny = test_overlap.ny;
+                pd = test_overlap.pd;
+            }
+
             FIXED rel_vx, rel_vy;
             if (ent_b)
             {
@@ -682,8 +710,64 @@ static bool physics_substep(FIXED vel_mult)
 
             if (!(col_group_b & col_mask_a) && !(col_group_a & col_mask_b))
                 continue;
+
+            bool anchor_a = false;
+            bool anchor_b = true;
+            if (col_ent_b)
+            {
+                anchor_a = is_body_anchored(col_ent_a, nx, ny);
+                anchor_b = !(ent_b->flags & ENTITY_FLAG_MOVING) ||
+                           is_body_anchored(col_ent_b, nx, ny);
+            }
             
-            if (col_ent_b && ent_b->flags & ENTITY_FLAG_MOVING)
+            if (anchor_a || anchor_b)
+            {
+                // if (anchor_a == anchor_b)
+                // {
+                //     LOG_ERR("Shit");
+                // }
+
+                entity_s *ent;
+                entity_coldata_s *ce;
+
+                if (anchor_b)
+                {
+                    ent = ent_a;
+                    ce = col_ent_a;
+                }
+                else
+                {
+                    ent = ent_b;
+                    ce = col_ent_b;
+                    nx = -nx;
+                    ny = -ny;
+                }
+
+                ce->dirty = true;
+
+                FIXED px = fxmul(nx, pd);
+                FIXED py = fxmul(ny, pd);
+
+                ent->pos.x = ent->pos.x - px;
+                ent->pos.y = ent->pos.y - py;
+                ent->vel.x = ent->vel.x - fxmul(nx, vdot);
+                ent->vel.y = ent->vel.y - fxmul(ny, vdot);
+
+                // LOG_DBG("Anchor move y %i %i", fxmul(ny, vdot));
+
+                // LOG_DBG("pos: %i, %i", ent_a->pos.x, ent_a->pos.y);
+                // LOG_DBG("vel: %i, %i", ent_a->vel.x, ent_a->vel.y);
+
+                if (nx != 0) ce->x_anchor = true;
+                if (ny != 0) ce->y_anchor = true;
+
+                if (ny < 0)
+                    ent->actor.flags |= ACTOR_FLAG_GROUNDED;
+
+                if (nx != 0)
+                    ent->actor.flags |= ACTOR_FLAG_WALL;
+            }
+            else
             {
                 col_ent_a->dirty = true;
                 col_ent_b->dirty = true;
@@ -696,19 +780,21 @@ static bool physics_substep(FIXED vel_mult)
                 FIXED inv_total_inv_mass = fxdiv(FIX_ONE, total_inv_mass);
 
                 FIXED restitution = TO_FIXED(1.0 + 0.5);
+                FIXED impulse_fac = fxmul(fxmul(restitution, vdot), inv_total_inv_mass);
+                FIXED impulse_x = fxmul(nx, impulse_fac);
+                FIXED impulse_y = fxmul(ny, impulse_fac);
+
+                ent_a->vel.x -= fxmul(impulse_x, inv_mass1);
+                ent_a->vel.y -= fxmul(impulse_y, inv_mass1);
+                ent_b->vel.x += fxmul(impulse_x, inv_mass2);
+                ent_b->vel.y += fxmul(impulse_y, inv_mass2);
+
                 FIXED move_x = fxmul(fxmul(nx, pd), inv_total_inv_mass);
                 FIXED move_y = fxmul(fxmul(ny, pd), inv_total_inv_mass);
-                FIXED impulse_fac = fxmul(fxmul(restitution, vdot), inv_total_inv_mass);
-
                 ent_a->pos.x -= fxmul(move_x, inv_mass1);
                 ent_a->pos.y -= fxmul(move_y, inv_mass1);
                 ent_b->pos.x += fxmul(move_x, inv_mass2);
                 ent_b->pos.y += fxmul(move_y, inv_mass2);
-
-                ent_a->vel.x -= fxmul(fxmul(nx, impulse_fac), inv_mass1);
-                ent_a->vel.y -= fxmul(fxmul(ny, impulse_fac), inv_mass1);
-                ent_b->vel.x += fxmul(fxmul(nx, impulse_fac), inv_mass2);
-                ent_b->vel.y += fxmul(fxmul(ny, impulse_fac), inv_mass2);
 
                 if (ny < 0)
                     ent_a->actor.flags |= ACTOR_FLAG_GROUNDED;
@@ -721,28 +807,7 @@ static bool physics_substep(FIXED vel_mult)
                     ent_b->actor.flags |= ACTOR_FLAG_WALL;
                 }
             }
-            else
-            {
-                col_ent_a->dirty = true;
-
-                FIXED px = fxmul(nx, pd);
-                FIXED py = fxmul(ny, pd);
-
-                ent_a->pos.x = ent_a->pos.x - px;
-                ent_a->pos.y = ent_a->pos.y - py;
-                ent_a->vel.x = ent_a->vel.x - fxmul(nx, vdot);
-                ent_a->vel.y = ent_a->vel.y - fxmul(ny, vdot);
-
-                // LOG_DBG("pos: %i, %i", ent_a->pos.x, ent_a->pos.y);
-                // LOG_DBG("vel: %i, %i", ent_a->vel.x, ent_a->vel.y);
-
-                if (ny < 0)
-                    ent_a->actor.flags |= ACTOR_FLAG_GROUNDED;
-
-                if (nx != 0)
-                    ent_a->actor.flags |= ACTOR_FLAG_WALL;
-            }
-
+            
             break_substep = false;
         }
 
