@@ -4,6 +4,8 @@
 #include "tonc_input.h"
 #include "math_util.h"
 
+#define DEFAULT_DAMP TO_FIXED(0.88)
+
 ////////////////////
 // GENERIC: enemy //
 ////////////////////
@@ -62,28 +64,6 @@ static bool enemy_base_proj_touch(entity_s *self, projectile_s *proj,
 
     return false;
 }
-
-///////////////////////
-// GENERIC: pushable //
-///////////////////////
-
-static void behavior_pushable_update(entity_s *self)
-{
-    const FIXED move_accel = TO_FIXED(1.0 / 20.0);
-    if (self->vel.x > 0)
-        self->vel.x = max(self->vel.x - move_accel, 0);
-    else
-        self->vel.x = min(self->vel.x + move_accel, 0);
-    // const FIXED max_vel = TO_FIXED(1.0);
-    // if (self->vel.x > 0)
-    //     self->vel.x = clamp(self->vel.x - move_accel, 0, max_vel);
-    // else if (self->vel.x < 0)
-    //     self->vel.x = clamp(self->vel.x + move_accel, -max_vel, 0);
-}
-
-static behavior_def_s behavior_pushable = {
-    .update = behavior_pushable_update
-};
 
 /////////////////////
 // player_behavior //
@@ -318,7 +298,8 @@ static void behavior_player_update(entity_s *self)
     data->interactable = NULL;
 }
 
-static void behavior_player_ent_touch(entity_s *self, entity_s *other)
+static void behavior_player_ent_touch(entity_s *self, entity_s *other, int nx,
+                                      int ny)
 {
     player_data_s *data = (player_data_s *)self->userdata;
 
@@ -559,8 +540,9 @@ void entity_gun_enemy_init(entity_s *self, FIXED px, FIXED py, bool ceil,
     }
     else
     {
-        self->flags |= ENTITY_FLAG_MOVING;
+        self->flags |= ENTITY_FLAG_MOVING | ENTITY_FLAG_DAMPING;
         self->sprite.oy = -4;
+        self->damp = DEFAULT_DAMP;
     }
 
     self->behavior = &behavior_gun_enemy;
@@ -657,31 +639,46 @@ const behavior_def_s behavior_gun_enemy = {
 
 void entity_ice_block_init(entity_s *self, FIXED px, FIXED py)
 {
-    self->flags |= ENTITY_FLAG_COLLIDE | ENTITY_FLAG_MOVING;
+    self->flags |=   ENTITY_FLAG_COLLIDE
+                   | ENTITY_FLAG_MOVING
+                   | ENTITY_FLAG_DAMPING;
     self->pos.x = px;
     self->pos.y = py;
     self->col.w = 8;
     self->col.h = 8;
     self->mass = 4;
+    self->damp = DEFAULT_DAMP;
     self->sprite.graphic_id = SPRID_GAME_ICE_BLOCK;
-    self->behavior = &behavior_pushable;
 }
 
 ////////////
 // spring //
 ////////////
 
+static void behavior_spring_ent_touch(entity_s *self, entity_s *other, int nx,
+                                      int ny)
+{
+    LOG_DBG("Spring touch %i", ny);
+    if (ny == -1) other->vel.y = TO_FIXED(-3.0) / (other->mass * 2) * 4;
+}
+
 void entity_spring_init(entity_s *self, FIXED px, FIXED py)
 {
-    self->flags |= ENTITY_FLAG_COLLIDE | ENTITY_FLAG_MOVING;
+    self->flags |= ENTITY_FLAG_COLLIDE | ENTITY_FLAG_MOVING
+                   | ENTITY_FLAG_DAMPING;
     self->pos.x = px;
     self->pos.y = py;
     self->col.w = 8;
     self->col.h = 8;
     self->mass = 4;
+    self->damp = DEFAULT_DAMP;
     self->sprite.graphic_id = SPRID_GAME_SPRING;
-    self->behavior = &behavior_pushable;
+    self->behavior = &behavior_spring;
 }
+
+const behavior_def_s behavior_spring = {
+    .ent_touch = behavior_spring_ent_touch
+};
 
 //////////
 // home //

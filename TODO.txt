@@ -8,12 +8,16 @@
           tile boundary, then reshow it before the HUD gets rendered.)
     - GBAtek notes that the first 8 scanlines are effectively invisible on
       a real GBA, since they are covered by a shadow.
-- better physics engine
 - maybemake substep processing local rather than global, like how it is in the
   code for the original unyuland.
-       
-- BUG: spitting a projectile in water causes a crash. this iss probably because
-       the projectile gets immediately destroyed afterward.
+- physics engine still buggy:
+  - sometimes objects will phase through the ground if they collide with other
+    stuff funny. i think this is because of the thing i added where it
+    recalculates the contact during collision resolution when it's marked as
+    dirty.
+  - actually i think that system means that i should be sorting contacts by
+    highest priority
+  - also probably make the physics code be put in IWRAM.
 
 
 

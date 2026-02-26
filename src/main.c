@@ -13,7 +13,7 @@
 #include "log.h"
 #include "menu.h"
 
-// #define MAIN_PROFILE
+#define MAIN_PROFILE
 
 static void text_test(void)
 {
@@ -186,8 +186,6 @@ int main(void)
     game_init();
     game_load_room(map);
 
-    int last_obj_index = 0;
-
     entity_s *player = entity_alloc();
     entity_player_init(player);
     player->pos.x = int2fx(16);
@@ -293,7 +291,7 @@ int main(void)
             update_pause_menu();
         }
 
-        game_render(&last_obj_index);
+        game_render();
         
         #ifdef MAIN_PROFILE
         frame_len = profile_stop();

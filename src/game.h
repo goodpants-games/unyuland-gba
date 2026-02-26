@@ -12,9 +12,10 @@
 #define ENTITY_FLAG_MOVING               2
 #define ENTITY_FLAG_ACTOR                4
 #define ENTITY_FLAG_COLLIDE              8
-#define ENTITY_FLAG_REMOVE_ON_CHECKPOINT 16
-#define ENTITY_FLAG_KEEP_ON_ROOM_CHANGE  32
-#define ENTITY_FLAG_QFREE                64
+#define ENTITY_FLAG_DAMPING              16
+#define ENTITY_FLAG_REMOVE_ON_CHECKPOINT 32
+#define ENTITY_FLAG_KEEP_ON_ROOM_CHANGE  64
+#define ENTITY_FLAG_QFREE                128
 
 #define ACTOR_FLAG_GROUNDED   1
 #define ACTOR_FLAG_WALL       2
@@ -99,7 +100,8 @@ typedef struct behavior_def
     void (*free)(struct entity *self);
 
     // fires on every frame an entity is being touched
-    void (*ent_touch)(struct entity *self, struct entity *other);
+    void (*ent_touch)(struct entity *self, struct entity *other, int nx,
+                      int ny);
 
     // fires on every frame a projectile is touched.
     // returns true if projectile should not be destroyed.
@@ -115,6 +117,7 @@ typedef struct entity
     struct { FIXED x; FIXED y; } pos;
     struct { FIXED x; FIXED y; } vel;
     FIXED gmult;
+    FIXED damp; // x damping
     u8 mass; // 1 = 0.5 mass, 2 = 1 mass, 3 = 1.5 mass, e.t.c.
     u8 health;
 
@@ -225,7 +228,7 @@ void game_init(void);
 void game_update(void);
 void game_load_room(const map_header_s *map);
 void game_transition_update(entity_s *player);
-void game_render(int *last_obj_index);
+void game_render(void);
 void game_save_state(void);
 void game_restore_state(void);
 
@@ -266,7 +269,9 @@ void entity_gun_enemy_init(entity_s *self, FIXED px, FIXED py, bool ceil,
 extern const behavior_def_s behavior_gun_enemy;
 
 void entity_ice_block_init(entity_s *self, FIXED px, FIXED py);
+
 void entity_spring_init(entity_s *self, FIXED px, FIXED py);
+extern const behavior_def_s behavior_spring;
 
 void entity_home_init(entity_s *self, FIXED px, FIXED py);
 extern const behavior_def_s behavior_home;

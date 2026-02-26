@@ -84,6 +84,8 @@ static entity_s *ent_free_queue[FREE_QUEUE_MAX_SIZE];
 static int proj_free_queue_count = 0;
 static projectile_s *proj_free_queue[FREE_QUEUE_MAX_SIZE];
 
+static int last_obj_index = 0;
+
 // this is called by both entity_alloc and game_restore_state
 static void on_entity_alloc(entity_s *ent)
 {
@@ -284,6 +286,17 @@ static void update_entities(void)
             }
 
             entity->actor.jump_trigger = (u8) jump_trigger;
+        }
+
+        if (entity->flags & ENTITY_FLAG_DAMPING)
+        {
+            FIXED vx = entity->vel.x;
+            entity->vel.x = fxmul(vx, entity->damp);
+
+            // integer rounding is towards negative infinity, so add +1 when
+            // negative to make it round to zero. otherwise it will approach
+            // some negative number rather than zero.
+            if (entity->vel.x < 0) ++entity->vel.x;
         }
 
         if (entity->flags & ENTITY_FLAG_MOVING)
@@ -503,7 +516,7 @@ static inline int render_obj_zidx(const render_obj_s *obj)
         return 0;
 }
 
-void game_render(int *p_last_obj_index)
+void game_render(void)
 {
     // sort render list by z index
     for (int i = 1; i < render_object_count; ++i)
@@ -662,13 +675,13 @@ void game_render(int *p_last_obj_index)
         ent->sprite.accum = sprite_time_accum;
     }
 
-    int last_obj_index = *p_last_obj_index;
-    for (int i = obj_index; i < last_obj_index; ++i)
+    int old_obj_count = last_obj_index;
+    for (int i = obj_index; i < old_obj_count; ++i)
     {
         obj_hide(&gfx_oam_buffer[i]);
     }
 
-    *p_last_obj_index = obj_index;
+    last_obj_index = obj_index;
 }
 
 static void change_room(const map_header_s *new_room)

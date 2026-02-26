@@ -522,10 +522,13 @@ static bool physics_substep(FIXED vel_mult)
             };
             ++col_contact_count;
 
+            int nx_int = sgn3(overlap_res.nx);
+            int ny_int = sgn3(overlap_res.ny);
+
             if (entity->behavior && entity->behavior->ent_touch)
-                entity->behavior->ent_touch(entity, ent2);
+                entity->behavior->ent_touch(entity, ent2, -nx_int, -ny_int);
             if (ent2->behavior && ent2->behavior->ent_touch)
-                ent2->behavior->ent_touch(ent2, entity);
+                ent2->behavior->ent_touch(ent2, entity, nx_int, ny_int);
         }
 
         // collect tile contacts
@@ -807,7 +810,7 @@ static bool physics_substep(FIXED vel_mult)
                     ent_b->actor.flags |= ACTOR_FLAG_WALL;
                 }
             }
-            
+
             break_substep = false;
         }
 
