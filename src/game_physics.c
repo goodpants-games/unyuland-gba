@@ -150,15 +150,15 @@ static col_overlap_res_s rect_collision(FIXED x0, FIXED y0, FIXED hw0, FIXED hh0
     res.overlap = true;
     if (x_overlap < y_overlap)
     {
-        res.nx = int2fx(SGN(-nx));
+        res.nx = int2fx(SGN(nx));
         res.ny = 0;
-        res.pd = -x_overlap;
+        res.pd = x_overlap;
     }
     else
     {
         res.nx = 0;
-        res.ny = int2fx(SGN(-ny));
-        res.pd = -y_overlap;
+        res.ny = int2fx(SGN(ny));
+        res.pd = y_overlap;
     }
 
     ret:
@@ -490,9 +490,9 @@ static bool physics_substep(FIXED vel_mult)
                                ent2->pos.x, ent2->pos.y, hw1, hh1);
 
             if (!overlap_res.overlap) continue;
-            if (overlap_res.ny >= 0 && ent2->col.flags & COL_FLAG_FLOOR_ONLY)
+            if (overlap_res.ny <= 0 && ent2->col.flags & COL_FLAG_FLOOR_ONLY)
                 continue;
-            if (overlap_res.ny <= 0 && entity->col.flags & COL_FLAG_FLOOR_ONLY)
+            if (overlap_res.ny >= 0 && entity->col.flags & COL_FLAG_FLOOR_ONLY)
                 continue;
 
             // pqueue_enqueue(contact_queue,
@@ -513,9 +513,9 @@ static bool physics_substep(FIXED vel_mult)
             int ny_int = sgn3(overlap_res.ny);
 
             if (entity->behavior && entity->behavior->ent_touch)
-                entity->behavior->ent_touch(entity, ent2, -nx_int, -ny_int);
+                entity->behavior->ent_touch(entity, ent2, nx_int, ny_int);
             if (ent2->behavior && ent2->behavior->ent_touch)
-                ent2->behavior->ent_touch(ent2, entity, nx_int, ny_int);
+                ent2->behavior->ent_touch(ent2, entity, -nx_int, -ny_int);
         }
 
         // collect tile contacts
@@ -586,7 +586,7 @@ static bool physics_substep(FIXED vel_mult)
                                           int2fx(WORLD_TILE_SIZE) / 2,
                                           int2fx(WORLD_TILE_SIZE) / 2);
                         
-                        if (overlap_res.overlap && overlap_res.pd < final_pd)
+                        if (overlap_res.overlap && overlap_res.pd > final_pd)
                         {
                             final_pd = overlap_res.pd;
                             final_nx = overlap_res.nx;
@@ -626,6 +626,19 @@ static bool physics_substep(FIXED vel_mult)
         #endif
 
         bool break_substep = true;
+
+        // sort contacts TODO: is it faster to use a heap priority queue?
+        // for (int i = 1; i < col_contact_count; ++i)
+        // {
+        //     for (int j = i - 1; j >= 0; --j)
+        //     {
+        //         if (col_contacts[j-1].pd < col_contacts[j].pd)
+        //         {
+        //             col_contact_s tmp;
+        //             SWAP3(col_contacts[j-1], col_contacts[j], tmp);
+        //         }
+        //     }
+        // }
 
         // resolve contacts
         // for (void *item;
@@ -681,7 +694,7 @@ static bool physics_substep(FIXED vel_mult)
             FIXED vdot = fxmul(nx, rel_vx) +
                          fxmul(ny, rel_vy);
             
-            if (vdot > 0) continue;
+            if (vdot < 0) continue;
 
             uint col_group_a = (uint)ent_a->col.group;
             uint col_mask_a = (uint)ent_a->col.mask;
@@ -751,7 +764,7 @@ static bool physics_substep(FIXED vel_mult)
                 if (nx != 0) ce->x_anchor = true;
                 if (ny != 0) ce->y_anchor = true;
 
-                if (ny < 0)
+                if (ny > 0)
                     ent->actor.flags |= ACTOR_FLAG_GROUNDED;
 
                 if (nx != 0)
@@ -786,9 +799,9 @@ static bool physics_substep(FIXED vel_mult)
                 ent_b->pos.x += fxmul(move_x, inv_mass2);
                 ent_b->pos.y += fxmul(move_y, inv_mass2);
 
-                if (ny < 0)
+                if (ny > 0)
                     ent_a->actor.flags |= ACTOR_FLAG_GROUNDED;
-                else if (ny > 0)
+                else if (ny < 0)
                     ent_b->actor.flags |= ACTOR_FLAG_GROUNDED;
 
                 if (nx != 0)
