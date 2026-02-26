@@ -18,6 +18,16 @@ static uint old_scroll_x = 0;
 static uint old_scroll_y = 0;
 static bool screen_dirty = false;
 
+#define RAINBOW_PALETTE_LENGTH (sizeof(rainbow_pal) / sizeof(*rainbow_pal))
+
+static const int rainbow_pal[] = {
+    GFX_PAL_RED, GFX_PAL_ORANGE, GFX_PAL_YELLOW, GFX_PAL_GREEN,
+    GFX_PAL_BLUE, GFX_PAL_PINK
+};
+
+static int rainbow_shift = 0;
+static int rainbow_shift_time_accum = 0;
+
 u16 gfx_palette[16] = {
     0x0000,
     0x28a3,
@@ -36,6 +46,94 @@ u16 gfx_palette[16] = {
     0x55df,
     0x573f,
 };
+
+static void update_rainbow_palette(void)
+{
+    int j = rainbow_shift;
+    for (int i = 0; i < 16; ++i)
+    {
+        pal_obj_bank[1][i] = gfx_palette[rainbow_pal[j]];
+        if (++j == RAINBOW_PALETTE_LENGTH) j = 0;
+    }
+}
+
+void gfx_reset_palette(void)
+{
+    // 0-15: regular palette, may be darkened for room transition
+    // 16: black (if on 16-bit color mode, this will be the start of the 2nd bank)
+    // 17-31: regular palette, with idx15 (peach) swapped out for black.
+    // will not be darkened during room trans. used for UI (presumably).
+    // 32-47: 1-black, 2-yellow, 3-light blue, 15-white. used for text.
+    for (int i = 0; i < 16; ++i)
+        pal_bg_mem[i] = gfx_palette[i];
+    pal_bg_mem[16] = gfx_palette[0];
+
+    for (int i = 1; i < 16; ++i)
+        pal_bg_mem[16 + i] = gfx_palette[i];
+    pal_bg_mem[31] = gfx_palette[0];
+
+    pal_bg_mem[33] = gfx_palette[0];
+    pal_bg_mem[34] = gfx_palette[GFX_PAL_YELLOW];
+    pal_bg_mem[35] = gfx_palette[GFX_PAL_BLUE];
+    pal_bg_mem[47] = gfx_palette[GFX_PAL_WHITE];
+
+    // pal bank 0: regular palette, may be darkened for room transition
+    // pal bank 1: dynamically changing rainbow palette (TODO)
+    for (int i = 0; i < 16; ++i)
+        pal_obj_bank[0][i] = gfx_palette[i];
+
+    update_rainbow_palette();
+}
+
+void gfx_set_palette_multiplied(FIXED factor)
+{
+    if      (factor < 0)       factor = 0;
+    else if (factor > FIX_ONE) factor = FIX_ONE;
+
+    u16 new_palette[16];
+    // const FIXED scale_factor = TO_FIXED(256.0 / 31.0) + 1;
+
+    for (int i = 1; i < 16; ++i)
+    {
+        int color = gfx_palette[i];
+        FIXED r = (2 * FIX_ONE) * (color & 0x1F);
+        FIXED g = (2 * FIX_ONE) * ((color >> 5) & 0x1F);
+        FIXED b = (2 * FIX_ONE) * ((color >> 10) & 0x1F);
+        r = fxmul(r, factor);
+        g = fxmul(g, factor);
+        b = fxmul(b, factor);
+
+        FIXED min_dist_sq = INT32_MAX;
+        int color_index = 0;
+
+        for (int j = 0; j < 16; ++j)
+        {
+            int ocolor = gfx_palette[j];
+            FIXED or = (2 * FIX_ONE) * (ocolor & 0x1F);
+            FIXED og = (2 * FIX_ONE) * ((ocolor >> 5) & 0x1F);
+            FIXED ob = (2 * FIX_ONE) * ((ocolor >> 10) & 0x1F);
+
+            FIXED dr = or - r;
+            FIXED dg = og - g;
+            FIXED db = ob - b;
+
+            FIXED dist_sq = fxmul(dr, dr) + fxmul(dg, dg) + fxmul(db, db);
+            if (dist_sq < min_dist_sq)
+            {
+                color_index = j;
+                min_dist_sq = dist_sq;
+            }
+        }
+
+        new_palette[i] = gfx_palette[color_index];
+    }
+
+    for (int i = 1; i < 16; ++i)
+        pal_bg_mem[i] = new_palette[i];
+
+    for (int i = 1; i < 16; ++i)
+        pal_obj_bank[0][i] = new_palette[i];
+}
 
 static void write_scr_block(const uint map_entry, u32 *const dest)
 {
@@ -99,6 +197,13 @@ void gfx_init(void)
 void gfx_new_frame(void)
 {
     REG_DISPCNT |= DCNT_OBJ | DCNT_BG0 | DCNT_BG1;
+
+    if (++rainbow_shift_time_accum == 4)
+    {
+        rainbow_shift_time_accum = 0;
+        if (++rainbow_shift == RAINBOW_PALETTE_LENGTH) rainbow_shift = 0;
+        update_rainbow_palette();
+    }
 
     if (gfx_loaded_map)
     {
@@ -211,82 +316,6 @@ void gfx_load_map(const map_header_s *map)
     gfx_map_width = gfx_loaded_map->width;
     gfx_map_height = gfx_loaded_map->height;
     screen_dirty = true;
-}
-
-void gfx_reset_palette(void)
-{
-    // 0-15: regular palette, may be darkened for room transition
-    // 16: black (if on 16-bit color mode, this will be the start of the 2nd bank)
-    // 17-31: regular palette, with idx15 (peach) swapped out for black.
-    // will not be darkened during room trans. used for UI (presumably).
-    // 32-47: 1-black, 2-yellow, 3-light blue, 15-white. used for text.
-    for (int i = 0; i < 16; ++i)
-        pal_bg_mem[i] = gfx_palette[i];
-    pal_bg_mem[16] = gfx_palette[0];
-
-    for (int i = 1; i < 16; ++i)
-        pal_bg_mem[16 + i] = gfx_palette[i];
-    pal_bg_mem[31] = gfx_palette[0];
-
-    pal_bg_mem[33] = gfx_palette[0];
-    pal_bg_mem[34] = gfx_palette[10];
-    pal_bg_mem[35] = gfx_palette[12];
-    pal_bg_mem[47] = gfx_palette[7];
-
-    // pal bank 0: regular palette, may be darkened for room transition
-    // pal bank 1: dynamically changing rainbow palette (TODO)
-    for (int i = 0; i < 16; ++i)
-        pal_obj_bank[0][i] = gfx_palette[i];
-}
-
-void gfx_set_palette_multiplied(FIXED factor)
-{
-    if      (factor < 0)       factor = 0;
-    else if (factor > FIX_ONE) factor = FIX_ONE;
-
-    u16 new_palette[16];
-    // const FIXED scale_factor = TO_FIXED(256.0 / 31.0) + 1;
-
-    for (int i = 1; i < 16; ++i)
-    {
-        int color = gfx_palette[i];
-        FIXED r = (2 * FIX_ONE) * (color & 0x1F);
-        FIXED g = (2 * FIX_ONE) * ((color >> 5) & 0x1F);
-        FIXED b = (2 * FIX_ONE) * ((color >> 10) & 0x1F);
-        r = fxmul(r, factor);
-        g = fxmul(g, factor);
-        b = fxmul(b, factor);
-
-        FIXED min_dist_sq = INT32_MAX;
-        int color_index = 0;
-
-        for (int j = 0; j < 16; ++j)
-        {
-            int ocolor = gfx_palette[j];
-            FIXED or = (2 * FIX_ONE) * (ocolor & 0x1F);
-            FIXED og = (2 * FIX_ONE) * ((ocolor >> 5) & 0x1F);
-            FIXED ob = (2 * FIX_ONE) * ((ocolor >> 10) & 0x1F);
-
-            FIXED dr = or - r;
-            FIXED dg = og - g;
-            FIXED db = ob - b;
-
-            FIXED dist_sq = fxmul(dr, dr) + fxmul(dg, dg) + fxmul(db, db);
-            if (dist_sq < min_dist_sq)
-            {
-                color_index = j;
-                min_dist_sq = dist_sq;
-            }
-        }
-
-        new_palette[i] = gfx_palette[color_index];
-    }
-
-    for (int i = 1; i < 16; ++i)
-        pal_bg_mem[i] = new_palette[i];
-
-    for (int i = 1; i < 16; ++i)
-        pal_obj_bank[0][i] = new_palette[i];
 }
 
 // static inline u32* get_pixel_row(const int x, const int y)

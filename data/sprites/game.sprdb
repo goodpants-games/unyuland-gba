@@ -15,6 +15,7 @@
         "spring.png",
         "super_spring.png",
         "home.png",
-        "ice_platform.png"
+        "ice_platform.png",
+        "platform_outline.png"
     ]
 }

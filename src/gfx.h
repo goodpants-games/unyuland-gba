@@ -31,6 +31,26 @@ typedef enum text_color
 }
 text_color_e;
 
+typedef enum gfx_pal
+{
+    GFX_PAL_BLACK,
+    GFX_PAL_DARK_BLUE,
+    GFX_PAL_DARK_PURPLE,
+    GFX_PAL_DARK_GREEN,
+    GFX_PAL_BROWN,
+    GFX_PAL_DARK_GRAY,
+    GFX_PAL_LIGHT_GRAY,
+    GFX_PAL_WHITE,
+    GFX_PAL_RED,
+    GFX_PAL_ORANGE,
+    GFX_PAL_YELLOW,
+    GFX_PAL_GREEN,
+    GFX_PAL_BLUE,
+    GFX_PAL_INDIGO,
+    GFX_PAL_PINK,
+    GFX_PAL_PEACH
+} gfx_pal_e;
+
 extern OBJ_ATTR gfx_oam_buffer[128];
 extern int gfx_scroll_x;
 extern int gfx_scroll_y;

@@ -129,6 +129,7 @@ entity_s* entity_alloc(void)
 
 void entity_free(entity_s *entity)
 {
+    if (!entity) return;
     // given entity is already free, don't do anything
     if (!(entity->flags & ENTITY_FLAG_ENABLED)) return;
 
@@ -203,6 +204,7 @@ projectile_s* projectile_alloc(void)
 
 void projectile_free(projectile_s *proj)
 {
+    if (!proj) return;
     if (!IS_PROJ_ACTIVE(proj)) return;
 
     game_physics_on_proj_free(proj);
@@ -577,19 +579,23 @@ void game_render(void)
 
         int sprite_graphic_id;
         int sprite_frame;
+        int sprite_palette;
         bool sprite_hflip, sprite_vflip;
+        bool sprite_hidden = false;
         int draw_x, draw_y;
 
         if (robj->type == RENDER_OBJ_SPRITE)
         {
             entity_s *ent = (entity_s *)robj->item;
-
+            
             draw_x = (ent->pos.x >> FIX_SHIFT) + ent->sprite.ox;
             draw_y = (ent->pos.y >> FIX_SHIFT) + ent->sprite.oy;
             sprite_graphic_id = (int) ent->sprite.graphic_id;
             sprite_frame = (int) ent->sprite.frame;
             sprite_hflip = ent->sprite.flags & SPRITE_FLAG_FLIP_X;
             sprite_vflip = ent->sprite.flags & SPRITE_FLAG_FLIP_Y;
+            sprite_palette = ent->sprite.palette;
+            sprite_hidden = (ent->sprite.flags & SPRITE_FLAG_HIDDEN);
         }
         else if (robj->type == RENDER_OBJ_PROJECTILE)
         {
@@ -600,6 +606,7 @@ void game_render(void)
             sprite_frame = 0;
             sprite_hflip = false;
             sprite_vflip = false;
+            sprite_palette = 0;
         }
         else
         {
@@ -655,8 +662,12 @@ void game_render(void)
                 oy = obj_src->oy;
             }
 
-            obj_set_attr(obj_dst, obj_src->a0, obj_src->a1 | (u16)flip_flags,
-                         obj_src->a2 | ATTR2_PALBANK(0) | ATTR2_PRIO(1));
+            u16 a0 = obj_src->a0;
+            if (sprite_hidden) a0 |= ATTR0_HIDE;
+            u16 a1 = obj_src->a1 | flip_flags;
+            u16 a2 = obj_src->a2 | ATTR2_PALBANK(sprite_palette)
+                     | ATTR2_PRIO(1);
+            obj_set_attr(obj_dst, a0, a1, a2);
             obj_set_pos(obj_dst, draw_cam_x + ox, draw_cam_y + oy);
             
             if (++obj_index >= 64) goto exit_entity_loop;

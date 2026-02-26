@@ -78,9 +78,11 @@ player_spit_mode_e;
 
 typedef struct player_data
 {
+    entity_s *interactable;
+    entity_s *cursor;
     bool spitting;
     u8 spit_mode;
-    entity_s *interactable;
+    u8 cursor_frame;
 } player_data_s;
 
 void entity_player_init(entity_s *self)
@@ -103,6 +105,21 @@ void entity_player_init(entity_s *self)
     self->behavior = &behavior_player;
 
     *data = (player_data_s){0};
+
+    entity_s *cursor = entity_alloc();
+    if (!cursor) return;
+
+    cursor->flags |= ENTITY_FLAG_KEEP_ON_ROOM_CHANGE;
+    cursor->sprite.graphic_id = SPRID_GAME_PLATFORM_OUTLINE;
+    cursor->sprite.palette = 1;
+
+    data->cursor = cursor;
+}
+
+static void behavior_player_free(entity_s *self)
+{
+    player_data_s *data = (player_data_s *)self->userdata;
+    entity_free(data->cursor);
 }
 
 static void player_platform_spit(entity_s *self)
@@ -178,6 +195,7 @@ static void behavior_player_update(entity_s *self)
 
     // input
     self->actor.move_x = 0;
+    bool show_cursor = false;
 
     if (g_game.input_enabled && !g_game.room_trans.override_player_move_x)
     {
@@ -224,13 +242,16 @@ static void behavior_player_update(entity_s *self)
         if (key_hit(KEY_A))
             self->actor.jump_trigger = 8;
 
-        if (key_hit(KEY_B) &&
-            can_move && !data->interactable)
+        if (can_move && !data->interactable)
         {
-            if (data->spit_mode == PLAYER_SPIT_MODE_PLATFORM)
-                player_platform_spit(self);
-            else if (data->spit_mode == PLAYER_SPIT_MODE_BULLET)
-                player_bullet_spit(self);
+            show_cursor = self->actor.flags & ACTOR_FLAG_GROUNDED;
+            if (key_hit(KEY_B))
+            {
+                if (data->spit_mode == PLAYER_SPIT_MODE_PLATFORM)
+                    player_platform_spit(self);
+                else if (data->spit_mode == PLAYER_SPIT_MODE_BULLET)
+                    player_bullet_spit(self);
+            }
         }
 
         if (key_hit(KEY_L))
@@ -296,6 +317,22 @@ static void behavior_player_update(entity_s *self)
     skip_animation:;
 
     data->interactable = NULL;
+    
+    entity_s *cursor = data->cursor;
+    if (cursor)
+    {
+        if (show_cursor)
+        {
+            cursor->pos.x = self->pos.x;
+            cursor->pos.y = self->pos.y;
+        }
+
+        cursor->sprite.flags |= SPRITE_FLAG_HIDDEN;
+        if (show_cursor && data->cursor_frame)
+            cursor->sprite.flags &= ~SPRITE_FLAG_HIDDEN;
+    }
+
+    data->cursor_frame = (data->cursor_frame + 1) & 1;
 }
 
 static void behavior_player_ent_touch(entity_s *self, entity_s *other, int nx,
@@ -316,6 +353,7 @@ static bool behavior_player_proj_touch(entity_s *self, projectile_s *proj)
 }
 
 const behavior_def_s behavior_player = {
+    .free = behavior_player_free,
     .update = behavior_player_update,
     .ent_touch = behavior_player_ent_touch,
     .proj_touch = behavior_player_proj_touch,

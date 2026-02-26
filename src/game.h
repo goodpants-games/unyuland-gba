@@ -25,6 +25,7 @@
 #define SPRITE_FLAG_PLAYING   1
 #define SPRITE_FLAG_FLIP_X    2
 #define SPRITE_FLAG_FLIP_Y    4
+#define SPRITE_FLAG_HIDDEN    8
 
 #define COL_FLAG_FLOOR_ONLY   1
 #define COL_FLAG_MONITOR_ONLY 2
@@ -144,7 +145,8 @@ typedef struct entity
         u8 frame;
         u8 accum;
         
-        s16 zidx;
+        s8 zidx;
+        s8 palette;
         s16 ox;
         s16 oy;
     } sprite;
