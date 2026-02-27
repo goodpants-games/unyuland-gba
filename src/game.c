@@ -57,6 +57,7 @@ typedef struct render_obj
 {
     u8 type;
     void *item;
+    s16 zidx;
 }
 render_obj_s;
 
@@ -367,6 +368,52 @@ static void update_projectiles()
     }
 }
 
+static void update_animation()
+{
+    const gfx_root_header_s *gfx_root_header =
+        (const gfx_root_header_s *)game_sprdb_data;
+    
+    const gfx_sprite_s *gfx_sprites =
+        (const gfx_sprite_s *)&gfx_root_header->sprite0;
+    const gfx_frame_s *frame_pool =
+        (const gfx_frame_s *)((uintptr_t)gfx_root_header + gfx_root_header->frame_pool);
+    
+    for (int i = 0; i < MAX_ENTITY_COUNT; ++i)
+    {
+        entity_s *ent = g_game.entities + i;
+        if (!(ent->flags & ENTITY_FLAG_ENABLED)) continue;
+        if (!(ent->sprite.flags & SPRITE_FLAG_PLAYING)) continue;
+
+        int sprite_time_accum = ent->sprite.accum;
+        int sprite_frame = ent->sprite.frame;
+
+        const gfx_sprite_s *spr = &gfx_sprites[ent->sprite.graphic_id];
+        const gfx_frame_s *frame = frame_pool + spr->frame_pool_idx + sprite_frame;
+
+        int frame_count = spr->frame_count;
+        int frame_len = frame->frame_len;
+
+        if (++sprite_time_accum >= frame_len)
+        {
+            sprite_time_accum = 0;
+            if (sprite_frame == frame_count - 1)
+            {
+                if (spr->loop)
+                    sprite_frame = 0;
+                else
+                    ent->sprite.flags &= ~SPRITE_FLAG_PLAYING;
+            }
+            else
+            {
+                ++sprite_frame;
+            }
+        }
+
+        ent->sprite.frame = sprite_frame;
+        ent->sprite.accum = sprite_time_accum;
+    }
+}
+
 void game_init(void)
 {
     g_game.cam_x = 0;
@@ -399,6 +446,7 @@ void game_update(void)
     update_entities();
     update_projectiles();
     game_physics_update();
+    update_animation();
 
     g_game.cam_x = (player->pos.x >> FIX_SHIFT) - SCREEN_WIDTH / 4;
     g_game.cam_y = (player->pos.y >> FIX_SHIFT) - SCREEN_HEIGHT / 4;
@@ -542,14 +590,22 @@ static inline int render_obj_zidx(const render_obj_s *obj)
         return 0;
 }
 
-void game_render(void)
+IWRAM_CODE
+static void sort_render_list(void)
 {
+    // precalculate object z-indices
+    for (int i = 1; i < render_object_count; ++i)
+    {
+        render_obj_s *const obj = render_objects + i;
+        obj->zidx = render_obj_zidx(obj);
+    }
+
     // sort render list by z index
     for (int i = 1; i < render_object_count; ++i)
     {
         for (int j = i; j > 0; --j)
         {
-            if (render_obj_zidx(&render_objects[j]) > render_obj_zidx(&render_objects[j-1]))
+            if (render_objects[j].zidx > render_objects[j-1].zidx)
             {
                 render_obj_s temp = render_objects[j];
                 render_objects[j] = render_objects[j-1];
@@ -557,6 +613,25 @@ void game_render(void)
             }
         }
     }
+}
+
+static inline bool renderer_cam_calc(int draw_x, int draw_y, int *draw_cam_x,
+                                     int *draw_cam_y)
+{
+    *draw_cam_x = (draw_x - g_game.cam_x) * 2;
+    *draw_cam_y = (draw_y - g_game.cam_y) * 2;
+
+    // frustum culling. needed so sprites don't wrap around the screen.
+    // and also obviously the performance benefit.
+    return (*draw_cam_x < -32 ||
+            *draw_cam_y < -32 ||
+            *draw_cam_x > SCREEN_WIDTH + 32 ||
+            *draw_cam_y > SCREEN_HEIGHT + 32);
+}
+
+void game_render(void)
+{
+    sort_render_list();
 
     gfx_scroll_x = g_game.cam_x * 2;
     gfx_scroll_y = g_game.cam_y * 2;
@@ -581,14 +656,18 @@ void game_render(void)
         int sprite_palette;
         bool sprite_hflip, sprite_vflip;
         bool sprite_hidden = false;
-        int draw_x, draw_y;
+        int draw_cam_x, draw_cam_y;
 
         if (robj->type == RENDER_OBJ_SPRITE)
         {
             entity_s *ent = (entity_s *)robj->item;
             
-            draw_x = (ent->pos.x >> FIX_SHIFT) + ent->sprite.ox;
-            draw_y = (ent->pos.y >> FIX_SHIFT) + ent->sprite.oy;
+            int draw_x = (ent->pos.x >> FIX_SHIFT) + ent->sprite.ox;
+            int draw_y = (ent->pos.y >> FIX_SHIFT) + ent->sprite.oy;
+
+            if (renderer_cam_calc(draw_x, draw_y, &draw_cam_x, &draw_cam_y))
+                continue;
+
             sprite_graphic_id = (int) ent->sprite.graphic_id;
             sprite_frame = (int) ent->sprite.frame;
             sprite_hflip = ent->sprite.flags & SPRITE_FLAG_FLIP_X;
@@ -599,8 +678,13 @@ void game_render(void)
         else if (robj->type == RENDER_OBJ_PROJECTILE)
         {
             projectile_s *proj = (projectile_s *)robj->item;
-            draw_x = (proj->px >> FIX_SHIFT) - 4;
-            draw_y = (proj->py >> FIX_SHIFT) - 4;
+
+            int draw_x = (proj->px >> FIX_SHIFT) - 4;
+            int draw_y = (proj->py >> FIX_SHIFT) - 4;
+
+            if (renderer_cam_calc(draw_x, draw_y, &draw_cam_x, &draw_cam_y))
+                continue;
+
             sprite_graphic_id = (int) proj->graphic_id;
             sprite_frame = 0;
             sprite_hflip = false;
@@ -610,19 +694,6 @@ void game_render(void)
         else
         {
             LOG_ERR("unknown render object type %i", (int) robj->type);
-            continue;
-        }
-
-        int draw_cam_x = (draw_x - g_game.cam_x) * 2;
-        int draw_cam_y = (draw_y - g_game.cam_y) * 2;
-
-        // frustum culling. needed so sprites don't wrap around the screen.
-        // and also obviously the performance benefit.
-        if (draw_cam_x < -32 ||
-            draw_cam_y < -32 ||
-            draw_cam_x > SCREEN_WIDTH + 32 ||
-            draw_cam_y > SCREEN_HEIGHT + 32)
-        {
             continue;
         }
 
@@ -673,42 +744,6 @@ void game_render(void)
         }
     }
     exit_entity_loop:;
-
-    // update sprite animation
-    for (int i = 0; i < MAX_ENTITY_COUNT; ++i)
-    {
-        entity_s *ent = g_game.entities + i;
-        if (!(ent->flags & ENTITY_FLAG_ENABLED)) continue;
-        if (!(ent->sprite.flags & SPRITE_FLAG_PLAYING)) continue;
-
-        int sprite_time_accum = ent->sprite.accum;
-        int sprite_frame = ent->sprite.frame;
-
-        const gfx_sprite_s *spr = &gfx_sprites[ent->sprite.graphic_id];
-        const gfx_frame_s *frame = frame_pool + spr->frame_pool_idx + sprite_frame;
-
-        int frame_count = spr->frame_count;
-        int frame_len = frame->frame_len;
-
-        if (++sprite_time_accum >= frame_len)
-        {
-            sprite_time_accum = 0;
-            if (sprite_frame == frame_count - 1)
-            {
-                if (spr->loop)
-                    sprite_frame = 0;
-                else
-                    ent->sprite.flags &= ~SPRITE_FLAG_PLAYING;
-            }
-            else
-            {
-                ++sprite_frame;
-            }
-        }
-
-        ent->sprite.frame = sprite_frame;
-        ent->sprite.accum = sprite_time_accum;
-    }
 
     int old_obj_count = last_obj_index;
     for (int i = obj_index; i < old_obj_count; ++i)
