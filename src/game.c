@@ -7,6 +7,7 @@
 #include "log.h"
 #include "gfx.h"
 #include "math_util.h"
+#include "gba_util.h"
 
 #define MAX_RENDER_OBJS ((MAX_ENTITY_COUNT + MAX_PROJECTILE_COUNT))
 #define FREE_QUEUE_MAX_SIZE 16
@@ -71,7 +72,7 @@ typedef struct game_state
 }
 game_state_s;
 
-IWRAM_DATA game_s g_game;
+game_s g_game;
 EWRAM_DATA game_state_s game_saved_state;
 EWRAM_DATA static u8 game_room_collision[GAME_COLLISION_MAP_SIZE];
 
@@ -590,7 +591,7 @@ static inline int render_obj_zidx(const render_obj_s *obj)
         return 0;
 }
 
-IWRAM_CODE
+ARM_FUNC
 static void sort_render_list(void)
 {
     // precalculate object z-indices
@@ -629,6 +630,7 @@ static inline bool renderer_cam_calc(int draw_x, int draw_y, int *draw_cam_x,
             *draw_cam_y > SCREEN_HEIGHT + 32);
 }
 
+ARM_FUNC NO_INLINE
 void game_render(void)
 {
     sort_render_list();

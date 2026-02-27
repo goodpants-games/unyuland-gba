@@ -5,6 +5,7 @@
 #include "game_physics.h"
 #include "datastruct.h"
 #include "math_util.h"
+#include "gba_util.h"
 #include "log.h"
 
 // #define PHYS_PROFILE
@@ -104,30 +105,30 @@ typedef struct proj_part_data
 }
 proj_part_data_s;
 
-IWRAM_DATA static int col_ent_count = 0;
-IWRAM_DATA static entity_coldata_s col_ent_map[MAX_ENTITY_COUNT];
-IWRAM_DATA static entity_coldata_s *col_ents[MAX_ENTITY_COUNT];
+static int col_ent_count = 0;
+static entity_coldata_s col_ent_map[MAX_ENTITY_COUNT];
+static entity_coldata_s *col_ents[MAX_ENTITY_COUNT];
 
-IWRAM_DATA static uint col_contact_count = 0;
-IWRAM_DATA static col_contact_s col_contacts[MAX_CONTACT_COUNT];
+static uint col_contact_count = 0;
+static col_contact_s col_contacts[MAX_CONTACT_COUNT];
 // static u8 contact_pairs[ENTITY_PAIR_SIZE];
 
-IWRAM_DATA static int x_overlap_count = 0;
-IWRAM_DATA static col_bp_overlap_s x_overlaps[MAX_ENTITY_COUNT * 2];
+static col_bp_overlap_s x_overlaps[MAX_ENTITY_COUNT * 2];
+static int x_overlap_count = 0;
 
-IWRAM_DATA static int x_edge_count = 0;
-IWRAM_DATA static col_bp_edge_s x_edges[EDGE_LIST_MAX_COUNT];
+static int x_edge_count = 0;
+static col_bp_edge_s x_edges[EDGE_LIST_MAX_COUNT];
 
-IWRAM_DATA static int y_edge_count = 0;
-IWRAM_DATA static col_bp_edge_s y_edges[EDGE_LIST_MAX_COUNT];
+static int y_edge_count = 0;
+static col_bp_edge_s y_edges[EDGE_LIST_MAX_COUNT];
 
-IWRAM_DATA static u8 x_contact_pairs[ENTITY_PAIR_SIZE];
-IWRAM_DATA static u8 y_contact_pairs[ENTITY_PAIR_SIZE];
+static u8 x_contact_pairs[ENTITY_PAIR_SIZE];
+static u8 y_contact_pairs[ENTITY_PAIR_SIZE];
 
-IWRAM_DATA static proj_part_data_s proj_data[MAX_PROJECTILE_COUNT];
-IWRAM_DATA static partgrid_node_s partgrid_node_pool[PARTGRID_NODE_POOL_SIZE];
-IWRAM_DATA static partgrid_node_s *partgrid_node_pool_ffree; // first free
-IWRAM_DATA static part_cell_t partgrid[PARTGRID_ROWS][PARTGRID_COLS];
+static proj_part_data_s proj_data[MAX_PROJECTILE_COUNT];
+static partgrid_node_s partgrid_node_pool[PARTGRID_NODE_POOL_SIZE];
+static partgrid_node_s *partgrid_node_pool_ffree; // first free
+static part_cell_t partgrid[PARTGRID_ROWS][PARTGRID_COLS];
 
 #ifdef PHYS_PROFILE
 struct phys_profile
@@ -268,6 +269,7 @@ static void col_ent_removed(int col_ent_idx)
 }
 
 // sweep and prune
+ARM_FUNC
 static inline void sort_edge_list(col_bp_edge_s *const list,
                            const int list_count,
                            u8 contact_pairs[ENTITY_PAIR_SIZE],
@@ -336,6 +338,7 @@ static inline void sort_edge_list(col_bp_edge_s *const list,
     }
 }
 
+ARM_FUNC NO_INLINE
 static void update_edge_lists(void)
 {
     // sync x edges
@@ -383,6 +386,211 @@ static inline bool is_body_anchored(entity_coldata_s *col_ent, FIXED nx,
     return false;
 }
 
+ARM_FUNC NO_INLINE
+static void physics_substeps_collect_contacts(void)
+{
+    PROFILE_START();
+
+    update_edge_lists();
+    col_contact_count = 0;
+
+    // collect entity contacts
+    for (int i = 0; i < x_overlap_count; ++i)
+    {
+        if (col_contact_count >= MAX_CONTACT_COUNT)
+        {
+            LOG_WRN("max contacts exceeded!");
+            return;
+        }
+
+        // check if this X overlap between two entities also exists on the Y
+        // axis
+        const col_bp_overlap_s *x_overlap = x_overlaps + i;
+        uint pkey = upair2u(x_overlap->eid_a, x_overlap->eid_b);
+        if (!ENTITY_PAIR_GET(y_contact_pairs, pkey)) continue;
+
+        entity_coldata_s *col_ent = col_ent_map + x_overlap->eid_a;
+        entity_coldata_s *entc2 = col_ent_map + x_overlap->eid_b;
+
+        // make sure that the second entity is the static one
+        if (entc2->ent->flags & ENTITY_FLAG_MOVING)
+        {
+            entity_coldata_s *temp;
+            SWAP3(col_ent, entc2, temp);
+        }
+
+        entity_s *entity = col_ent->ent;
+        entity_s *ent2 = entc2->ent;
+
+        // if both entities are static objects, collision cannot happen
+        // between them.
+        if (!(entity->flags & ENTITY_FLAG_MOVING) &&
+            !(ent2->flags & ENTITY_FLAG_MOVING))
+            continue;
+
+        if (col_ent == entc2)
+        {
+            LOG_WRN("entity contact is with itself? how tf?");
+            continue;
+        }
+
+        // narrow-phase collision. also calculates penetration vector.
+        const FIXED hw0 = col_ent->half_width;
+        const FIXED hh0 = col_ent->half_height;
+        const FIXED hw1 = entc2->half_width;
+        const FIXED hh1 = entc2->half_height;
+        
+        col_overlap_res_s overlap_res =
+            rect_collision(entity->pos.x, entity->pos.y, hw0, hh0,
+                            ent2->pos.x, ent2->pos.y, hw1, hh1);
+
+        if (!overlap_res.overlap) continue;
+        if (overlap_res.ny <= 0 && ent2->col.flags & COL_FLAG_FLOOR_ONLY)
+            continue;
+        if (overlap_res.ny >= 0 && entity->col.flags & COL_FLAG_FLOOR_ONLY)
+            continue;
+
+        // add contact to contact list
+        col_contacts[col_contact_count] = (col_contact_s)
+        {
+            .nx = overlap_res.nx,
+            .ny = overlap_res.ny,
+            .pd = overlap_res.pd,
+            .ent_a = col_ent,
+            .ent_b = entc2,
+            .priority = (entity->flags & ENTITY_FLAG_MOVING) ||
+                        (ent2->flags & ENTITY_FLAG_MOVING)
+        };
+        ++col_contact_count;
+
+        // run behavior callbacks
+        int nx_int = sgn3(overlap_res.nx);
+        int ny_int = sgn3(overlap_res.ny);
+
+        if (entity->behavior && entity->behavior->ent_touch)
+            entity->behavior->ent_touch(entity, ent2, nx_int, ny_int);
+        if (ent2->behavior && ent2->behavior->ent_touch)
+            ent2->behavior->ent_touch(ent2, entity, -nx_int, -ny_int);
+    }
+
+    PROFILE_END(detection_ent_t);
+
+    // collect tile contacts
+    PROFILE_START();
+
+    for (int i = 0; i < col_ent_count; ++i)
+    {
+        if (col_contact_count >= MAX_CONTACT_COUNT)
+        {
+            LOG_WRN("max contacts exceeded!");
+            return;
+        }
+
+        entity_coldata_s *const col_ent = col_ents[i];
+        entity_s *entity = col_ent->ent;
+
+        if (!(entity->flags & ENTITY_FLAG_MOVING)) continue;
+
+        // only calculate tile overlaps if this entity moved in the previous
+        // iteration. (or, if it's the first iteration.)
+        if (!col_ent->dirty) continue;
+        col_ent->dirty = false;
+
+        const FIXED col_w = col_ent->width;
+        const FIXED col_h = col_ent->height;
+        const FIXED col_half_w = col_ent->half_width;
+        const FIXED col_half_h = col_ent->half_height;
+
+        // const uint col_group = (uint)entity->col.group;
+        const uint col_mask = (uint)entity->col.mask;
+
+        const int el = entity->pos.x;
+        const int et = entity->pos.y;
+        const int er = (entity->pos.x + col_w);
+        const int eb = (entity->pos.y + col_h);
+
+        if (col_mask & COLGROUP_DEFAULT)
+        {
+            int min_x = el / (WORLD_TILE_SIZE * FIX_SCALE);
+            int min_y = et / (WORLD_TILE_SIZE * FIX_SCALE);
+            int max_x = er / (WORLD_TILE_SIZE * FIX_SCALE);
+            int max_y = eb / (WORLD_TILE_SIZE * FIX_SCALE);
+            
+            // integer division rounds towards zero, but i want to round
+            // towards negative infinity (floor). this should fix it.
+            // micro-optimization notice: doing `a / b - (a < 0)` is faster,
+            // but it incurs a cost for both positive and negative values.
+            // most of the time, the value will be positive. therefore, it
+            // is generally faster to branch.
+            // (at least on -O2)
+            if (el < 0) --min_x;
+            if (et < 0) --min_y;
+            if (er < 0) --min_x;
+            if (eb < 0) --min_y;
+
+            // bool tile_col_found = false;
+            // FIXED final_nx = 0, final_ny = 0, final_pd = 0;
+            // int tx, ty;
+            for (int y = min_y; y <= max_y; ++y)
+            {
+                for (int x = min_x; x <= max_x; ++x)
+                {
+                    if (game_get_col_clamped(x, y) != 1)
+                        continue;
+
+                    const FIXED tx = x * FIX_ONE * WORLD_TILE_SIZE;
+                    const FIXED ty = y * FIX_ONE * WORLD_TILE_SIZE;
+
+                    col_overlap_res_s overlap_res = 
+                        rect_collision(entity->pos.x, entity->pos.y,
+                                        col_half_w, col_half_h, tx, ty,
+                                        int2fx(WORLD_TILE_SIZE) / 2,
+                                        int2fx(WORLD_TILE_SIZE) / 2);
+                    
+                    if (!overlap_res.overlap) continue;
+
+                    col_contacts[col_contact_count] = (col_contact_s)
+                    {
+                        .nx = overlap_res.nx,
+                        .ny = overlap_res.ny,
+                        .pd = overlap_res.pd,
+                        .ent_a = col_ent,
+                        .ent_b = NULL,
+                        .priority = 1,
+                        .tx = tx,
+                        .ty = ty,
+                    };
+                    ++col_contact_count;
+                }
+            }
+        }
+    }
+
+    PROFILE_END(detection_tile_t);
+
+    // sort contacts such that those with the most penetration will be
+    // processed first. also, i want contacts containing static bodies to
+    // be processed first as well.
+    // TODO: is it faster to use a heap priority queue?
+    // i hypothesize it will either not be or the difference will be
+    // negligible, since this insertion sort runs pretty quickly already. i
+    // think.
+    for (int i = 1; i < col_contact_count; ++i)
+    {
+        for (int j = i - 1; j >= 0; --j)
+        {
+            col_contact_s *const c0 = col_contacts + j;
+            col_contact_s *const c1 = col_contacts + j + 1;
+
+            if (c1->pd > c0->pd || c1->priority > c0->priority)
+            {
+                col_contact_s tmp;
+                SWAP3(col_contacts[j], col_contacts[j+1], tmp);
+            }
+        }
+    }
+}
+
 static bool physics_substep(FIXED vel_mult)
 {
     PROFILE_START();
@@ -417,211 +625,10 @@ static bool physics_substep(FIXED vel_mult)
             break;
         }
 
-        PROFILE_START();
-
-        update_edge_lists();
-        col_contact_count = 0;
-
-        // collect entity contacts
-        for (int i = 0; i < x_overlap_count; ++i)
-        {
-            if (col_contact_count >= MAX_CONTACT_COUNT)
-            {
-                LOG_WRN("max contacts exceeded!");
-                goto exit_contact_collection;
-            }
-
-            // check if this X overlap between two entities also exists on the Y
-            // axis
-            const col_bp_overlap_s *x_overlap = x_overlaps + i;
-            uint pkey = upair2u(x_overlap->eid_a, x_overlap->eid_b);
-            if (!ENTITY_PAIR_GET(y_contact_pairs, pkey)) continue;
-
-            entity_coldata_s *col_ent = col_ent_map + x_overlap->eid_a;
-            entity_coldata_s *entc2 = col_ent_map + x_overlap->eid_b;
-
-            // make sure that the second entity is the static one
-            if (entc2->ent->flags & ENTITY_FLAG_MOVING)
-            {
-                entity_coldata_s *temp;
-                SWAP3(col_ent, entc2, temp);
-            }
-
-            entity_s *entity = col_ent->ent;
-            entity_s *ent2 = entc2->ent;
-
-            // if both entities are static objects, collision cannot happen
-            // between them.
-            if (!(entity->flags & ENTITY_FLAG_MOVING) &&
-                !(ent2->flags & ENTITY_FLAG_MOVING))
-                continue;
-
-            if (col_ent == entc2)
-            {
-                LOG_WRN("entity contact is with itself? how tf?");
-                continue;
-            }
-
-            // narrow-phase collision. also calculates penetration vector.
-            const FIXED hw0 = col_ent->half_width;
-            const FIXED hh0 = col_ent->half_height;
-            const FIXED hw1 = entc2->half_width;
-            const FIXED hh1 = entc2->half_height;
-            
-            col_overlap_res_s overlap_res =
-                rect_collision(entity->pos.x, entity->pos.y, hw0, hh0,
-                               ent2->pos.x, ent2->pos.y, hw1, hh1);
-
-            if (!overlap_res.overlap) continue;
-            if (overlap_res.ny <= 0 && ent2->col.flags & COL_FLAG_FLOOR_ONLY)
-                continue;
-            if (overlap_res.ny >= 0 && entity->col.flags & COL_FLAG_FLOOR_ONLY)
-                continue;
-
-            // add contact to contact list
-            col_contacts[col_contact_count] = (col_contact_s)
-            {
-                .nx = overlap_res.nx,
-                .ny = overlap_res.ny,
-                .pd = overlap_res.pd,
-                .ent_a = col_ent,
-                .ent_b = entc2,
-                .priority = (entity->flags & ENTITY_FLAG_MOVING) ||
-                            (ent2->flags & ENTITY_FLAG_MOVING)
-            };
-            ++col_contact_count;
-
-            // run behavior callbacks
-            int nx_int = sgn3(overlap_res.nx);
-            int ny_int = sgn3(overlap_res.ny);
-
-            if (entity->behavior && entity->behavior->ent_touch)
-                entity->behavior->ent_touch(entity, ent2, nx_int, ny_int);
-            if (ent2->behavior && ent2->behavior->ent_touch)
-                ent2->behavior->ent_touch(ent2, entity, -nx_int, -ny_int);
-        }
-
-        PROFILE_END(detection_ent_t);
-        PROFILE_START();
-
-        // collect tile contacts
-        for (int i = 0; i < col_ent_count; ++i)
-        {
-            if (col_contact_count >= MAX_CONTACT_COUNT)
-            {
-                LOG_WRN("max contacts exceeded!");
-                goto exit_contact_collection;
-            }
-
-            entity_coldata_s *const col_ent = col_ents[i];
-            entity_s *entity = col_ent->ent;
-
-            if (!(entity->flags & ENTITY_FLAG_MOVING)) continue;
-
-            // only calculate tile overlaps if this entity moved in the previous
-            // iteration. (or, if it's the first iteration.)
-            if (!col_ent->dirty) continue;
-            col_ent->dirty = false;
-
-            const FIXED col_w = col_ent->width;
-            const FIXED col_h = col_ent->height;
-            const FIXED col_half_w = col_ent->half_width;
-            const FIXED col_half_h = col_ent->half_height;
-
-            // const uint col_group = (uint)entity->col.group;
-            const uint col_mask = (uint)entity->col.mask;
-
-            const int el = entity->pos.x;
-            const int et = entity->pos.y;
-            const int er = (entity->pos.x + col_w);
-            const int eb = (entity->pos.y + col_h);
-
-            if (col_mask & COLGROUP_DEFAULT)
-            {
-                int min_x = el / (WORLD_TILE_SIZE * FIX_SCALE);
-                int min_y = et / (WORLD_TILE_SIZE * FIX_SCALE);
-                int max_x = er / (WORLD_TILE_SIZE * FIX_SCALE);
-                int max_y = eb / (WORLD_TILE_SIZE * FIX_SCALE);
-                
-                // integer division rounds towards zero, but i want to round
-                // towards negative infinity (floor). this should fix it.
-                // micro-optimization notice: doing `a / b - (a < 0)` is faster,
-                // but it incurs a cost for both positive and negative values.
-                // most of the time, the value will be positive. therefore, it
-                // is generally faster to branch.
-                // (at least on -O2)
-                if (el < 0) --min_x;
-                if (et < 0) --min_y;
-                if (er < 0) --min_x;
-                if (eb < 0) --min_y;
-
-                // bool tile_col_found = false;
-                // FIXED final_nx = 0, final_ny = 0, final_pd = 0;
-                // int tx, ty;
-                for (int y = min_y; y <= max_y; ++y)
-                {
-                    for (int x = min_x; x <= max_x; ++x)
-                    {
-                        if (game_get_col_clamped(x, y) != 1)
-                            continue;
-
-                        const FIXED tx = x * FIX_ONE * WORLD_TILE_SIZE;
-                        const FIXED ty = y * FIX_ONE * WORLD_TILE_SIZE;
-
-                        col_overlap_res_s overlap_res = 
-                            rect_collision(entity->pos.x, entity->pos.y,
-                                          col_half_w, col_half_h, tx, ty,
-                                          int2fx(WORLD_TILE_SIZE) / 2,
-                                          int2fx(WORLD_TILE_SIZE) / 2);
-                        
-                        if (!overlap_res.overlap) continue;
-
-                        col_contacts[col_contact_count] = (col_contact_s)
-                        {
-                            .nx = overlap_res.nx,
-                            .ny = overlap_res.ny,
-                            .pd = overlap_res.pd,
-                            .ent_a = col_ent,
-                            .ent_b = NULL,
-                            .priority = 1,
-                            .tx = tx,
-                            .ty = ty,
-                        };
-                        ++col_contact_count;
-                    }
-                }
-            }
-        }
-        
-        exit_contact_collection:;
-        
-        PROFILE_END(detection_tile_t);
+        physics_substeps_collect_contacts();
 
         PROFILE_START();
-
         bool break_substep = true;
-
-        // sort contacts such that those with the most penetration will be
-        // processed first. also, i want contacts containing static bodies to
-        // be processed first as well.
-        // TODO: is it faster to use a heap priority queue?
-        // i hypothesize it will either not be or the difference will be
-        // negligible, since this insertion sort runs pretty quickly already. i
-        // think.
-        for (int i = 1; i < col_contact_count; ++i)
-        {
-            for (int j = i - 1; j >= 0; --j)
-            {
-                col_contact_s *const c0 = col_contacts + j;
-                col_contact_s *const c1 = col_contacts + j + 1;
-
-                if (c1->pd > c0->pd || c1->priority > c0->priority)
-                {
-                    col_contact_s tmp;
-                    SWAP3(col_contacts[j], col_contacts[j+1], tmp);
-                }
-            }
-        }
 
         // resolve collected contacts
         for (int i = 0; i < col_contact_count; ++i)
