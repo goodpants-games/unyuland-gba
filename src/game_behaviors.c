@@ -62,6 +62,16 @@ static bool enemy_base_update(entity_s *self)
     return false;
 }
 
+static void enemy_base_ent_touch(entity_s *self, entity_s *other, int nx, int ny)
+{
+    if (other == g_game.entities && other->behavior &&
+        other->behavior->attacked)
+    {
+        int dx = sgn(other->pos.x - self->pos.x);
+        other->behavior->attacked(other, self, dx);
+    }
+}
+
 static bool enemy_base_proj_touch(entity_s *self, projectile_s *proj,
                                   sprid_game_e dead_gfx)
 {
@@ -124,6 +134,7 @@ typedef struct player_data
     bool spitting;
     u8 spit_mode;
     u8 cursor_frame;
+    s8 death_timer;
 } player_data_s;
 
 void entity_player_init(entity_s *self)
@@ -157,6 +168,7 @@ void entity_player_init(entity_s *self)
     cursor->sprite.zidx = -9;
 
     data->cursor = cursor;
+    data->death_timer = -1;
 }
 
 static void behavior_player_free(entity_s *self)
@@ -305,9 +317,26 @@ static void player_bullet_spit(entity_s *self)
     proj->life = 120;
 }
 
+static void behavior_player_death_update(entity_s *self)
+{
+    player_data_s *data = (player_data_s *)self->userdata;
+    entity_s *cursor = data->cursor;
+    if (cursor)
+        cursor->sprite.flags |= SPRITE_FLAG_HIDDEN;
+
+    if (++data->death_timer > 30)
+        g_game.queue_restore = true;
+}
+
 static void behavior_player_update(entity_s *self)
 {
     player_data_s *data = (player_data_s *)self->userdata;
+
+    if (data->death_timer != -1)
+    {
+        behavior_player_death_update(self);
+        return;
+    }
 
     // input
     self->actor.move_x = 0;
@@ -479,6 +508,17 @@ static void behavior_player_update(entity_s *self)
 
     self->col.flags &= ~COL_FLAG_HEAD_BUMP;
     if (self->vel.y < 0 || jumped) self->col.flags |= COL_FLAG_HEAD_BUMP;
+
+    if (self->col.flags & COL_FLAG_IN_WATER)
+    {
+        self->flags &= ~ENTITY_FLAG_ACTOR;
+        self->flags |= ENTITY_FLAG_DAMPING;
+        self->damp = TO_FIXED(0.8);
+        self->sprite.graphic_id = SPRID_GAME_PLAYER_FROZEN;
+        self->sprite.frame = 0;
+        self->sprite.accum = 0;
+        data->death_timer = 0;
+    }
 }
 
 static void behavior_player_ent_touch(entity_s *self, entity_s *other, int nx,
@@ -490,12 +530,41 @@ static void behavior_player_ent_touch(entity_s *self, entity_s *other, int nx,
         data->interactable = other;
 }
 
+static void behavior_player_attacked(entity_s *self, entity_s *attacker,
+                                     int dir)
+{
+    player_data_s *data = (player_data_s *)self->userdata;
+
+    self->flags &= ~(ENTITY_FLAG_COLLIDE | ENTITY_FLAG_ACTOR);
+
+    // note: the original unyuland has a bug where the kinematics of fallen
+    // enemies are ticked twice, so the numbers need to be adjusted here
+    // since that bug is not present here.
+    self->vel.x = TO_FIXED(0.5) * dir;
+    self->vel.y = TO_FIXED(-1.5);
+    self->gmult = TO_FIXED(1.2);
+
+    self->sprite.graphic_id = SPRID_GAME_PLAYER_GOOPED;
+    self->sprite.frame = 0;
+    self->sprite.accum = 0;
+    
+    self->sprite.flags &= ~SPRITE_FLAG_FLIP_X;
+    if (dir < 0)
+        self->sprite.flags |= SPRITE_FLAG_FLIP_X;
+
+    data->death_timer = 0;
+}
+
 static bool behavior_player_proj_touch(entity_s *self, projectile_s *proj)
 {
     player_data_s *data = (player_data_s *)self->userdata;
     (void)data;
 
-    return proj->kind == PROJ_KIND_PLAYER;
+    if (proj->kind == PROJ_KIND_PLAYER)
+        return true;
+
+    behavior_player_attacked(self, NULL, sgn(proj->vx));
+    return false;
 }
 
 const behavior_def_s behavior_player = {
@@ -503,6 +572,7 @@ const behavior_def_s behavior_player = {
     .update = behavior_player_update,
     .ent_touch = behavior_player_ent_touch,
     .proj_touch = behavior_player_proj_touch,
+    .attacked = behavior_player_attacked,
 };
 
 #pragma endregion player
@@ -719,7 +789,8 @@ static bool behavior_crawler_proj_touch(entity_s *self, projectile_s *proj)
 
 const behavior_def_s behavior_crawler = {
     .update = behavior_crawler_update,
-    .proj_touch = behavior_crawler_proj_touch
+    .proj_touch = behavior_crawler_proj_touch,
+    .ent_touch = enemy_base_ent_touch
 };
 
 #pragma endregion crawler
@@ -860,7 +931,8 @@ static bool behavior_gun_enemy_proj_touch(entity_s *self, projectile_s *proj)
 
 const behavior_def_s behavior_gun_enemy = {
     .update = behavior_gun_enemy_update,
-    .proj_touch = behavior_gun_enemy_proj_touch
+    .proj_touch = behavior_gun_enemy_proj_touch,
+    .ent_touch = enemy_base_ent_touch
 };
 
 #pragma endregion gun_enemy

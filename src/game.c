@@ -36,6 +36,7 @@ typedef struct game_state
     int cam_x, cam_y;
     room_trans_state_s room_trans;
     entity_s *active_water_tank;
+    int player_ammo;
 }
 game_state_s;
 
@@ -416,6 +417,12 @@ void game_update(void)
     update_projectiles();
     game_physics_update();
     update_animation();
+
+    if (g_game.queue_restore)
+    {
+        g_game.queue_restore = false;
+        game_restore_state();
+    }
 
     g_game.cam_x = (player->pos.x >> FIX_SHIFT) - SCREEN_WIDTH / 4;
     g_game.cam_y = (player->pos.y >> FIX_SHIFT) - SCREEN_HEIGHT / 4;
@@ -952,6 +959,7 @@ void game_save_state(void)
     game_saved_state.cam_y = g_game.cam_y;
     game_saved_state.room_trans = g_game.room_trans;
     game_saved_state.active_water_tank = g_game.active_water_tank;
+    game_saved_state.player_ammo = g_game.player_ammo;
 }
 
 void game_restore_state(void)
@@ -1004,6 +1012,7 @@ void game_restore_state(void)
     g_game.cam_y = game_saved_state.cam_y;
     g_game.room_trans = game_saved_state.room_trans;
     g_game.active_water_tank = game_saved_state.active_water_tank;
+    g_game.player_ammo = game_saved_state.player_ammo;
 
     gfx_mark_scroll_dirty();
 }

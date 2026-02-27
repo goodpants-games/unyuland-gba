@@ -110,6 +110,7 @@ typedef struct behavior_def
     bool (*proj_touch)(struct entity *self, projectile_s *other);
 
     void (*interact)(struct entity *self, struct entity *source);
+    void (*attacked)(struct entity *self, struct entity *attacker, int dir);
 } behavior_def_s;
 
 typedef struct entity
@@ -180,6 +181,7 @@ typedef struct game {
     int cam_y;
 
     bool input_enabled;
+    bool queue_restore;
 
     room_trans_state_s room_trans;
 
