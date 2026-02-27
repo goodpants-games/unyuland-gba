@@ -271,7 +271,7 @@ extern const behavior_def_s behavior_gun_enemy;
 
 void entity_ice_block_init(entity_s *self, FIXED px, FIXED py);
 
-void entity_spring_init(entity_s *self, FIXED px, FIXED py);
+void entity_spring_init(entity_s *self, FIXED px, FIXED py, bool super);
 extern const behavior_def_s behavior_spring;
 
 void entity_home_init(entity_s *self, FIXED px, FIXED py);
@@ -283,5 +283,7 @@ extern const behavior_def_s behavior_sign;
 
 void entity_water_tank_init(entity_s *self, FIXED px, FIXED py);
 extern const behavior_def_s behavior_water_tank;
+
+void entity_fragile_block_init(entity_s *self, FIXED px, FIXED py);
 
 #endif

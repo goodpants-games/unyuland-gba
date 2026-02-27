@@ -900,10 +900,10 @@ static void behavior_spring_ent_touch(entity_s *self, entity_s *other, int nx,
                                       int ny)
 {
     if (ny == -1)
-        other->vel.y = TO_FIXED(-3.0) / (other->mass * 2) * 4;
+        other->vel.y = self->userdata[0] / (other->mass * 2) * 4;
 }
 
-void entity_spring_init(entity_s *self, FIXED px, FIXED py)
+void entity_spring_init(entity_s *self, FIXED px, FIXED py, bool super)
 {
     self->flags |= ENTITY_FLAG_COLLIDE | ENTITY_FLAG_MOVING
                    | ENTITY_FLAG_DAMPING;
@@ -913,8 +913,9 @@ void entity_spring_init(entity_s *self, FIXED px, FIXED py)
     self->col.h = 8;
     self->mass = 4;
     self->damp = DEFAULT_DAMP;
-    self->sprite.graphic_id = SPRID_GAME_SPRING;
+    self->sprite.graphic_id = super ? SPRID_GAME_SUPER_SPRING : SPRID_GAME_SPRING;
     self->behavior = &behavior_spring;
+    self->userdata[0] = super ? TO_FIXED(-6.0) : TO_FIXED(-3.0);
 }
 
 const behavior_def_s behavior_spring = {
@@ -1054,3 +1055,57 @@ const behavior_def_s behavior_water_tank = {
 };
 
 #pragma endregion water_tank
+
+
+
+
+
+
+
+
+
+///////////////////
+// fragile_block //
+///////////////////
+#pragma region fragile_block
+const behavior_def_s behavior_fragile_block;
+
+typedef struct fragile_block_data
+{
+    int hits;
+} fragile_block_data_s;
+
+void entity_fragile_block_init(entity_s *self, FIXED px, FIXED py)
+{
+    self->flags |= ENTITY_FLAG_COLLIDE;
+    self->pos.x = px;
+    self->pos.y = py;
+    self->col.w = 8;
+    self->col.h = 8;
+    self->sprite.graphic_id = SPRID_GAME_FRAGILE_BLOCK_RED;
+    self->behavior = &behavior_fragile_block;
+
+    fragile_block_data_s *data = (fragile_block_data_s *)self->userdata;
+    data->hits = 0;
+}
+
+static bool behavior_fragile_block_proj_touch(entity_s *self,
+                                              projectile_s *proj)
+{
+    fragile_block_data_s *data = (fragile_block_data_s *)self->userdata;
+    LOG_DBG("block hit!!!");
+
+    ++data->hits;
+    ++self->sprite.frame;
+
+    if (data->hits == 3)
+        entity_queue_free(self);
+
+    return false;
+}
+
+const behavior_def_s behavior_fragile_block = {
+    .proj_touch = behavior_fragile_block_proj_touch
+};
+
+#pragma endregion

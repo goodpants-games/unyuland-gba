@@ -117,7 +117,11 @@ void game_load_entity(const entity_load_s *load_data)
     }
     STR_CASE("spring")
     {
-        entity_spring_init(ent, load_data->x, load_data->y);
+        entity_spring_init(ent, load_data->x, load_data->y, false);
+    }
+    STR_CASE("super_spring")
+    {
+        entity_spring_init(ent, load_data->x, load_data->y, true);
     }
     STR_CASE("home")
     {
@@ -130,6 +134,10 @@ void game_load_entity(const entity_load_s *load_data)
     STR_CASE("water_tank")
     {
         entity_water_tank_init(ent, load_data->x, load_data->y);
+    }
+    STR_CASE("static_fragile_block")
+    {
+        entity_fragile_block_init(ent, load_data->x, load_data->y);
     }
     STR_CASE_FALLBACK
     {
