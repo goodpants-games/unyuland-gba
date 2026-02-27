@@ -819,7 +819,7 @@ static bool physics_substep(FIXED vel_mult)
                 FIXED restitution;
                 if (ny != 0 && (col_ent_a->head_bump || col_ent_b->head_bump))
                 {
-                    restitution = TO_FIXED(2.0);
+                    restitution = TO_FIXED(1.9);
                     col_ent_a->head_bump = true;
                     col_ent_b->head_bump = true;
                 }
@@ -838,12 +838,18 @@ static bool physics_substep(FIXED vel_mult)
                 ent_b->vel.x += fxmul(impulse_x, inv_mass2);
                 ent_b->vel.y += fxmul(impulse_y, inv_mass2);
 
-                FIXED move_x = fxmul(fxmul(nx, pd), inv_total_inv_mass);
-                FIXED move_y = fxmul(fxmul(ny, pd), inv_total_inv_mass);
-                ent_a->pos.x -= fxmul(move_x, inv_mass1);
-                ent_a->pos.y -= fxmul(move_y, inv_mass1);
-                ent_b->pos.x += fxmul(move_x, inv_mass2);
-                ent_b->pos.y += fxmul(move_y, inv_mass2);
+                // don't perform regular multiplication here. instead, do a
+                // version that rounds up the product. because if the
+                // penetration depth is too small, the product can end up
+                // as zero due to rounding, causing no movement to be done and
+                // thus the collision will never resolve.
+                FIXED move_x = ceil_div(fxmul(nx, pd) * inv_total_inv_mass, FIX_ONE);
+                FIXED move_y = ceil_div(fxmul(ny, pd) * inv_total_inv_mass, FIX_ONE);
+
+                ent_a->pos.x -= ceil_div(move_x * inv_mass1, FIX_ONE);
+                ent_a->pos.y -= ceil_div(move_y * inv_mass1, FIX_ONE);
+                ent_b->pos.x += ceil_div(move_x * inv_mass2, FIX_ONE);
+                ent_b->pos.y += ceil_div(move_y * inv_mass2, FIX_ONE);
 
                 if (ny > 0)
                     ent_a->actor.flags |= ACTOR_FLAG_GROUNDED;
