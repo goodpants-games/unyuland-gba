@@ -306,6 +306,7 @@ static void behavior_player_update(entity_s *self)
     // input
     self->actor.move_x = 0;
     bool show_cursor = false;
+    bool jumped = false;
 
     if (g_game.input_enabled && !g_game.room_trans.override_player_move_x)
     {
@@ -350,7 +351,10 @@ static void behavior_player_update(entity_s *self)
         }
 
         if (key_hit(KEY_A))
+        {
             self->actor.jump_trigger = 8;
+            jumped = true;
+        }
 
         if (can_move && !data->interactable)
         {
@@ -466,6 +470,9 @@ static void behavior_player_update(entity_s *self)
     }
 
     data->cursor_frame = (data->cursor_frame + 1) % 3;
+
+    self->col.flags &= ~COL_FLAG_HEAD_BUMP;
+    if (self->vel.y < 0 || jumped) self->col.flags |= COL_FLAG_HEAD_BUMP;
 }
 
 static void behavior_player_ent_touch(entity_s *self, entity_s *other, int nx,

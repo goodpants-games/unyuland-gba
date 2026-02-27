@@ -31,9 +31,10 @@
 #define SPRITE_FLAG_FLIP_Y    4
 #define SPRITE_FLAG_HIDDEN    8
 
-#define COL_FLAG_FLOOR_ONLY   1
-#define COL_FLAG_MONITOR_ONLY 2
-#define COL_FLAG_IN_WATER     4
+#define COL_FLAG_FLOOR_ONLY    1
+#define COL_FLAG_MONITOR_ONLY  2
+#define COL_FLAG_IN_WATER      4
+#define COL_FLAG_HEAD_BUMP     8 // restitution on vertical contacts is increased
 
 #define COLGROUP_DEFAULT           ((1 << 0))
 #define COLGROUP_ENTITY            ((1 << 1))

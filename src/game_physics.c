@@ -44,6 +44,7 @@ typedef struct entity_coldata
     FIXED width, height;
     FIXED half_width, half_height;
     bool dirty;
+    bool head_bump;
     s8 x_anchor;
     s8 y_anchor;
 }
@@ -397,6 +398,7 @@ static bool physics_substep(FIXED vel_mult)
         entity->pos.y += s_vy;
 
         col_ent->dirty = true;
+        col_ent->head_bump = entity->col.flags & COL_FLAG_HEAD_BUMP;
         col_ent->x_anchor = 0;
         col_ent->y_anchor = 0;
     }
@@ -814,8 +816,20 @@ static bool physics_substep(FIXED vel_mult)
                 if (total_inv_mass == 0) continue;
                 FIXED inv_total_inv_mass = fxdiv(FIX_ONE, total_inv_mass);
 
-                FIXED restitution = TO_FIXED(1.0 + 0.5);
-                FIXED impulse_fac = fxmul(fxmul(restitution, vdot), inv_total_inv_mass);
+                FIXED restitution;
+                if (ny != 0 && (col_ent_a->head_bump || col_ent_b->head_bump))
+                {
+                    restitution = TO_FIXED(2.0);
+                    col_ent_a->head_bump = true;
+                    col_ent_b->head_bump = true;
+                }
+                else
+                {
+                    restitution = TO_FIXED(1.2);
+                }
+                
+                FIXED impulse_fac =
+                    fxmul(fxmul(restitution, vdot), inv_total_inv_mass);
                 FIXED impulse_x = fxmul(nx, impulse_fac);
                 FIXED impulse_y = fxmul(ny, impulse_fac);
 
