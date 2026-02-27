@@ -2,8 +2,7 @@
 #include <ctype.h>
 #include <font_gfx.h>
 #include "gfx.h"
-#include "mgba.h"
-#include "log.h"
+#include "gba_util.h"
 
 #define TEXT_CHAR_ID(i) ((i) * 4)
 
@@ -85,6 +84,7 @@ void gfx_reset_palette(void)
     update_rainbow_palette();
 }
 
+ARM_FUNC NO_INLINE
 void gfx_set_palette_multiplied(FIXED factor)
 {
     if      (factor < 0)       factor = 0;
@@ -419,6 +419,7 @@ static inline void blit_tile_colored(uint x, uint y, const TILE4 *src_tile,
     // }
 }
 
+ARM_FUNC NO_INLINE
 void gfx_text_bmap_print(int x, int y, const char *text, text_color_e text_color)
 {
     const TILE *const text_data = (const TILE *)font_gfxTiles;
