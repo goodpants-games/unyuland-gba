@@ -184,6 +184,9 @@ typedef struct game {
     room_trans_state_s room_trans;
 
     entity_s *active_water_tank;
+    int player_ammo;
+    int collected_rorbs;
+    int collected_borbs;
 } game_s;
 
 typedef enum entity_load_prop_type

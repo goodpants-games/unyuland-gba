@@ -235,12 +235,15 @@ static bool player_simulate_droplet(int droplet_type, int dir, FIXED player_x,
 static void player_platform_spit(entity_s *self)
 {
     if (!(self->actor.flags & ACTOR_FLAG_GROUNDED)) return;
+    if (g_game.player_ammo < 10) return;
 
     player_data_s *data = (player_data_s *)self->userdata;
 
     entity_s *droplet = entity_alloc();
     if (droplet)
     {
+        g_game.player_ammo -= 10;
+
         int type, dir;
         FIXED x = self->pos.x + int2fx(3);
         FIXED y = self->pos.y + int2fx(4);
@@ -270,6 +273,9 @@ static void player_platform_spit(entity_s *self)
 
 static void player_bullet_spit(entity_s *self)
 {
+    if (g_game.player_ammo < 1) return;
+    --g_game.player_ammo;
+
     projectile_s *proj = projectile_alloc();
     if (!proj) return;
 
@@ -1025,6 +1031,7 @@ static void behavior_water_tank_interact(entity_s *self, entity_s *source)
             = SPRID_GAME_WATER_TANK_NORMAL_INACTIVE;
 
     g_game.active_water_tank = self;
+    g_game.player_ammo = 100;
     self->sprite.graphic_id = SPRID_GAME_WATER_TANK_NORMAL_ACTIVE;
 
     // respect "remove on checkpoint" flag

@@ -51,6 +51,58 @@ typedef enum gfx_pal
     GFX_PAL_PEACH
 } gfx_pal_e;
 
+typedef struct gfx_frame
+{
+    u16 obj_pool_index;
+    u8 width; // in tiles
+    u8 height; // in tiles
+    u8 frame_len;
+    u8 obj_count;
+} gfx_frame_s;
+
+typedef struct gfx_sprite
+{
+    u8 frame_count;
+    u8 loop; // bool
+    u16 frame_pool_idx;
+} gfx_sprite_s;
+
+typedef struct gfx_obj {
+    u16 a0; // contains only config for the sprite shape
+    u16 a1; // contains only config for the sprite size
+    u16 a2; // contains only config for the character index
+    s8 ox;
+    s8 oy;
+    s8 flipped_ox;
+    s8 flipped_oy;
+} gfx_obj_s;
+
+typedef struct gfx_sprdb
+{
+    const gfx_sprite_s *gfx_sprites;
+    const gfx_frame_s *frame_pool;
+    const gfx_obj_s *obj_pool;
+}
+gfx_sprdb_s;
+
+typedef struct gfx_root_header {
+    uintptr_t  frame_pool;
+    uintptr_t  obj_pool;
+    
+    gfx_sprite_s sprite0;
+} gfx_root_header_s;
+
+typedef struct gfx_draw_sprite_state
+{
+    const gfx_sprdb_s *sprdb;
+
+    OBJ_ATTR *dst_obj;
+    uint dst_obj_count;
+
+    u16 a0, a1, a2;
+}
+gfx_draw_sprite_state_s;
+
 extern OBJ_ATTR gfx_oam_buffer[128];
 extern int gfx_scroll_x;
 extern int gfx_scroll_y;
@@ -74,9 +126,22 @@ INLINE void gfx_unload_map(void)
 void gfx_reset_palette(void);
 void gfx_set_palette_multiplied(FIXED factor);
 
-void gfx_text_bmap_fill(int oc, int or_, int cols, int rows, u32 data[8]);
-void gfx_text_bmap_print(int x, int y, const char *text, text_color_e color);
-void gfx_text_bmap_dst_clear(int row, int row_count);
-void gfx_text_bmap_dst_assign(int row, int row_count, int src_row);
+void gfx_text_bmap_fill(uint oc, uint or_, uint cols, uint rows, u32 data[8]);
+void gfx_text_bmap_print(uint x, uint y, const char *text, text_color_e color);
+void gfx_text_bmap_dst_clear(uint row, uint row_count);
+void gfx_text_bmap_dst_assign(uint row, uint row_count, uint src_row, uint pal);
+
+static inline gfx_sprdb_s gfx_get_sprdb(const gfx_root_header_s *header)
+{
+    return (gfx_sprdb_s)
+    {
+        .gfx_sprites = (const gfx_sprite_s *)&header->sprite0,
+        .frame_pool = (const gfx_frame_s *)((uintptr_t)header + header->frame_pool),
+        .obj_pool = (const gfx_obj_s *)((uintptr_t)header + header->obj_pool)
+    };
+}
+
+void gfx_draw_sprite(gfx_draw_sprite_state_s *state, uint spr_idx,
+                     uint frame_idx, int draw_x, int draw_y);
 
 #endif

@@ -13,11 +13,42 @@
 #include "log.h"
 #include "menu.h"
 
-// #define MAIN_PROFILE
+#define MAIN_PROFILE
+
+#define HUD_ROW_ORIGIN (GFX_TEXT_BMP_ROWS - 2)
+#define HUD_Y_ORIGIN   (HUD_ROW_ORIGIN * 8 + 6)
+
+static void int_to_str(int n, char *buf)
+{
+    if (n < 0)
+    {
+        *(buf++) = '-';
+        n = -n;
+    }
+
+    // buf: start
+    // ch: end
+    char *ch = buf;
+    do
+    {
+        *(ch++) = (n % 10) + '0';
+    }
+    while ((n /= 10) != 0);
+    *ch = '\0';
+
+    // reverse output
+    do
+    {
+        char tmp = *buf;
+        *(buf++) = *(--ch);
+        *ch = tmp;
+    }
+    while (ch > buf);
+}
 
 static void text_test(void)
 {
-    gfx_text_bmap_dst_assign(0, 6, 0);
+    gfx_text_bmap_dst_assign(0, 6, 0, 2);
 
     u32 black8[8] = {0x11111111, 0x11111111, 0x11111111, 0x11111111,
                     0x11111111, 0x11111111, 0x11111111, 0x11111111};
@@ -38,24 +69,36 @@ static void text_test(void)
 // DURING DIALOGUE:
 //   everything: dialogue
 
-static void setup_game_hud(void)
+static void clear_game_hud(void)
 {
-    // set up pause menu display
-    gfx_text_bmap_dst_assign(0, 8, 0);
-
-    // set up HUD display
-    int row_origin = GFX_TEXT_BMP_ROWS - 2;
-    int y_origin = row_origin * 8 + 6;
-    gfx_text_bmap_dst_assign(18, 2, row_origin);
-
     u32 bg1[8] = {0x00000000, 0x00000000, 0x00000000, 0x00000000,
                  0x00000000, 0x00000000, 0x11111111, 0x11111111};
     u32 bg2[8] = {0x11111111, 0x11111111, 0x11111111, 0x11111111,
                     0x11111111, 0x11111111, 0x11111111, 0x11111111};
-    gfx_text_bmap_fill(0, row_origin + 0, GFX_TEXT_BMP_COLS, 1, bg1);
-    gfx_text_bmap_fill(0, row_origin + 1, GFX_TEXT_BMP_COLS, 1, bg2);
+    gfx_text_bmap_fill(0, HUD_ROW_ORIGIN + 0, GFX_TEXT_BMP_COLS, 1, bg1);
+    gfx_text_bmap_fill(0, HUD_ROW_ORIGIN + 1, GFX_TEXT_BMP_COLS, 1, bg2);
+}
 
-    gfx_text_bmap_print(0, y_origin, "Hello, world!", TEXT_COLOR_WHITE);
+static void setup_game_hud(void)
+{
+    // set up pause menu display
+    gfx_text_bmap_dst_assign(0, 8, 0, 2);
+
+    // set up HUD display
+    gfx_text_bmap_dst_assign(18, 2, HUD_ROW_ORIGIN, 3);
+
+    clear_game_hud();
+
+    gfx_sprdb_s sprdb = gfx_get_sprdb((const gfx_root_header_s *)game_sprdb_data);
+    gfx_draw_sprite_state_s state = (gfx_draw_sprite_state_s)
+    {
+        .sprdb = &sprdb,
+        .dst_obj = &gfx_oam_buffer[0],
+        .dst_obj_count = 16,
+        .a1 = ATTR2_PRIO(0),
+    };
+    
+    gfx_draw_sprite(&state, SPRID_GAME_UI_ICONS, 0, 0, SCREEN_HEIGHT - 10);
 }
 
 #define PAUSE_MENU_OPTION_COUNT 4
@@ -63,7 +106,6 @@ static const char *pause_menu_options[PAUSE_MENU_OPTION_COUNT] =
     {"RESUME", "RESPAWN", "MAP", "QUIT"};
 
 static bool game_paused = false;
-static bool queue_pause_show = false;
 
 static menu_s pause_menu = (menu_s)
 {
@@ -112,7 +154,9 @@ static void close_pause_menu(void)
 static void pause_game(void)
 {
     game_paused = true;
-    queue_pause_show = true;
+    open_pause_menu();
+    mmSetModuleVolume((int)(1024 * 0.1));
+    gfx_set_palette_multiplied(TO_FIXED(0.55));
 }
 
 static void unpause_game(void)
@@ -253,14 +297,6 @@ int main(void)
 
         key_poll();
 
-        if (queue_pause_show)
-        {
-            open_pause_menu();
-            mmSetModuleVolume((int)(1024 * 0.1));
-            gfx_set_palette_multiplied(TO_FIXED(0.55));
-            queue_pause_show = false;
-        }
-
         if (key_hit(KEY_START))
         {
             if (!game_paused)
@@ -276,6 +312,18 @@ int main(void)
         if (!game_paused)
         {
             game_update();
+
+            static int last_player_ammo = -1;
+            if (g_game.player_ammo != last_player_ammo)
+            {
+                last_player_ammo = g_game.player_ammo;
+                LOG_DBG("print!!!");
+                
+                char buf[8];
+                int_to_str(g_game.player_ammo, buf);
+                gfx_text_bmap_print(12, HUD_Y_ORIGIN, "\x7F\x7F\x7F", TEXT_COLOR_BLACK);
+                gfx_text_bmap_print(12, HUD_Y_ORIGIN, buf, TEXT_COLOR_WHITE);
+            }
         }
         else
         {
@@ -283,12 +331,13 @@ int main(void)
         }
 
         game_render();
-        mmFrame();
         
         #ifdef MAIN_PROFILE
         frame_len = profile_stop();
         LOG_DBG("frame usage: %.1f%%", (float)frame_len / 280896.f * 100.f);
         #endif
+
+        mmFrame();
 
         VBlankIntrWait();
         gfx_new_frame();

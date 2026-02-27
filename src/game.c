@@ -21,39 +21,6 @@ typedef enum render_obj_t
     RENDER_OBJ_PROJECTILE
 } render_obj_t_e;
 
-typedef struct gfx_frame
-{
-    u16 obj_pool_index;
-    u8 width; // in tiles
-    u8 height; // in tiles
-    u8 frame_len;
-    u8 obj_count;
-} gfx_frame_s;
-
-typedef struct gfx_sprite
-{
-    u8 frame_count;
-    u8 loop; // bool
-    u16 frame_pool_idx;
-} gfx_sprite_s;
-
-typedef struct gfx_obj {
-    u16 a0; // contains only config for the sprite shape
-    u16 a1; // contains only config for the sprite size
-    u16 a2; // contains only config for the character index
-    s8 ox;
-    s8 oy;
-    s8 flipped_ox;
-    s8 flipped_oy;
-} gfx_obj_s;
-
-typedef struct gfx_root_header {
-    uintptr_t  frame_pool;
-    uintptr_t  obj_pool;
-    
-    gfx_sprite_s sprite0;
-} gfx_root_header_s;
-
 typedef struct render_obj
 {
     u8 type;
@@ -420,6 +387,7 @@ void game_init(void)
     g_game.cam_x = 0;
     g_game.cam_y = 0;
     g_game.input_enabled = true;
+    g_game.player_ammo = 100;
     
     for (int i = 0; i < MAX_ENTITY_COUNT; ++i)
     {
@@ -591,7 +559,7 @@ static inline int render_obj_zidx(const render_obj_s *obj)
         return 0;
 }
 
-ARM_FUNC
+ARM_FUNC NO_INLINE
 static void sort_render_list(void)
 {
     // precalculate object z-indices
@@ -630,7 +598,6 @@ static inline bool renderer_cam_calc(int draw_x, int draw_y, int *draw_cam_x,
             *draw_cam_y > SCREEN_HEIGHT + 32);
 }
 
-ARM_FUNC NO_INLINE
 void game_render(void)
 {
     sort_render_list();
@@ -638,17 +605,18 @@ void game_render(void)
     gfx_scroll_x = g_game.cam_x * 2;
     gfx_scroll_y = g_game.cam_y * 2;
 
-    const gfx_root_header_s *gfx_root_header =
-        (const gfx_root_header_s *)game_sprdb_data;
-    
-    const gfx_sprite_s *gfx_sprites =
-        (const gfx_sprite_s *)&gfx_root_header->sprite0;
-    const gfx_frame_s *frame_pool =
-        (const gfx_frame_s *)((uintptr_t)gfx_root_header + gfx_root_header->frame_pool);
-    const gfx_obj_s *obj_pool =
-        (const gfx_obj_s *)((uintptr_t)gfx_root_header + gfx_root_header->obj_pool);
+    gfx_sprdb_s sprdb =
+        gfx_get_sprdb((const gfx_root_header_s *)game_sprdb_data);
 
-    int obj_index = 0;
+    OBJ_ATTR *const game_oam = gfx_oam_buffer + 64;
+
+    gfx_draw_sprite_state_s draw_state = (gfx_draw_sprite_state_s)
+    {
+        .sprdb = &sprdb,
+        .dst_obj = game_oam,
+        .dst_obj_count = 64
+    };
+
     for (int i = 0; i < render_object_count; ++i)
     {
         const render_obj_s *robj = render_objects + i;
@@ -699,58 +667,29 @@ void game_render(void)
             continue;
         }
 
-        const gfx_sprite_s *spr = &gfx_sprites[sprite_graphic_id];
-        const gfx_frame_s *frame = frame_pool + spr->frame_pool_idx + sprite_frame;
-        const gfx_obj_s *objs = obj_pool + frame->obj_pool_index;
-        
-        int frame_obj_count = frame->obj_count;
+        draw_state.a0 = 0;
+        draw_state.a1 = 0;
+        draw_state.a2 = 0;
 
-        // draw object assembly
-        for (int j = 0; j < frame_obj_count; ++j)
-        {
-            const gfx_obj_s *obj_src = &objs[j];
-            OBJ_ATTR *obj_dst = &gfx_oam_buffer[obj_index];
+        if (sprite_hidden)
+            draw_state.a0 |= ATTR0_HIDE;
+        if (sprite_hflip)
+            draw_state.a1 |= ATTR1_HFLIP;
+        if (sprite_vflip)
+            draw_state.a1 |= ATTR1_VFLIP;
 
-            int ox, oy;
+        draw_state.a2 |= ATTR2_PALBANK(sprite_palette) | ATTR2_PRIO(1);
 
-            int flip_flags = 0;
-            if (sprite_hflip)
-            {
-                flip_flags |= ATTR1_HFLIP;
-                ox = obj_src->flipped_ox;
-            }
-            else
-            {
-                ox = obj_src->ox;
-            }
-
-            if (sprite_vflip)
-            {
-                flip_flags |= ATTR1_VFLIP;
-                oy = obj_src->flipped_oy;
-            }
-            else
-            {
-                oy = obj_src->oy;
-            }
-
-            u16 a0 = obj_src->a0;
-            if (sprite_hidden) a0 |= ATTR0_HIDE;
-            u16 a1 = obj_src->a1 | flip_flags;
-            u16 a2 = obj_src->a2 | ATTR2_PALBANK(sprite_palette)
-                     | ATTR2_PRIO(1);
-            obj_set_attr(obj_dst, a0, a1, a2);
-            obj_set_pos(obj_dst, draw_cam_x + ox, draw_cam_y + oy);
-            
-            if (++obj_index >= 64) goto exit_entity_loop;
-        }
+        gfx_draw_sprite(&draw_state, sprite_graphic_id, sprite_frame,
+                        draw_cam_x, draw_cam_y);
+        if (draw_state.dst_obj_count == 0) break;
     }
-    exit_entity_loop:;
 
+    int obj_index = 64 - draw_state.dst_obj_count;
     int old_obj_count = last_obj_index;
     for (int i = obj_index; i < old_obj_count; ++i)
     {
-        obj_hide(&gfx_oam_buffer[i]);
+        obj_hide(&game_oam[i]);
     }
 
     last_obj_index = obj_index;

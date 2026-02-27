@@ -13,6 +13,8 @@ uint gfx_map_width = 0;
 uint gfx_map_height = 0;
 const map_header_s *gfx_loaded_map = NULL;
 
+static u16 gfx_mul_palette[16];
+
 static uint old_scroll_x = 0;
 static uint old_scroll_y = 0;
 static bool screen_dirty = false;
@@ -51,35 +53,48 @@ static void update_rainbow_palette(void)
     int j = rainbow_shift;
     for (int i = 0; i < 16; ++i)
     {
-        pal_obj_bank[1][i] = gfx_palette[rainbow_pal[j]];
+        pal_obj_bank[1][i] = gfx_mul_palette[rainbow_pal[j]];
         if (++j == RAINBOW_PALETTE_LENGTH) j = 0;
     }
 }
 
 void gfx_reset_palette(void)
 {
-    // 0-15: regular palette, may be darkened for room transition
-    // 16: black (if on 16-bit color mode, this will be the start of the 2nd bank)
-    // 17-31: regular palette, with idx15 (peach) swapped out for black.
-    // will not be darkened during room trans. used for UI (presumably).
-    // 32-47: 1-black, 2-yellow, 3-light blue, 15-white. used for text.
     for (int i = 0; i < 16; ++i)
-        pal_bg_mem[i] = gfx_palette[i];
-    pal_bg_mem[16] = gfx_palette[0];
-
-    for (int i = 1; i < 16; ++i)
-        pal_bg_mem[16 + i] = gfx_palette[i];
-    pal_bg_mem[31] = gfx_palette[0];
-
-    pal_bg_mem[33] = gfx_palette[0];
-    pal_bg_mem[34] = gfx_palette[GFX_PAL_YELLOW];
-    pal_bg_mem[35] = gfx_palette[GFX_PAL_BLUE];
-    pal_bg_mem[47] = gfx_palette[GFX_PAL_WHITE];
+        gfx_mul_palette[i] = gfx_palette[i];
 
     // pal bank 0: regular palette, may be darkened for room transition
-    // pal bank 1: dynamically changing rainbow palette (TODO)
+    // pal bank 1: regular palette, with idx15 (peach) swapped out for black.
+    //             also color index 0 *must* be black, so that 8bpp mode can
+    //             use idx 16 to refer to black.
+    // pal bank 2: 1-black, 2-yellow, 3-light blue, 15-white. used for text.
+    // pal bank 3: same as pal bank 2, but may be darkened for room transition.
+    for (int i = 0; i < 16; ++i)
+        pal_bg_bank[0][i] = gfx_palette[i];
+
+    pal_bg_bank[1][0] = gfx_palette[GFX_PAL_BLACK];
+    for (int i = 1; i < 16; ++i)
+        pal_bg_bank[1][i] = gfx_palette[i];
+    pal_bg_bank[1][15] = gfx_palette[GFX_PAL_BLACK];
+
+    pal_bg_bank[2][1]  = gfx_palette[0];
+    pal_bg_bank[2][2]  = gfx_palette[GFX_PAL_YELLOW];
+    pal_bg_bank[2][3]  = gfx_palette[GFX_PAL_BLUE];
+    pal_bg_bank[2][15] = gfx_palette[GFX_PAL_WHITE];
+
+    pal_bg_bank[3][1]  = gfx_palette[0];
+    pal_bg_bank[3][2]  = gfx_palette[GFX_PAL_YELLOW];
+    pal_bg_bank[3][3]  = gfx_palette[GFX_PAL_BLUE];
+    pal_bg_bank[3][15] = gfx_palette[GFX_PAL_WHITE];
+
+    // pal bank 0: regular palette, may be darkened for room transition
+    // pal bank 1: dynamically changing rainbow palette
+    // pal bank 2: regular palette, but never darkened
     for (int i = 0; i < 16; ++i)
         pal_obj_bank[0][i] = gfx_palette[i];
+
+    for (int i = 0; i < 16; ++i)
+        pal_obj_bank[2][i] = gfx_palette[i];
 
     update_rainbow_palette();
 }
@@ -90,7 +105,6 @@ void gfx_set_palette_multiplied(FIXED factor)
     if      (factor < 0)       factor = 0;
     else if (factor > FIX_ONE) factor = FIX_ONE;
 
-    u16 new_palette[16];
     // const FIXED scale_factor = TO_FIXED(256.0 / 31.0) + 1;
 
     for (int i = 1; i < 16; ++i)
@@ -125,14 +139,21 @@ void gfx_set_palette_multiplied(FIXED factor)
             }
         }
 
-        new_palette[i] = gfx_palette[color_index];
+        gfx_mul_palette[i] = gfx_palette[color_index];
     }
 
     for (int i = 1; i < 16; ++i)
-        pal_bg_mem[i] = new_palette[i];
+        pal_bg_bank[0][i] = gfx_mul_palette[i];
+
+    pal_bg_bank[3][1]  = gfx_mul_palette[0];
+    pal_bg_bank[3][2]  = gfx_mul_palette[GFX_PAL_YELLOW];
+    pal_bg_bank[3][3]  = gfx_mul_palette[GFX_PAL_BLUE];
+    pal_bg_bank[3][15] = gfx_mul_palette[GFX_PAL_WHITE];
 
     for (int i = 1; i < 16; ++i)
-        pal_obj_bank[0][i] = new_palette[i];
+        pal_obj_bank[0][i] = gfx_mul_palette[i];
+
+    update_rainbow_palette();
 }
 
 static void write_scr_block(const uint map_entry, u32 *const dest)
@@ -420,7 +441,7 @@ static inline void blit_tile_colored(uint x, uint y, const TILE4 *src_tile,
 }
 
 ARM_FUNC NO_INLINE
-void gfx_text_bmap_print(int x, int y, const char *text, text_color_e text_color)
+void gfx_text_bmap_print(uint x, uint y, const char *text, text_color_e text_color)
 {
     const TILE *const text_data = (const TILE *)font_gfxTiles;
 
@@ -436,7 +457,7 @@ void gfx_text_bmap_print(int x, int y, const char *text, text_color_e text_color
     for (; *text != '\0'; ++text)
     {
         char ch = *text;
-        int id;
+        uint id;
         switch (ch)
         {
         case ' ':
@@ -474,6 +495,10 @@ void gfx_text_bmap_print(int x, int y, const char *text, text_color_e text_color
         case '*': // not actually the asterisk character but whatever. sure.
             id = TEXT_CHAR_ID(43);
             break;
+        
+        case '\x7F':
+            id = TEXT_CHAR_ID(44);
+            break;
 
         // assume [a-zA-Z0-9]
         default:
@@ -506,39 +531,96 @@ void gfx_text_bmap_print(int x, int y, const char *text, text_color_e text_color
     }
 }
 
-void gfx_text_bmap_fill(int oc, int or, int cols, int rows, u32 data[8])
+// void gfx_text_bmap_fill(int oc, int or, int cols, int rows, u32 data[8])
+// {
+//     for (int r = or; r < or + rows; ++r)
+//     {
+//         TILE *t = &GFX_TEXT_BMP_VRAM[r * GFX_TEXT_BMP_COLS + oc];
+//         TILE *end_tile = t + cols;
+//         for (; t != end_tile; ++t)
+//         {
+//             for (int i = 0; i < 8; ++i)
+//                 t->data[i] = data[i];
+//         }
+//     }
+// }
+
+void gfx_text_bmap_fill(uint oc, uint or, uint cols, uint rows, u32 data[8])
 {
-    for (int r = or; r < or + rows; ++r)
+    for (uint r = or; r < or + rows; ++r)
     {
         TILE *t = &GFX_TEXT_BMP_VRAM[r * GFX_TEXT_BMP_COLS + oc];
-        TILE *end_tile = t + cols;
-        for (; t != end_tile; ++t)
+        for (uint c = 0; c < cols; ++c, ++t)
         {
-            for (int i = 0; i < 8; ++i)
+            for (uint i = 0; i < 8; ++i)
                 t->data[i] = data[i];
         }
     }
 }
 
-void gfx_text_bmap_dst_clear(int row, int row_count)
+void gfx_text_bmap_dst_clear(uint row, uint row_count)
 {
-    int i = row * 32;
-    for (int y = row; y < row + row_count; ++y)
+    uint i = row * 32;
+    for (uint y = row; y < row + row_count; ++y)
     {
-        for (int x = 0; x < 30; ++x)
+        for (uint x = 0; x < 30; ++x)
             se_mem[GFX_BG0_INDEX][i++] = 0;
         i += 2;
     }
 }
 
-void gfx_text_bmap_dst_assign(int row, int row_count, int src_row)
+void gfx_text_bmap_dst_assign(uint row, uint row_count, uint src_row, uint pal)
 {
-    int i = src_row * GFX_TEXT_BMP_COLS + 1;
-    int j = row * 32;
-    for (int y = row; y < row + row_count; ++y)
+    uint i = src_row * GFX_TEXT_BMP_COLS + 1;
+    uint j = row * 32;
+    for (uint y = row; y < row + row_count; ++y)
     {
-        for (int x = 0; x < 30; ++x)
-            se_mem[GFX_BG0_INDEX][j++] = SE_PALBANK(2) | SE_ID(i++);
+        for (uint x = 0; x < 30; ++x)
+            se_mem[GFX_BG0_INDEX][j++] = SE_PALBANK(pal) | SE_ID(i++);
         j += 2;
+    }
+}
+
+void gfx_draw_sprite(gfx_draw_sprite_state_s *state, uint spr_idx,
+                     uint frame_idx, int draw_x, int draw_y)
+{
+    const gfx_sprdb_s *sprdb = state->sprdb;
+
+    const gfx_sprite_s *spr = &sprdb->gfx_sprites[spr_idx];
+    const gfx_frame_s *frame = sprdb->frame_pool + spr->frame_pool_idx + frame_idx;
+    const gfx_obj_s *objs = sprdb->obj_pool + frame->obj_pool_index;
+    
+    int frame_obj_count = frame->obj_count;
+
+    const bool hflip = state->a1 & ATTR1_HFLIP;
+    const bool vflip = state->a1 & ATTR1_VFLIP;
+
+    // draw object assembly
+    for (int j = 0; j < frame_obj_count; ++j)
+    {
+        if (state->dst_obj_count == 0) break;
+
+        const gfx_obj_s *obj_src = &objs[j];
+
+        int ox, oy;
+
+        if (hflip)
+            ox = obj_src->flipped_ox;
+        else
+            ox = obj_src->ox;
+
+        if (vflip)
+            oy = obj_src->flipped_oy;
+        else
+            oy = obj_src->oy;
+
+        u16 final_a0 = obj_src->a0 | state->a0;
+        u16 final_a1 = obj_src->a1 | state->a1;
+        u16 final_a2 = obj_src->a2 | state->a2;
+
+        obj_set_attr(state->dst_obj, final_a0, final_a1, final_a2);
+        obj_set_pos(state->dst_obj, draw_x + ox, draw_y + oy);
+        ++state->dst_obj;
+        --state->dst_obj_count;
     }
 }
