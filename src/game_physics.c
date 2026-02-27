@@ -37,6 +37,7 @@
 
 #define EDGE_LIST_MAX_COUNT ((MAX_ENTITY_COUNT * 2))
 
+// collision-processing data for each active entity
 typedef struct entity_coldata
 {
     entity_s *ent;
@@ -59,6 +60,7 @@ typedef struct col_contact
 }
 col_contact_s;
 
+// edge structure for sweep and prune
 typedef struct col_bp_edge
 {
     u16 eid;
@@ -67,12 +69,14 @@ typedef struct col_bp_edge
 }
 col_bp_edge_s;
 
+// overlap on an axis calculated by sweep and prune
 typedef struct col_bp_overlap
 {
     u16 eid_a, eid_b;
 }
 col_bp_overlap_s;
 
+// narrow-phase collision detection. contains penetration vector.
 typedef struct col_overlap_res {
     bool overlap;
     FIXED nx, ny, pd;
@@ -263,8 +267,7 @@ static void col_ent_removed(int col_ent_idx)
     }
 }
 
-static int swaps = 0;
-
+// sweep and prune
 static inline void sort_edge_list(col_bp_edge_s *const list,
                            const int list_count,
                            u8 contact_pairs[ENTITY_PAIR_SIZE],
@@ -275,8 +278,6 @@ static inline void sort_edge_list(col_bp_edge_s *const list,
         int j = i;
         while (list[j].pos > list[j+1].pos)
         {
-            ++swaps;
-
             // LOG_DBG("swap %i%s %i%s",
             //         (int) list[j].eid, list[j].left ? "L" : "R",
             //         (int) list[j+1].eid, list[j+1].left ? "L" : "R");
@@ -363,15 +364,17 @@ static void update_edge_lists(void)
             edge->pos = ent->pos.y + col->height;
     }
 
-    // LOG_DBG("%i", x_edge_count + y_edge_count);
-
-    swaps = 0;
-
+    // perform sweep and prune
     sort_edge_list(x_edges, x_edge_count, x_contact_pairs, x_overlaps,
                    &x_overlap_count);
     sort_edge_list(y_edges, y_edge_count, y_contact_pairs, NULL, NULL);
 }
 
+// a body is anchored if:
+// 1. it is static (i.e. does not have ENTITY_FLAG_MOVING set)
+// 2. it has previously collided with an anchored object in the same
+//    direction.
+// this function only checks for condition #2.
 static inline bool is_body_anchored(entity_coldata_s *col_ent, FIXED nx,
                                     FIXED ny)
 {
@@ -382,11 +385,9 @@ static inline bool is_body_anchored(entity_coldata_s *col_ent, FIXED nx,
 
 static bool physics_substep(FIXED vel_mult)
 {
-    // size_t contact_queue_size = 0;
-
     PROFILE_START();
 
-    // first move all entities
+    // first move all entities. also reset substep-local state.
     for (int i = 0; i < col_ent_count; ++i)
     {
         entity_coldata_s *const col_ent = col_ents[i];
@@ -405,7 +406,8 @@ static bool physics_substep(FIXED vel_mult)
 
     PROFILE_END(move_t);
     
-    // then, perform collision detection and resolution
+    // perform iterations. more iterations are needed the more complex the
+    // system is wrt collisions with multiple entities.
     int subsubstep = 1;
     for (;; ++subsubstep)
     {
@@ -429,6 +431,8 @@ static bool physics_substep(FIXED vel_mult)
                 goto exit_contact_collection;
             }
 
+            // check if this X overlap between two entities also exists on the Y
+            // axis
             const col_bp_overlap_s *x_overlap = x_overlaps + i;
             uint pkey = upair2u(x_overlap->eid_a, x_overlap->eid_b);
             if (!ENTITY_PAIR_GET(y_contact_pairs, pkey)) continue;
@@ -436,7 +440,7 @@ static bool physics_substep(FIXED vel_mult)
             entity_coldata_s *col_ent = col_ent_map + x_overlap->eid_a;
             entity_coldata_s *entc2 = col_ent_map + x_overlap->eid_b;
 
-            // make sure that the second is the one that isn't moving
+            // make sure that the second entity is the static one
             if (entc2->ent->flags & ENTITY_FLAG_MOVING)
             {
                 entity_coldata_s *temp;
@@ -458,6 +462,7 @@ static bool physics_substep(FIXED vel_mult)
                 continue;
             }
 
+            // narrow-phase collision. also calculates penetration vector.
             const FIXED hw0 = col_ent->half_width;
             const FIXED hh0 = col_ent->half_height;
             const FIXED hw1 = entc2->half_width;
@@ -473,10 +478,7 @@ static bool physics_substep(FIXED vel_mult)
             if (overlap_res.ny >= 0 && entity->col.flags & COL_FLAG_FLOOR_ONLY)
                 continue;
 
-            // pqueue_enqueue(contact_queue,
-            //                &contact_queue_size, MAX_CONTACT_COUNT,
-            //                col_contacts + col_contact_count, pd);
-
+            // add contact to contact list
             col_contacts[col_contact_count] = (col_contact_s)
             {
                 .nx = overlap_res.nx,
@@ -489,6 +491,7 @@ static bool physics_substep(FIXED vel_mult)
             };
             ++col_contact_count;
 
+            // run behavior callbacks
             int nx_int = sgn3(overlap_res.nx);
             int ny_int = sgn3(overlap_res.ny);
 
@@ -513,8 +516,11 @@ static bool physics_substep(FIXED vel_mult)
             entity_coldata_s *const col_ent = col_ents[i];
             entity_s *entity = col_ent->ent;
 
-            if (!(entity->flags & ENTITY_FLAG_MOVING)) goto _continue;
-            if (!col_ent->dirty) goto _continue;
+            if (!(entity->flags & ENTITY_FLAG_MOVING)) continue;
+
+            // only calculate tile overlaps if this entity moved in the previous
+            // iteration. (or, if it's the first iteration.)
+            if (!col_ent->dirty) continue;
             col_ent->dirty = false;
 
             const FIXED col_w = col_ent->width;
@@ -553,6 +559,7 @@ static bool physics_substep(FIXED vel_mult)
                 // FIXED final_nx = 0, final_ny = 0, final_pd = 0;
                 // int tx, ty;
                 for (int y = min_y; y <= max_y; ++y)
+                {
                     for (int x = min_x; x <= max_x; ++x)
                     {
                         if (game_get_col_clamped(x, y) != 1)
@@ -581,40 +588,9 @@ static bool physics_substep(FIXED vel_mult)
                             .ty = ty,
                         };
                         ++col_contact_count;
-                        // if (overlap_res.overlap && overlap_res.pd > final_pd)
-                        // {
-                        //     final_pd = overlap_res.pd;
-                        //     final_nx = overlap_res.nx;
-                        //     final_ny = overlap_res.ny;
-                        //     tx = x;
-                        //     ty = y;
-                        //     tile_col_found = true;
-                        // }
                     }
-
-                // if (tile_col_found)
-                // {
-                //     // pqueue_enqueue(contact_queue,
-                //     //                &contact_queue_size, MAX_CONTACT_COUNT,
-                //     //                col_contacts + col_contact_count, final_pd);
-
-                //     col_contacts[col_contact_count] = (col_contact_s)
-                //     {
-                //         .nx = final_nx,
-                //         .ny = final_ny,
-                //         .pd = final_pd,
-                //         .ent_a = col_ent,
-                //         .ent_b = NULL,
-                //         .priority = 1,
-
-                //         .tx = tx,
-                //         .ty = ty
-                //     };
-                //     ++col_contact_count;
-                // }
+                }
             }
-
-            _continue:;
         }
         
         exit_contact_collection:;
@@ -625,7 +601,13 @@ static bool physics_substep(FIXED vel_mult)
 
         bool break_substep = true;
 
-        // sort contacts TODO: is it faster to use a heap priority queue?
+        // sort contacts such that those with the most penetration will be
+        // processed first. also, i want contacts containing static bodies to
+        // be processed first as well.
+        // TODO: is it faster to use a heap priority queue?
+        // i hypothesize it will either not be or the difference will be
+        // negligible, since this insertion sort runs pretty quickly already. i
+        // think.
         for (int i = 1; i < col_contact_count; ++i)
         {
             for (int j = i - 1; j >= 0; --j)
@@ -641,9 +623,7 @@ static bool physics_substep(FIXED vel_mult)
             }
         }
 
-        // resolve contacts
-        // for (void *item;
-        //      (item = pqueue_dequeue(contact_queue, &contact_queue_size));)
+        // resolve collected contacts
         for (int i = 0; i < col_contact_count; ++i)
         {
             col_contact_s *const contact = col_contacts + i;
@@ -663,12 +643,13 @@ static bool physics_substep(FIXED vel_mult)
                 continue;
             }
 
+            // if one of the entities already moved before in the same
+            // iteration, then recalculate the penetration vector. if there is
+            // no more overlap, just skip the contact.
             if (col_ent_a->dirty && !col_ent_b)
             {
                 const FIXED tx = contact->tx;
                 const FIXED ty = contact->ty;
-
-                // LOG_DBG("tx: %i, ty: %i", tx / (FIX_ONE * WORLD_TILE_SIZE), ty / (FIX_ONE * WORLD_TILE_SIZE));
 
                 col_overlap_res_s test_overlap =
                     rect_collision(ent_a->pos.x, ent_a->pos.y,
@@ -698,6 +679,7 @@ static bool physics_substep(FIXED vel_mult)
                 pd = test_overlap.pd;
             }
 
+            // calculate relative velocity of impact
             FIXED rel_vx, rel_vy;
             if (ent_b)
             {
@@ -710,6 +692,7 @@ static bool physics_substep(FIXED vel_mult)
                 rel_vy = ent_a->vel.y;
             }
 
+            // don't process if the objects are moving away from each other.
             FIXED vdot = fxmul(nx, rel_vx) +
                          fxmul(ny, rel_vy);
             
@@ -718,6 +701,7 @@ static bool physics_substep(FIXED vel_mult)
             uint col_group_a = (uint)ent_a->col.group;
             uint col_mask_a = (uint)ent_a->col.mask;
 
+            // check collision groups
             uint col_group_b, col_mask_b;
             if (ent_b)
             {
@@ -733,6 +717,11 @@ static bool physics_substep(FIXED vel_mult)
             if (!(col_group_b & col_mask_a) && !(col_group_a & col_mask_b))
                 continue;
 
+            // check if this is a collision with an anchored body.
+            // a body is anchored if:
+            // 1. it is static (i.e. does not have ENTITY_FLAG_MOVING set)
+            // 2. it has previously collided with an anchored object in the same
+            //    direction.
             bool anchor_a = false;
             bool anchor_b = true;
             if (col_ent_b)
@@ -756,15 +745,12 @@ static bool physics_substep(FIXED vel_mult)
             if (anchor_a || anchor_b)
             {
                 // LOG_DBG("%i: anchor collision", subsubstep);
-                // if (anchor_a || ent_b) LOG_DBG("Anchor!!");
-                if (anchor_a == anchor_b)
-                {
-                    LOG_ERR("Shit %x,%x", col_ent_a, col_ent_b);
-                }
+                // if (anchor_a || ent_b) LOG_DBG("Anchors away!!");
 
                 entity_s *ent;
                 entity_coldata_s *ce;
 
+                // we only want to modify the entity that is not anchored.
                 if (anchor_b)
                 {
                     ent = ent_a;
@@ -778,6 +764,8 @@ static bool physics_substep(FIXED vel_mult)
                     ny = -ny;
                 }
 
+                // mark that the entity moved. tile contacts will be
+                // recalculated for this entity on the next iteration.
                 ce->dirty = true;
 
                 FIXED px = fxmul(nx, pd);
@@ -787,11 +775,6 @@ static bool physics_substep(FIXED vel_mult)
                 ent->pos.y = ent->pos.y - py;
                 ent->vel.x = ent->vel.x - fxmul(nx, vdot);
                 ent->vel.y = ent->vel.y - fxmul(ny, vdot);
-
-                // LOG_DBG("Anchor move y %i %i", fxmul(ny, vdot));
-
-                // LOG_DBG("pos: %i, %i", ent_a->pos.x, ent_a->pos.y);
-                // LOG_DBG("vel: %i, %i", ent_a->vel.x, ent_a->vel.y);
 
                 if (nx != 0) ce->x_anchor = sgn(-nx);
                 if (ny != 0) ce->y_anchor = sgn(-ny);
@@ -806,6 +789,8 @@ static bool physics_substep(FIXED vel_mult)
             {
                 // LOG_DBG("%i: free collision", subsubstep);
                 
+                // mark that these entity moved. tile contacts will be
+                // recalculated for this entity on the next iteration.
                 col_ent_a->dirty = true;
                 col_ent_b->dirty = true;
 
@@ -816,6 +801,11 @@ static bool physics_substep(FIXED vel_mult)
                 if (total_inv_mass == 0) continue;
                 FIXED inv_total_inv_mass = fxdiv(FIX_ONE, total_inv_mass);
 
+                // i want head bumps to move the bodies more. i also want it
+                // to work in a chain. this is a kind of hacky solution for
+                // parity with the physics of the original unyuland, since a
+                // puzzle depends on a head-bump chain moving the last entity
+                // far up enough to go over a one-block step.
                 FIXED restitution;
                 if (ny != 0 && (col_ent_a->head_bump || col_ent_b->head_bump))
                 {
@@ -1076,6 +1066,14 @@ void game_physics_update(void)
     col_ent_count = 0;
     int substeps = 0;
 
+    // preprocessing pass:
+    //  - add/remove entities to collision data structures
+    //    (i.e. sweep and prune)
+    //  - reset physics state flags
+    //  - calculate substeps needed for simulation based on fastest-moving
+    //    entity
+    //  - cache inverse mass and half-extents (although caching size-related data
+    //    is probably pointless for performance...)
     for (int i = 0; i < MAX_ENTITY_COUNT; ++i)
     {
         entity_s *entity = g_game.entities + i;
@@ -1124,6 +1122,8 @@ void game_physics_update(void)
         col_ents[col_ent_count++] = col_ent;
     }
 
+    // find fastest-moving projectile, use for determining how many substeps
+    // the simulation will need
     for (int i = 0; i < MAX_PROJECTILE_COUNT; ++i)
     {
         projectile_s *proj = g_game.projectiles + i;
@@ -1135,10 +1135,12 @@ void game_physics_update(void)
             substeps = subst;
     }
 
+    // cap substeps to 8. but entities usually don't move very fast, so
+    // typically it will be 1 or 2.
     if (substeps > 8) substeps = 8;
 
-    // probably good if i snap the substep count to a power of two, so that
-    // division is exact
+    // round the substep count up to the nearest power of two. this is to make
+    // division exact.
     --substeps;
     substeps |= substeps >> 1;
     substeps |= substeps >> 2;
@@ -1155,7 +1157,7 @@ void game_physics_update(void)
 
     game_physics_move_projs(FIX_ONE);
 
-    // projectile detection and handling
+    // projectile/entity collision detection
     for (int i = 0; i < col_ent_count; ++i)
     {
         entity_coldata_s *const col_ent = col_ents[i];
@@ -1191,6 +1193,7 @@ void game_physics_update(void)
         for (int y = min_py; y <= max_py; ++y)
             for (int x = min_px; x <= max_px; ++x)
             {
+                // traverse linked list
                 for (partgrid_node_s *node = partgrid[y][x]; node;
                     node = node->next)
                 {
