@@ -601,10 +601,13 @@ static bool physics_substep(FIXED vel_mult)
         entity_coldata_s *const col_ent = col_ents[i];
         entity_s *entity = col_ent->ent;
 
-        FIXED s_vx = fxmul(entity->vel.x, vel_mult);
-        FIXED s_vy = fxmul(entity->vel.y, vel_mult);
-        entity->pos.x += s_vx;
-        entity->pos.y += s_vy;
+        if (entity->flags & ENTITY_FLAG_MOVING)
+        {
+            FIXED s_vx = fxmul(entity->vel.x, vel_mult);
+            FIXED s_vy = fxmul(entity->vel.y, vel_mult);
+            entity->pos.x += s_vx;
+            entity->pos.y += s_vy;
+        }
 
         col_ent->dirty = true;
         col_ent->head_bump = entity->col.flags & COL_FLAG_HEAD_BUMP;

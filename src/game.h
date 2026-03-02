@@ -265,34 +265,17 @@ static inline int game_get_col_clamped(int tx, int ty)
 }
 
 void entity_player_init(entity_s *self);
-extern const behavior_def_s behavior_player;
-
 void entity_player_droplet_init(entity_s *self, FIXED px, FIXED py,
                                 int type, int dir);
-extern const behavior_def_s behavior_player_droplet;
-
 void entity_crawler_init(entity_s *self, FIXED px, FIXED py, FIXED max_dist);
-extern const behavior_def_s behavior_crawler;
-
 void entity_gun_enemy_init(entity_s *self, FIXED px, FIXED py, bool ceil,
                            int flags);
-extern const behavior_def_s behavior_gun_enemy;
-
 void entity_ice_block_init(entity_s *self, FIXED px, FIXED py);
-
 void entity_spring_init(entity_s *self, FIXED px, FIXED py, bool super);
-extern const behavior_def_s behavior_spring;
-
 void entity_home_init(entity_s *self, FIXED px, FIXED py);
-extern const behavior_def_s behavior_home;
-
 void entity_sign_init(entity_s *self, FIXED px, FIXED py, void *dialogue,
                       bool alt_appearance);
-extern const behavior_def_s behavior_sign;
-
 void entity_water_tank_init(entity_s *self, FIXED px, FIXED py);
-extern const behavior_def_s behavior_water_tank;
-
 void entity_fragile_block_init(entity_s *self, FIXED px, FIXED py);
 
 #endif

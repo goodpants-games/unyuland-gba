@@ -131,6 +131,10 @@ void game_load_entity(const entity_load_s *load_data)
     {
         entity_sign_init(ent, load_data->x, load_data->y, NULL, false);
     }
+    STR_CASE("hint_sign")
+    {
+        entity_sign_init(ent, load_data->x, load_data->y, NULL, true);
+    }
     STR_CASE("water_tank")
     {
         entity_water_tank_init(ent, load_data->x, load_data->y);

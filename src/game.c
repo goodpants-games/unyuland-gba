@@ -631,6 +631,7 @@ void game_render(void)
         uint timer = g_game.active_interactable_timer;
 
         // timer * 4.25
+        // offset by 0.5 for better pixel rounding
         FIXED dy = sine_lut(timer * 4 + timer / 4) + TO_FIXED(0.5);
         
         // draw arrow
@@ -639,7 +640,7 @@ void game_render(void)
         draw_state.a2 = ATTR2_PALBANK(1) | ATTR2_PRIO(1);
 
         FIXED pos_x = ent->pos.x + int2fx(ent->col.w) / 2;
-        FIXED pos_y = ent->pos.y - int2fx(9) + dy;
+        FIXED pos_y = ent->pos.y - int2fx(5) + dy;
 
         int draw_cam_x, draw_cam_y;
         FIXED draw_x = (pos_x >> FIX_SHIFT) - 4;

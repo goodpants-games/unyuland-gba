@@ -120,6 +120,8 @@ static bool enemy_base_proj_touch(entity_s *self, projectile_s *proj,
 /////////////////////
 #pragma region player
 
+const behavior_def_s behavior_player;
+
 typedef enum player_spit_mode
 {
     PLAYER_SPIT_MODE_PLATFORM,
@@ -593,6 +595,8 @@ const behavior_def_s behavior_player = {
 ////////////////////
 #pragma region player_bullet
 
+const behavior_def_s behavior_player_droplet;
+
 typedef struct player_bullet_data
 {
     u32 type;
@@ -728,6 +732,8 @@ const behavior_def_s behavior_player_droplet = {
 /////////////
 #pragma region crawler
 
+const behavior_def_s behavior_crawler;
+
 typedef struct crawler_data
 {
     enemy_base_s base;
@@ -810,6 +816,8 @@ const behavior_def_s behavior_crawler = {
 // gun_enemy //
 ///////////////
 #pragma region gun_enemy
+
+const behavior_def_s behavior_gun_enemy;
 
 #define COS45 0.7071067811865475
 #define GUN_ENEMY_SHOOT_COOLDOWN_LENGTH 50
@@ -983,9 +991,14 @@ void entity_ice_block_init(entity_s *self, FIXED px, FIXED py)
 ////////////
 #pragma region spring
 
+const behavior_def_s behavior_spring;
+
 static void behavior_spring_ent_touch(entity_s *self, entity_s *other, int nx,
                                       int ny)
 {
+    if (!(other->flags & ENTITY_FLAG_MOVING))
+        return;
+    
     if (ny == -1)
         other->vel.y = self->userdata[0] / (other->mass * 2) * 4;
 }
@@ -1054,18 +1067,31 @@ const behavior_def_s behavior_home = {0};
 // sign //
 //////////
 #pragma region sign
+
+const behavior_def_s behavior_sign;
+
 void entity_sign_init(entity_s *self, FIXED px, FIXED py, void *dialogue,
                       bool alt_appearance)
 {
+    self->flags |= ENTITY_FLAG_COLLIDE;
     self->pos.x = px;
     self->pos.y = py;
     self->col.w = 8;
     self->col.h = 8;
+    self->col.flags = COL_FLAG_MONITOR_ONLY;
     self->sprite.graphic_id = alt_appearance ? SPRID_GAME_HINT_SIGN : SPRID_GAME_SIGN;
     self->sprite.zidx = -20;
+    self->behavior = &behavior_sign;
 }
 
-const behavior_def_s behavior_sign = {0};
+static void entity_sign_interact(entity_s *self, entity_s *source)
+{
+    LOG_DBG("sign interact!");
+}
+
+const behavior_def_s behavior_sign = {
+    .interact = entity_sign_interact
+};
 
 #pragma endregion sign
 
@@ -1083,17 +1109,19 @@ const behavior_def_s behavior_sign = {0};
 ////////////////
 #pragma region water_tank
 
+const behavior_def_s behavior_water_tank;
+
 void entity_water_tank_init(entity_s *self, FIXED px, FIXED py)
 {
     self->flags |= ENTITY_FLAG_COLLIDE;
     self->pos.x = px + int2fx(1);
-    self->pos.y = py;
+    self->pos.y = py - int2fx(4);
     self->col.w = 6;
-    self->col.h = 8;
+    self->col.h = 16;
     self->col.flags = COL_FLAG_MONITOR_ONLY;
     self->sprite.graphic_id = SPRID_GAME_WATER_TANK_NORMAL_INACTIVE;
     self->sprite.ox = -1;
-    self->sprite.oy = -8;
+    self->sprite.oy = -4;
     self->sprite.zidx = -20;
     self->behavior = &behavior_water_tank;
 }
