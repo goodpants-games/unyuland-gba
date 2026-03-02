@@ -13,7 +13,7 @@
 #include "log.h"
 #include "menu.h"
 
-// #define MAIN_PROFILE
+#define MAIN_PROFILE
 
 #define HUD_ROW_ORIGIN (GFX_TEXT_BMP_ROWS - 2)
 #define HUD_Y_ORIGIN   (HUD_ROW_ORIGIN * 8 + 6)
@@ -82,7 +82,7 @@ static void clear_game_hud(void)
 static void setup_game_hud(void)
 {
     // set up pause menu display
-    gfx_text_bmap_dst_assign(0, 8, 0, 2);
+    gfx_text_bmap_dst_assign(0, 9, 0, 2);
 
     // set up HUD display
     gfx_text_bmap_dst_assign(18, 2, HUD_ROW_ORIGIN, 3);

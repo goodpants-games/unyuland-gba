@@ -381,6 +381,52 @@ static void update_animation()
         ent->sprite.frame = sprite_frame;
         ent->sprite.accum = sprite_time_accum;
     }
+
+    // timer * 4.25
+    // offset by 0.5 for better pixel rounding
+    uint timer = g_game.active_interactable_timer;
+    g_game.interactable_indicator_offset =
+        sine_lut(timer * 4 + timer / 4) + TO_FIXED(0.5);
+}
+
+void dialogue_init(void)
+{
+    const int line_count = 6;
+    const int row_count = ceil_div(line_count * 12, 8);
+    u32 full_bitmap[] = {0x11111111, 0x11111111, 0x11111111, 0x11111111,
+                         0x11111111, 0x11111111, 0x11111111, 0x11111111};
+
+    int bitmap_row_overflow = (2 + (line_count - 1) * 4) % 8;
+    u32 partial_bitmap[8] = {0x00000000, 0x00000000, 0x00000000, 0x00000000,
+                             0x00000000, 0x00000000, 0x00000000, 0x00000000};
+    for (int i = 0; i < bitmap_row_overflow; ++i)
+    {
+        partial_bitmap[i] = 0x11111111;
+    }
+
+    gfx_text_bmap_fill(0, 0, GFX_TEXT_BMP_COLS, row_count - 1, full_bitmap);
+    gfx_text_bmap_fill(0, row_count - 1, GFX_TEXT_BMP_COLS, 1, partial_bitmap);
+
+    gfx_text_bmap_print(0, 0, "Lorem ipsum dolor", TEXT_COLOR_WHITE);
+    gfx_text_bmap_print(0, 12, "sit amet. Adispicing", TEXT_COLOR_WHITE);
+    gfx_text_bmap_print(0, 24, "Adispicing asd", TEXT_COLOR_WHITE);
+    gfx_text_bmap_print(0, 36, "line four", TEXT_COLOR_WHITE);
+    gfx_text_bmap_print(0, 48, "Line five line5!!", TEXT_COLOR_WHITE);
+    gfx_text_bmap_print(0, 60, "Line six line5!!", TEXT_COLOR_WHITE);
+
+    g_game.dialogue_active = true;
+}
+
+static void update_dialogue()
+{
+    if (key_hit(KEY_A | KEY_B))
+    {
+        u32 bitmap[] = {0x00000000, 0x00000000, 0x00000000, 0x00000000,
+                        0x00000000, 0x00000000, 0x00000000, 0x00000000};
+        gfx_text_bmap_fill(0, 0, GFX_TEXT_BMP_COLS, 9, bitmap);
+
+        g_game.dialogue_active = false;
+    }
 }
 
 void game_init(void)
@@ -410,6 +456,18 @@ void game_init(void)
 
 void game_update(void)
 {
+    if (g_game.queue_dialogue_start)
+    {
+        g_game.queue_dialogue_start = false;
+        dialogue_init();
+    }
+
+    if (g_game.dialogue_active)
+    {
+        update_dialogue();
+        return;
+    }
+
     entity_s *player = &g_game.entities[0];
     g_game.active_interactable = NULL;
 
@@ -628,11 +686,7 @@ void game_render(void)
     if (g_game.active_interactable)
     {
         const entity_s *const ent = g_game.active_interactable;
-        uint timer = g_game.active_interactable_timer;
-
-        // timer * 4.25
-        // offset by 0.5 for better pixel rounding
-        FIXED dy = sine_lut(timer * 4 + timer / 4) + TO_FIXED(0.5);
+        FIXED dy = g_game.interactable_indicator_offset;
         
         // draw arrow
         draw_state.a0 = 0;
@@ -1066,4 +1120,9 @@ void game_restore_state(void)
     g_game.player_ammo = game_saved_state.player_ammo;
 
     gfx_mark_scroll_dirty();
+}
+
+void game_start_dialogue(void)
+{
+    g_game.queue_dialogue_start = true;
 }

@@ -97,6 +97,12 @@ void gfx_reset_palette(void)
         pal_obj_bank[2][i] = gfx_palette[i];
 
     update_rainbow_palette();
+
+    for (int i = 2; i < 16; ++i)
+        pal_bg_bank[i][0] = RGB8(255, 0, 255);
+
+    for (int i = 0; i < 16; ++i)
+        pal_obj_bank[i][0] = RGB8(255, 0, 255);
 }
 
 ARM_FUNC NO_INLINE

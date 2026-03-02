@@ -1087,6 +1087,7 @@ void entity_sign_init(entity_s *self, FIXED px, FIXED py, void *dialogue,
 static void entity_sign_interact(entity_s *self, entity_s *source)
 {
     LOG_DBG("sign interact!");
+    game_start_dialogue();
 }
 
 const behavior_def_s behavior_sign = {

@@ -188,10 +188,14 @@ typedef struct game {
     entity_s *active_water_tank;
     entity_s *active_interactable;
     uint active_interactable_timer;
+    FIXED interactable_indicator_offset;
     
     int player_ammo;
     int collected_rorbs;
     int collected_borbs;
+
+    bool dialogue_active;
+    bool queue_dialogue_start;
 } game_s;
 
 typedef enum entity_load_prop_type
@@ -241,6 +245,7 @@ void game_load_room(const map_header_s *map);
 void game_render(void);
 void game_save_state(void);
 void game_restore_state(void);
+void game_start_dialogue(void);
 
 void game_load_entity(const entity_load_s *load_data);
 
