@@ -418,6 +418,8 @@ static void behavior_player_update(entity_s *self)
     {
         if (key_hit(KEY_B))
             data->interactable->behavior->interact(data->interactable, self);
+
+        g_game.active_interactable = data->interactable;
     }
 
     if (self->actor.move_x != 0)

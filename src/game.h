@@ -186,6 +186,9 @@ typedef struct game {
     room_trans_state_s room_trans;
 
     entity_s *active_water_tank;
+    entity_s *active_interactable;
+    uint active_interactable_timer;
+    
     int player_ammo;
     int collected_rorbs;
     int collected_borbs;

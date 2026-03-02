@@ -411,6 +411,8 @@ void game_init(void)
 void game_update(void)
 {
     entity_s *player = &g_game.entities[0];
+    g_game.active_interactable = NULL;
+
     if (!game_transition_update(player)) return;
 
     update_entities();
@@ -607,8 +609,6 @@ static inline bool renderer_cam_calc(int draw_x, int draw_y, int *draw_cam_x,
 
 void game_render(void)
 {
-    sort_render_list();
-
     gfx_scroll_x = g_game.cam_x * 2;
     gfx_scroll_y = g_game.cam_y * 2;
 
@@ -623,6 +623,56 @@ void game_render(void)
         .dst_obj = game_oam,
         .dst_obj_count = 64
     };
+
+    // draw interactable indicator
+    if (g_game.active_interactable)
+    {
+        const entity_s *const ent = g_game.active_interactable;
+        uint timer = g_game.active_interactable_timer;
+
+        // timer * 4.25
+        FIXED dy = sine_lut(timer * 4 + timer / 4) + TO_FIXED(0.5);
+        
+        // draw arrow
+        draw_state.a0 = 0;
+        draw_state.a1 = 0;
+        draw_state.a2 = ATTR2_PALBANK(1) | ATTR2_PRIO(1);
+
+        FIXED pos_x = ent->pos.x + int2fx(ent->col.w) / 2;
+        FIXED pos_y = ent->pos.y - int2fx(9) + dy;
+
+        int draw_cam_x, draw_cam_y;
+        FIXED draw_x = (pos_x >> FIX_SHIFT) - 4;
+        FIXED draw_y = (pos_y >> FIX_SHIFT) - 2;
+
+        renderer_cam_calc(draw_x, draw_y, &draw_cam_x, &draw_cam_y);
+        gfx_draw_sprite(&draw_state, SPRID_GAME_DOWN_ARROW, 0,
+                        draw_cam_x, draw_cam_y);
+
+        // draw interact button
+        draw_state.a0 = 0;
+        draw_state.a1 = 0;
+        draw_state.a2 = ATTR2_PALBANK(0) | ATTR2_PRIO(1);
+
+        pos_y -= int2fx(6);
+        draw_x = (pos_x >> FIX_SHIFT) - 4;
+        draw_y = (pos_y >> FIX_SHIFT) - 2;
+
+        renderer_cam_calc(draw_x, draw_y, &draw_cam_x, &draw_cam_y);
+        
+        gfx_draw_sprite(&draw_state, SPRID_GAME_BUTTON_B, 0,
+                        draw_cam_x, draw_cam_y);
+
+        if (++g_game.active_interactable_timer == 61)
+            g_game.active_interactable_timer = 0;
+    }
+    else
+    {
+        g_game.active_interactable_timer = 0;
+    }
+    
+
+    sort_render_list();
 
     for (int i = 0; i < render_object_count; ++i)
     {

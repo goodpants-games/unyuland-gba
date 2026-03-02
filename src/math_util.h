@@ -2,6 +2,7 @@
 #define MATH_UTIL_H
 
 #include <tonc_math.h>
+#include <sinelut_bin.h>
 
 // x always has to be greater than y
 #define UPAIR2U(x, y) ((((x) * (x) + (x)) >> 1) + (y))
@@ -23,6 +24,14 @@ static inline uint upair2u(uint a, uint b)
     if (a < b) x = b, y = a;
     else       x = a, y = b;
     return ((x * x + x) >> 1) + y;
+}
+
+// t is an integer [0, 256]
+// [0, 256] => [0, 2PI]
+static inline FIXED sine_lut(uint t)
+{
+    const FIXED *lut = (const FIXED *)sinelut_bin;
+    return lut[(t & 127) << 1] * (((t & 255) >= 128) ? -1 : 1);
 }
 
 #endif

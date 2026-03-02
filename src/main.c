@@ -13,7 +13,7 @@
 #include "log.h"
 #include "menu.h"
 
-#define MAIN_PROFILE
+// #define MAIN_PROFILE
 
 #define HUD_ROW_ORIGIN (GFX_TEXT_BMP_ROWS - 2)
 #define HUD_Y_ORIGIN   (HUD_ROW_ORIGIN * 8 + 6)

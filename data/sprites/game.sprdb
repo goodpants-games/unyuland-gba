@@ -17,6 +17,8 @@
         "home.png",
         "ice_platform.png",
         "platform_outline.png",
-        "ui_icons.ase"
+        "ui_icons.ase",
+        "button_b.png",
+        "down_arrow.png"
     ]
 }
