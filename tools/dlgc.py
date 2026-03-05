@@ -7,6 +7,7 @@ import struct
 from typing import BinaryIO
 
 MAX_COLS = 20
+MAX_ROWS = 6
 
 """
 struct dlg_root
@@ -51,12 +52,18 @@ def process(in_json: dict, out_path: str):
     chat_data_list: bytearray = bytearray()
     chat_data_offsets: list[int] = []
     cur_chat_data_offset = 0
+    success = True
 
     for chat in in_json:
         chat_data = bytearray()
 
         for text in chat['pages']:
-            for line in wrap_text(text, MAX_COLS):
+            lines = wrap_text(text, MAX_COLS)
+            if len(lines) > MAX_ROWS:
+                eprint(f"error: {(chat['id'])}, with a line count of {(len(lines))}, exceeds the max length of {MAX_ROWS} lines")
+                success = False
+            
+            for line in lines:
                 chat_data += bytes(line, 'ascii')
             
             chat_data.append(0)
@@ -66,6 +73,8 @@ def process(in_json: dict, out_path: str):
         chat_data_offsets.append(cur_chat_data_offset)
         cur_chat_data_offset += len(chat_data)
         chat_data_list += chat_data
+    
+    if not success: exit(1)
     
     out_data = bytearray()
     out_data += struct.pack('<H', len(in_json))
