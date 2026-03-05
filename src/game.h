@@ -2,8 +2,8 @@
 #define GAME_H
 
 #include <tonc_types.h>
-#include "map_data.h"
 #include <game_sprdb.h>
+#include "map_data.h"
 
 #define WORLD_SUBPX_SHIFT 4
 #define WORLD_SUBPX_SCALE 16
@@ -196,6 +196,7 @@ typedef struct game {
 
     bool dialogue_active;
     bool queue_dialogue_start;
+    const char *dialogue_page;
 } game_s;
 
 typedef enum entity_load_prop_type
@@ -245,7 +246,7 @@ void game_load_room(const map_header_s *map);
 void game_render(void);
 void game_save_state(void);
 void game_restore_state(void);
-void game_start_dialogue(void);
+void game_start_dialogue(const char *dialogue);
 
 void game_load_entity(const entity_load_s *load_data);
 
@@ -278,7 +279,7 @@ void entity_gun_enemy_init(entity_s *self, FIXED px, FIXED py, bool ceil,
 void entity_ice_block_init(entity_s *self, FIXED px, FIXED py);
 void entity_spring_init(entity_s *self, FIXED px, FIXED py, bool super);
 void entity_home_init(entity_s *self, FIXED px, FIXED py);
-void entity_sign_init(entity_s *self, FIXED px, FIXED py, void *dialogue,
+void entity_sign_init(entity_s *self, FIXED px, FIXED py, const char *dialogue,
                       bool alt_appearance);
 void entity_water_tank_init(entity_s *self, FIXED px, FIXED py);
 void entity_fragile_block_init(entity_s *self, FIXED px, FIXED py);

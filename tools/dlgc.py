@@ -1,12 +1,100 @@
 #!/usr/bin/env python3
+import argparse
+import ioutil
+import json
+import sys
+import struct
+from typing import BinaryIO
+
+MAX_COLS = 20
 
 """
 struct dlg_root
 {
-    u32 chat_count;
-    struct {
+    u16 chat_count;
+    struct
+    {
         char id[16];
-        u32 pointer; // relative to root
-    } chat_index[?];
+        u16 offset;
+    } chat_data[chat_count];
+    dlg_chat chats[chat_count];
+}
+
+struct dlg_chat
+{
+    // each page is NUL-terminated.
+    char pages[?][?]
 }
 """
+
+def eprint(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
+
+
+def wrap_text(text: str, max_cols: int):
+    out: list[str] = []
+
+    while len(text) > max_cols:
+        ch = max_cols
+        while not text[ch].isspace():
+            ch = ch - 1
+        
+        out.append(text[:ch] + '\n')
+        text = text[ch:].lstrip()
+    
+    out.append(text)
+    
+    return out
+
+
+def process(in_json: dict, out_path: str):
+    chat_data_list: bytearray = bytearray()
+    chat_data_offsets: list[int] = []
+    cur_chat_data_offset = 0
+
+    for chat in in_json:
+        chat_data = bytearray()
+
+        for text in chat['pages']:
+            for line in wrap_text(text, MAX_COLS):
+                chat_data += bytes(line, 'ascii')
+            
+            chat_data.append(0)
+        
+        chat_data.append(0)
+
+        chat_data_offsets.append(cur_chat_data_offset)
+        cur_chat_data_offset += len(chat_data)
+        chat_data_list += chat_data
+    
+    out_data = bytearray()
+    out_data += struct.pack('<H', len(in_json))
+
+    for i in range(0, len(in_json)):
+        chat = in_json[i]
+
+        out_data += struct.pack('<16sH', bytes(chat['id'], 'ascii'),
+                                chat_data_offsets[i])
+    
+    out_data += chat_data_list
+    
+    if out_path:
+        with ioutil.open_output(out_path, binary=True) as out_file:
+            out_file.write(out_data)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(prog='dlgx')
+    parser.add_argument('input', help="path to input .json file. pass - to read from stdin.")
+    parser.add_argument('output', help="output bin file. pass - to write to stdout.")
+
+    args = parser.parse_args()
+
+    with ioutil.open_input(args.input, binary=True) as in_file:
+        in_json = json.load(in_file)
+
+    process(in_json, args.output)
+
+
+if __name__ == '__main__':
+    main()

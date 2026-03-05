@@ -389,9 +389,18 @@ static void update_animation()
         sine_lut(timer * 4 + timer / 4) + TO_FIXED(0.5);
 }
 
-void dialogue_init(void)
+void dialogue_show_page(void)
 {
-    const int line_count = 6;
+    if (g_game.dialogue_page == NULL || *g_game.dialogue_page == 0)
+    {
+        g_game.dialogue_active = false;
+        return;
+    }
+    
+    int line_count = 1;
+    for (const char *c = g_game.dialogue_page; *c != '\0'; ++c)
+        if (*c == '\n') ++line_count;
+    
     const int row_count = ceil_div(line_count * 12, 8);
     u32 full_bitmap[] = {0x11111111, 0x11111111, 0x11111111, 0x11111111,
                          0x11111111, 0x11111111, 0x11111111, 0x11111111};
@@ -407,14 +416,31 @@ void dialogue_init(void)
     gfx_text_bmap_fill(0, 0, GFX_TEXT_BMP_COLS, row_count - 1, full_bitmap);
     gfx_text_bmap_fill(0, row_count - 1, GFX_TEXT_BMP_COLS, 1, partial_bitmap);
 
-    gfx_text_bmap_print(0, 0, "Lorem ipsum dolor", TEXT_COLOR_WHITE);
-    gfx_text_bmap_print(0, 12, "sit amet. Adispicing", TEXT_COLOR_WHITE);
-    gfx_text_bmap_print(0, 24, "Adispicing asd", TEXT_COLOR_WHITE);
-    gfx_text_bmap_print(0, 36, "line four", TEXT_COLOR_WHITE);
-    gfx_text_bmap_print(0, 48, "Line five line5!!", TEXT_COLOR_WHITE);
-    gfx_text_bmap_print(0, 60, "Line six line5!!", TEXT_COLOR_WHITE);
+    char line_buf[21];
+    uint lb_i = 0;
+    int ypos = 0;
+    const char *ch = g_game.dialogue_page;
+    for (; *ch != '\0'; ++ch)
+    {
+        if (*ch == '\n')
+        {
+            line_buf[lb_i] = '\0';
+            LOG_DBG("Line: %s\n", line_buf);
+            gfx_text_bmap_print(0, ypos, line_buf, TEXT_COLOR_WHITE);
+            ypos += 12;
+            line_buf[0] = '\0';
+            lb_i = 0;
+            continue;
+        }
+
+        line_buf[lb_i++] = *ch;
+    }
+
+    line_buf[lb_i] = '\0';
+    gfx_text_bmap_print(0, ypos, line_buf, TEXT_COLOR_WHITE);
 
     g_game.dialogue_active = true;
+    g_game.dialogue_page = ch + 1;
 }
 
 static void update_dialogue()
@@ -425,7 +451,7 @@ static void update_dialogue()
                         0x00000000, 0x00000000, 0x00000000, 0x00000000};
         gfx_text_bmap_fill(0, 0, GFX_TEXT_BMP_COLS, 9, bitmap);
 
-        g_game.dialogue_active = false;
+        dialogue_show_page();
     }
 }
 
@@ -459,7 +485,7 @@ void game_update(void)
     if (g_game.queue_dialogue_start)
     {
         g_game.queue_dialogue_start = false;
-        dialogue_init();
+        dialogue_show_page();
     }
 
     if (g_game.dialogue_active)
@@ -1122,7 +1148,8 @@ void game_restore_state(void)
     gfx_mark_scroll_dirty();
 }
 
-void game_start_dialogue(void)
+void game_start_dialogue(const char *dialogue)
 {
     g_game.queue_dialogue_start = true;
+    g_game.dialogue_page = dialogue;
 }

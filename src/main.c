@@ -6,6 +6,7 @@
 #include <maxmod.h>
 #include "soundbank.h"
 #include "soundbank_bin.h"
+#include "dialogue.h"
 
 #include <world.h>
 #include "game.h"
@@ -214,7 +215,6 @@ static u8 mm_mixing_buf[MM_MIXLEN_21KHZ];
 int main(void)
 {
     LOG_INIT();
-    LOG_DBG("Hello, world!");
 
     irq_init(NULL);
     irq_add(II_VBLANK, mmVBlank);

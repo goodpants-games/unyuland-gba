@@ -1070,7 +1070,13 @@ const behavior_def_s behavior_home = {0};
 
 const behavior_def_s behavior_sign;
 
-void entity_sign_init(entity_s *self, FIXED px, FIXED py, void *dialogue,
+typedef struct sign_data
+{
+    const char *dialogue;
+}
+sign_data_s;
+
+void entity_sign_init(entity_s *self, FIXED px, FIXED py, const char *dialogue,
                       bool alt_appearance)
 {
     self->flags |= ENTITY_FLAG_COLLIDE;
@@ -1082,12 +1088,17 @@ void entity_sign_init(entity_s *self, FIXED px, FIXED py, void *dialogue,
     self->sprite.graphic_id = alt_appearance ? SPRID_GAME_HINT_SIGN : SPRID_GAME_SIGN;
     self->sprite.zidx = -20;
     self->behavior = &behavior_sign;
+
+    sign_data_s *data = (sign_data_s *)self->userdata;
+    data->dialogue = dialogue;
 }
 
 static void entity_sign_interact(entity_s *self, entity_s *source)
 {
+    sign_data_s *data = (sign_data_s *)self->userdata;
+
     LOG_DBG("sign interact!");
-    game_start_dialogue();
+    game_start_dialogue(data->dialogue);
 }
 
 const behavior_def_s behavior_sign = {

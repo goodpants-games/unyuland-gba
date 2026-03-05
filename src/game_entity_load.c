@@ -1,6 +1,6 @@
-#include "game.h"
 #include <string.h>
-
+#include "game.h"
+#include "dialogue.h"
 #include "log.h"
 
 #define STR_CASE(case) else if (!strcmp(__match, (case)))
@@ -82,6 +82,26 @@ static int parse_gun_enemy_flags(const entity_load_s *load_data)
     return flags;
 }
 
+static const char* parse_sign_text(const entity_load_s *load_data)
+{
+    const char *id;
+    if (!get_property_string(load_data, "text", &id))
+        return NULL;
+
+    char test_str[17];
+    strncpy(test_str, id, 16);
+
+    for (int i = 0; i < dlg_get_root()->chat_count; ++i)
+    {
+        const dlg_chat_header_s *header = dlg_get_chat_headers() + i;
+        if (memcmp(header->id, test_str, 16)) continue;
+
+        return dlg_get_chat_data(i);
+    }
+
+    return NULL;
+}
+
 void game_load_entity(const entity_load_s *load_data)
 {
     const char *name = load_data->name;
@@ -129,11 +149,13 @@ void game_load_entity(const entity_load_s *load_data)
     }
     STR_CASE("sign")
     {
-        entity_sign_init(ent, load_data->x, load_data->y, NULL, false);
+        entity_sign_init(ent, load_data->x, load_data->y,
+                         parse_sign_text(load_data), false);
     }
     STR_CASE("hint_sign")
     {
-        entity_sign_init(ent, load_data->x, load_data->y, NULL, true);
+        entity_sign_init(ent, load_data->x, load_data->y,
+                         parse_sign_text(load_data), true);
     }
     STR_CASE("water_tank")
     {

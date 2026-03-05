@@ -54,7 +54,7 @@ class TextInputIO(io.TextIOWrapper):
             self.flush()
 
 
-class BinaryInputIO(io.BufferedWriter):
+class BinaryInputIO(io.BufferedReader):
     def __init__(self: typing.Self, path: str):
         if path == '-':
             self._tty = True

@@ -551,6 +551,7 @@ void gfx_text_bmap_print(uint x, uint y, const char *text, text_color_e text_col
 //     }
 // }
 
+ARM_FUNC NO_INLINE
 void gfx_text_bmap_fill(uint oc, uint or, uint cols, uint rows, u32 data[8])
 {
     for (uint r = or; r < or + rows; ++r)
