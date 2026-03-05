@@ -1,0 +1,61 @@
+[
+    {
+        "id": "tut1",
+        "pages": [
+            "Hello, unyu! I'm assuming you're an unyu.",
+            "Did you know? I am placing helpful signs everywhere to help Unyus survive the winter.",
+            "I heard they need to collect those fire orbs because they're so weak and frail and dumb.",
+            "No offense though.",
+            "Anyway, did you know?",
+            "You can spit liquid out by pressing B. The droplet will freeze shortly afterwards, creating a platform.",
+            "If you hold UP, the platform will be above you. Otherwise, it will be to the side.",
+            "Also, if you hold DOWN, the platform will be placed closer when placed to the side.",
+            "You can refill your liquid meter at a dispenser. They serve as respawn points as well.",
+            "If you ever get stuck, you can respawn to the last dispenser from the pause menu.",
+            "I hope this information was useful!"
+        ]
+    },
+    {
+        "id": "tut_water",
+        "pages": [
+            "Hello, unyu!",
+            "Did you know? The water is dangerously cold! This is because the environment is very cold. Did you know that?",
+            "It could be fatal for an Unyu. I don't know how that kills them though. It's not even that cold.",
+            "I hope this information was useful!"
+        ]
+    },
+    {
+        "id": "tut_shoot",
+        "pages": [
+            "Did you know? There is a Blux up ahead. Oh no!",
+            "Don't ask how I knew that ahead of time. Too complicated.",
+            "Fortunately, you can shoot at it by switching to attack mode by pressing L.",
+            "Then, by pressing B, you will spit water bullets in the direction you are facing.",
+            "You can even shoot up and downwards if you're holding the respective directions down. Did you know that?",
+            "I hope this information was useful!",
+            "...Oh! I almost forgot to mention:",
+            "Your fire rate is unlimited. So you shoot as fast as you can mash the button.",
+            "I hope that information was useful as well!"
+        ]
+    },
+    {
+        "id": "tut_push",
+        "pages": [
+            "Did you know? You can push objects!",
+            "Also, you can't place platforms on torches or sky holes.",
+            "I hope this information was useful!"
+        ]
+    },
+    {
+        "id": "tut_hint_sign",
+        "pages": [
+            "Did you know? Sometimes I don't have useful information.",
+            "So, I try to instead explain how to get to the other side of a certain room.",
+            "Although, even that explanation turns out unfinished and useless.",
+            "In order to not waste your time reading useless information, I adopted a color scheme for these signs!",
+            "Lighter-colored signs, like this one, indicate a hint for a puzzle.",
+            "But the darker brown ones you should definitely read! You might die if you don't.",
+            "I hope this information is useful!"
+        ]
+    }
+]
