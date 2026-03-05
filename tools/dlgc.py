@@ -56,11 +56,14 @@ def process(in_json: dict, out_path: str):
 
     for chat in in_json:
         chat_data = bytearray()
+        pages = chat['pages']
 
-        for text in chat['pages']:
+        for page_index in range(0, len(pages)):
+            text = pages[page_index]
+
             lines = wrap_text(text, MAX_COLS)
             if len(lines) > MAX_ROWS:
-                eprint(f"error: {(chat['id'])}, with a line count of {(len(lines))}, exceeds the max length of {MAX_ROWS} lines")
+                eprint(f"error: page {(page_index + 1)} of {(chat['id'])}, with a line count of {(len(lines))}, exceeds the max length of {MAX_ROWS} lines")
                 success = False
             
             for line in lines:
