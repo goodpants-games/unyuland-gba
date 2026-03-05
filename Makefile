@@ -8,7 +8,7 @@ endif
 
 include $(DEVKITARM)/gba_rules
 
-PYTHON ?= python
+PYTHON ?= python3
 ASEPRITE ?= aseprite
 DEVDEBUG ?= yes
 
@@ -72,11 +72,6 @@ LIBS	:= -lmm -ltonc
 #---------------------------------------------------------------------------------
 LIBDIRS	:=	$(LIBGBA) $(LIBTONC)
 
-#---------------------------------------------------------------------------------
-# no real need to edit anything past this point unless you need to add additional
-# rules for different file extensions
-#---------------------------------------------------------------------------------
-
 
 ifneq ($(BUILD),$(notdir $(CURDIR)))
 #---------------------------------------------------------------------------------
@@ -85,15 +80,14 @@ export TOPLEVEL :=  $(CURDIR)
 export OUTPUT	:=	$(CURDIR)/$(TARGET)
 
 export VPATH	:=	$(foreach dir,$(SOURCES),$(CURDIR)/$(dir)) \
-			$(foreach dir,$(DATA),$(CURDIR)/$(dir)) \
-			$(foreach dir,$(GRAPHICS),$(CURDIR)/$(dir)) \
-			$(foreach dir,$(MAPS),$(CURDIR)/$(dir)) \
-			$(foreach dir,$(SPRITES),$(CURDIR)/$(dir))
+                    $(foreach dir,$(DATA),$(CURDIR)/$(dir)) \
+                    $(foreach dir,$(GRAPHICS),$(CURDIR)/$(dir)) \
+                    $(foreach dir,$(MAPS),$(CURDIR)/$(dir)) \
+                    $(foreach dir,$(SPRITES),$(CURDIR)/$(dir))
 
 export DEPSDIR	:=	$(CURDIR)/$(BUILD)
 
-CFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c))) \
-			    world.c
+CFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
 CPPFILES	:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp)))
 SFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))
 PNGFILES	:=	$(foreach dir,$(GRAPHICS),$(notdir $(wildcard $(dir)/*.png)))
@@ -102,7 +96,7 @@ SPRFILES	:=	$(foreach dir,$(SPRITES),$(notdir $(wildcard $(dir)/*.sprdb)))
 BINFILES	:=	$(foreach dir,$(DATA),$(notdir $(wildcard $(dir)/*.*)))
 
 ifneq ($(strip $(MUSIC)),)
-	export AUDIOFILES	:=	$(foreach dir,$(notdir $(wildcard $(MUSIC)/*.*)),$(CURDIR)/$(MUSIC)/$(dir))
+	export AUDIOFILES := $(foreach dir,$(notdir $(wildcard $(MUSIC)/*.*)),$(CURDIR)/$(MUSIC)/$(dir))
 	BINFILES += soundbank.bin
 endif
 
@@ -126,17 +120,15 @@ export OFILES_SOURCES := $(CPPFILES:.cpp=.o) $(CFILES:.c=.o) $(SFILES:.s=.o)
 
 export OFILES_GRAPHICS := $(addsuffix _gfx.o,$(PNGFILES:.png=))
 
-export OFILES_MAPS := $(addsuffix .map.o,$(MAPFILES:.tmx=))
+export OFILES_MAPS := $(addsuffix .map.o,$(MAPFILES:.tmx=)) world.o
 
-export OFILES_SPRITES := $(addsuffix _sprdb_data.o,$(SPRFILES:.sprdb=)) $(addsuffix _sprdb_gfx.o,$(SPRFILES:.sprdb=))
+export OFILES_SPRITES := $(addsuffix _sprdb.bin.o,$(SPRFILES:.sprdb=))\
+                         $(addsuffix _sprdb_gfx.s,$(SPRFILES:.sprdb=))
 
-export OFILES := $(OFILES_BIN) $(OFILES_SOURCES) $(OFILES_GRAPHICS) $(OFILES_MAPS) $(OFILES_SPRITES)
+export OFILES_INTERMEDIATE := sinelut.bin.o dlg.bin.o
 
-# export HFILES := $(addsuffix .h,$(subst .,_,$(BINFILES))) $(addsuffix _map.h,$(MAPFILES:.tmx=)) $(PNGFILES:.png=.h)
-export HFILES := $(addsuffix .h,$(subst .,_,$(BINFILES))) \
-                 $(addsuffix _gfx.h,$(PNGFILES:.png=)) \
-				 $(addsuffix _map.h,$(MAPFILES:.tmx=)) \
-				 $(addsuffix _sprdb.h,$(SPRFILES:.sprdb=))
+export OFILES := $(OFILES_BIN) $(OFILES_GRAPHICS) $(OFILES_INTERMEDIATE)\
+                 $(OFILES_MAPS) $(OFILES_SPRITES) $(OFILES_SOURCES)
 
 export INCLUDE	:=	$(foreach dir,$(INCLUDES),-iquote $(CURDIR)/$(dir)) \
 					$(foreach dir,$(LIBDIRS),-I$(dir)/include) \
@@ -164,11 +156,8 @@ else
 # main targets
 #---------------------------------------------------------------------------------
 
-$(OUTPUT).gba	:	$(OUTPUT).elf
-
-$(OUTPUT).elf	:	$(OFILES)
-
-$(OFILES_SOURCES) : $(HFILES)
+$(OUTPUT).gba: $(OUTPUT).elf
+$(OUTPUT).elf: $(OFILES)
 
 #---------------------------------------------------------------------------------
 # The bin2o rule should be copied and modified
@@ -201,7 +190,6 @@ soundbank.bin soundbank.h : $(AUDIOFILES)
 	@echo "grit $<"
 	@grit $< -fts -o$*_gfx
 
-
 #---------------------------------------------------------------------------------
 # These rules convert Tiled level files to a more efficient format readable by
 # the game.
@@ -209,50 +197,66 @@ soundbank.bin soundbank.h : $(AUDIOFILES)
 %.map.o %_map.h: %.map
 	@echo $(notdir $<)
 	@$(bin2o)
+
 %.map: %.tmx world.json
 	@$(PYTHON) ../tools/mapc.py $< world.json $@
 
 #---------------------------------------------------------------------------------
 # This rule compiles .sprdb files to a sprdb binary data and image file, using
-# Aseprite with the sprdb.lua script. The image file is then compiled with grit.
+# Aseprite with the sprdb.lua script. The image file should then compiled with
+# grit.
 #---------------------------------------------------------------------------------
-%_sprdb.h %_sprdb_data.o %_sprdb_data.h %_sprdb_gfx.h %_sprdb_gfx.s: %.sprdb
+%_sprdb.bin %_sprdb.png %_sprdb.grit %_sprdb.h: %.sprdb
 #---------------------------------------------------------------------------------
 	@echo $(notdir $<)
-	
-	$(eval _tmpdir = $(shell mktemp -d))
-	$(eval _tmppng = $(_tmpdir)/$(notdir $(basename $@))_gfx.png)
-	$(eval _tmpbin = $(_tmpdir)/$(notdir $(basename $@)).data)
 
 	@$(ASEPRITE) --batch \
-	            --script-param sprdb="$<" \
-	            --script-param output_dat="$(_tmpbin)" \
-	            --script-param output_img="$(_tmppng)" \
-	            --script-param output_h="`(echo $(<F) | tr . _)`.h" \
-	            --script-param out_dep="$(DEPSDIR)/$(notdir $(<:.sprdb=.sd))" \
-	            --script-param artifact_name="$@" \
-	            --script       "$(TOPLEVEL)/tools/sprdb.lua"
+	             --script-param sprdb="$<" \
+	             --script-param output_dat="$*_sprdb.bin" \
+	             --script-param output_img="$*_sprdb.png" \
+	             --script-param output_h="`(echo $(<F) | tr . _)`.h" \
+	             --script-param out_dep="$(DEPSDIR)/$(notdir $(<:.sprdb=.sd))" \
+	             --script-param artifact_name="$@" \
+	             --script       "$(TOPLEVEL)/tools/sprdb.lua"
 
-	@grit $(_tmppng) -fts -gB 4 -p!
-	
-	$(eval _tmpasm := $(shell mktemp))
-	@bin2s -a 4 -H `(echo $(<F) | tr . _)`_data.h $(_tmpbin) > $(_tmpasm)
-	@$(CC) -x assembler-with-cpp $(CPPFLAGS) $(ASFLAGS) -c $(_tmpasm) -o `(echo $(<F) | tr . _)`_data.o
-	@rm $(_tmpasm)
-	@rm $(_tmppng)
-	@rm $(_tmpbin)
-	@rmdir $(_tmpdir)
+	@echo -fts -gB 4 -p! > $*_sprdb.grit
 
 #---------------------------------------------------------------------------------
-# This rule compiles Tiled world data
+# This rule compiles the positions of each room in the world matrix, as well
+# as the room order. This data is then read by mapc.
 #---------------------------------------------------------------------------------
-world.json world.c world.h: $(MAPFILES)
+world.json: $(MAPFILES)
 #---------------------------------------------------------------------------------
 	@$(PYTHON) $(TOPLEVEL)/tools/worldproc.py \
 	           $(TOPLEVEL)/data/maps/unyuland.world \
 	           $(TOPLEVEL)/data/room_list.txt \
-	           --json world.json \
+	           --json world.json
+
+#---------------------------------------------------------------------------------
+# This rule creates a pointer list to each map file and the world matrix.
+#---------------------------------------------------------------------------------
+world.c world.h: $(MAPFILES)
+#---------------------------------------------------------------------------------
+	@$(PYTHON) $(TOPLEVEL)/tools/worldproc.py \
+	           $(TOPLEVEL)/data/maps/unyuland.world \
+	           $(TOPLEVEL)/data/room_list.txt \
 			   --c world.c
+
+#---------------------------------------------------------------------------------
+# This rule creates the sine look-up table.
+#---------------------------------------------------------------------------------
+sinelut.bin:
+#---------------------------------------------------------------------------------
+	@$(PYTHON) $(TOPLEVEL)/tools/sinelut.py \
+	           $@
+
+#---------------------------------------------------------------------------------
+# This rule creates the dialogue file.
+#---------------------------------------------------------------------------------
+dlg.bin: $(TOPLEVEL)/data/dialogue.json
+#---------------------------------------------------------------------------------
+	@$(PYTHON) $(TOPLEVEL)/tools/dlgc.py \
+	           $< $@
 
 # make likes to delete intermediate files. This prevents it from deleting the
 # files generated by grit after building the GBA ROM.

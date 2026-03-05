@@ -430,7 +430,7 @@ local function process_sprdb(output_img, output_dat, output_h)
     output_h_f:write("#ifndef ", inc_guard_name, "\n")
     output_h_f:write("#define ", inc_guard_name, "\n\n")
 
-    output_h_f:write("#include <", h_name, "_data.h", ">\n")
+    output_h_f:write("#include <", h_name, "_bin.h", ">\n")
     output_h_f:write("#include <", h_name, "_gfx.h", ">\n\n")
 
     output_h_f:write("typedef enum sprid_", sprdb_ident, "\n{\n")

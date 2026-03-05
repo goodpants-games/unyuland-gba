@@ -340,7 +340,7 @@ static void update_projectiles()
 static void update_animation()
 {
     const gfx_root_header_s *gfx_root_header =
-        (const gfx_root_header_s *)game_sprdb_data;
+        (const gfx_root_header_s *)game_sprdb_bin;
     
     const gfx_sprite_s *gfx_sprites =
         (const gfx_sprite_s *)&gfx_root_header->sprite0;
@@ -697,7 +697,7 @@ void game_render(void)
     gfx_scroll_y = g_game.cam_y * 2;
 
     gfx_sprdb_s sprdb =
-        gfx_get_sprdb((const gfx_root_header_s *)game_sprdb_data);
+        gfx_get_sprdb((const gfx_root_header_s *)game_sprdb_bin);
 
     OBJ_ATTR *const game_oam = gfx_oam_buffer + 64;
 

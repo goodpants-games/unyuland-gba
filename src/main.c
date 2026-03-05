@@ -90,7 +90,7 @@ static void setup_game_hud(void)
 
     clear_game_hud();
 
-    gfx_sprdb_s sprdb = gfx_get_sprdb((const gfx_root_header_s *)game_sprdb_data);
+    gfx_sprdb_s sprdb = gfx_get_sprdb((const gfx_root_header_s *)game_sprdb_bin);
     gfx_draw_sprite_state_s state = (gfx_draw_sprite_state_s)
     {
         .sprdb = &sprdb,
