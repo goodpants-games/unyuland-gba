@@ -183,7 +183,7 @@ def parse(ifile_path: str, output_file: BinaryIO, tileset: Tileset,
             odata.append(0)
 
             prop_tag = ent.find('properties')
-            if prop_tag:
+            if prop_tag is not None:
                 ent_props = prop_tag.findall('property')
                 odata += struct.pack('<B', len(ent_props))
 
