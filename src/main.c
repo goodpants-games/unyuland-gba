@@ -15,9 +15,6 @@
 #include "gfx.h"
 #include "log.h"
 #include "menu.h"
-#include "tonc_core.h"
-#include "tonc_memdef.h"
-#include "tonc_memmap.h"
 
 // #define MAIN_PROFILE
 
@@ -223,6 +220,9 @@ int main(void)
 
     irq_init(NULL);
     irq_add(II_VBLANK, mmVBlank);
+    irq_add(II_HBLANK, snd_irq_hblank);
+
+    LOG_DBG("IE: %i", REG_IE);
 
     gfx_init();
 
@@ -300,8 +300,6 @@ int main(void)
         profile_start();
         #endif
 
-        snd_frame();
-
         // screen_print(&se_mat[GFX_BG0_INDEX][18][0], "Hello, world!");
 
         key_poll();
@@ -348,6 +346,7 @@ int main(void)
 
         mmFrame();
 
+        snd_frame();
         VBlankIntrWait();
         gfx_new_frame();
     }

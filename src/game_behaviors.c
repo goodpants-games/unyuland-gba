@@ -291,6 +291,8 @@ static void player_bullet_spit(entity_s *self)
     if (g_game.player_ammo < 1) return;
     --g_game.player_ammo;
 
+    snd_play(SND_ID_PLAYER_SHOOT);
+
     projectile_s *proj = projectile_alloc();
     if (!proj) return;
 

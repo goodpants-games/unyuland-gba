@@ -1,11 +1,16 @@
+#include <stdlib.h>
 #include <tonc_memmap.h>
 #include <tonc_memdef.h>
 #include <tonc_math.h>
+#include <pitchlut_bin.h>
 #include "sound.h"
 #include "log.h"
 #include "tonc_core.h"
 #include "tonc_types.h"
-#include <pitchlut_bin.h>
+#include "gba_util.h"
+
+#define SND_TICK_LENGTH    8
+#define TICKS_PER_FRAME    8
 
 #define SNDCMD_END 0x0000
 
@@ -70,31 +75,50 @@ static const snd_cmd sound_player_jump[] = {
     SNDCMD_SET_CH(SNDCMD_CH_SQR1, SNDCMD_CH_SQR_DUTY8),
     SNDCMD_PITCH(0, SNDCMD_KEY(C, 5)),
     SNDCMD_PITCH(1, SNDCMD_KEY(Eb, 6)),
+    SNDCMD_PLAY_SWP(6),
+    SNDCMD_END,
+};
+
+static const snd_cmd sound_player_shoot[] = {
+    SNDCMD_PRIO(SNDCMD_PRIO_PLAYER),
+    SNDCMD_SET_CH(SNDCMD_CH_SQR1, SNDCMD_CH_SQR_DUTY2),
+    SNDCMD_PITCH(0, SNDCMD_KEY(C, 7)),
+    SNDCMD_PITCH(1, SNDCMD_KEY(Eb, 4)),
     SNDCMD_PLAY_SWP(3),
     SNDCMD_END,
 };
 
 snd_slot_s snd_slots[SND_SLOT_COUNT];
-const snd_cmd *snd_sounds[SND_SOUND_COUNT] = {
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-};
+const snd_cmd *snd_sounds[SND_SOUND_COUNT];
+
+// static vu16 *const cnt_regs[] =
+//     { &REG_SND1CNT, &REG_SND2CNT, &REG_SND3CNT, &REG_SND4CNT };
+// #define REG_SNDXCTL(n) (*cnt_regs[n])
+// #define REG_SNDXFREQ(n) (*(vu16 *)(0x04000000 + 0x0064 + ((n) << 3)))
+
+static u16 reg_ctl_vals[4][TICKS_PER_FRAME];
+static u16 reg_freq_vals[4][TICKS_PER_FRAME];
+static u16 reg_dmgctl_vals[TICKS_PER_FRAME];
+static uint frame_tick_idx = 0;
+static uint scanline_wait = 0;
+
+#define SCANLINE_WAIT_RESET (228 / TICKS_PER_FRAME)
 
 #define pitch_lut ((const FIXED *)pitchlut_bin)
 
 void snd_init(void)
 {
-    snd_sounds[SND_ID_PLAYER_JUMP] = sound_player_jump;
+    snd_sounds[SND_ID_PLAYER_JUMP]    = sound_player_jump;
+    snd_sounds[SND_ID_PLAYER_SHOOT]   = sound_player_shoot;
+    snd_sounds[SND_ID_PLAYER_SPIT]    = NULL;
+    snd_sounds[SND_ID_PLATFORM_PLACE] = NULL;
+    snd_sounds[SND_ID_PLAYER_DIE]     = NULL;
+    snd_sounds[SND_ID_CHECKPOINT]     = NULL;
+    snd_sounds[SND_ID_SPRING]         = NULL;
+    snd_sounds[SND_ID_ENEMY_SPIT]     = NULL;
+    snd_sounds[SND_ID_ENEMY_DIE]      = NULL;
+    snd_sounds[SND_ID_MENU_MOVE]      = NULL;
+    snd_sounds[SND_ID_MENU_SELECT]    = NULL;
 
     // turn sound on
     REG_SNDSTAT = SSTAT_ENABLE;
@@ -160,17 +184,19 @@ static bool proc_snd_slot(snd_slot_s *slot)
             uint len = (instr >> 4) & 0x3F;
             uint vol_start = (instr >> 10) & 7;
             uint vol_end = (instr >> 13) & 7;
+            int denom = (len * SND_TICK_LENGTH);
             
             slot->pitch = int2fx(slot->pitch_reg[0]);
-            slot->vol_increment = int2fx(vol_end - vol_start) / (len * SND_FRAMES_PER_ROW + 1);
+            slot->vol_increment = int2fx(vol_end - vol_start) / denom;
             slot->vol = vol_start;
-            slot->wait = len * SND_FRAMES_PER_ROW;
+            slot->wait = len * SND_TICK_LENGTH;
 
             if (opcode == SNDCMD_OP_PLAY_SWP)
             {
                 LOG_DBG("PLAY_SWP");
                 slot->flags |= SND_SLOT_FLAG_SWEEP;
-                slot->pitch_increment = int2fx(slot->pitch_reg[1] - slot->pitch_reg[0]) / (len * SND_FRAMES_PER_ROW + 1);
+                slot->pitch_increment = int2fx(slot->pitch_reg[1] - slot->pitch_reg[0])
+                                            / denom;
             }
             else
             {
@@ -198,7 +224,7 @@ static bool proc_snd_slot(snd_slot_s *slot)
     return true;
 }
 
-void snd_frame(void)
+static void snd_tick(uint tick_idx)
 {
     snd_slot_s *channel_slot[4] = { NULL, NULL, NULL, NULL };
 
@@ -223,13 +249,18 @@ void snd_frame(void)
         channel_slot[ch] = slot;
     }
 
-    for (int i = 0; i < 4; ++i)
+    u16 *reg_dmgctl = &reg_dmgctl_vals[tick_idx];
+    *reg_dmgctl = SDMG_RVOL(3) | SDMG_LVOL(3);
+
+    for (uint ch = 0; ch < 4; ++ch)
     {
-        snd_slot_s *slot = channel_slot[i];
+        const snd_slot_s *const slot = channel_slot[ch];
+        u16 *reg_ctl = &reg_ctl_vals[ch][tick_idx];
+        u16 *reg_freq = &reg_freq_vals[ch][tick_idx];
+
         if (!slot)
         {
-            REG_SND1CNT = SSQR_IVOL(0);
-            REG_SNDDMGCNT &= ~(SDMG_LSQR1 | SDMG_RSQR1);
+            *reg_ctl = SSQR_IVOL(0);
             continue;
         }
 
@@ -243,12 +274,24 @@ void snd_frame(void)
         FIXED rate1 = pitch_lut[pitch + 1];
         FIXED rate = fxmul((rate1 - rate0), pitch_frac) + rate0;
 
-        REG_SNDDMGCNT |= SDMG_LSQR1 | SDMG_RSQR1;
-        REG_SND1CNT = SSQR_IVOL(7) | SSQR_DUTY1_8;
-        REG_SND1FREQ = SFREQ_HOLD | SFREQ_RESET | (fx2int(rate) & 0x7FF);
-
-        break;
+        static const uint duty_flags[] =
+            { SSQR_DUTY1_2, SSQR_DUTY1_4, SSQR_DUTY1_8 };
+        
+        *reg_dmgctl |= (1 << (ch + 0x8)) | (1 << (ch + 0xC));
+        *reg_ctl = SSQR_IVOL(12) | duty_flags[slot->channel_config];
+        *reg_freq = SFREQ_HOLD | SFREQ_RESET | (fx2int(rate) & 0x7FF);
     }
+}
+
+void snd_frame(void)
+{
+    for (uint i = 0; i < TICKS_PER_FRAME; ++i)
+        snd_tick(i);
+
+    scanline_wait = 0;
+    frame_tick_idx = 0;
+    snd_irq_hblank();
+    // snd_timer_irq();
 }
 
 void snd_play(snd_id_e id)
@@ -274,4 +317,24 @@ void snd_play(snd_id_e id)
     
     if (!proc_snd_slot(slot))
         slot->flags = 0;
+}
+
+ARM_FUNC
+void snd_irq_hblank(void)
+{    
+    if (frame_tick_idx == TICKS_PER_FRAME) return;
+    if (scanline_wait-- != 0) return;
+
+    REG_SNDDMGCNT = reg_dmgctl_vals[frame_tick_idx];
+    REG_SND1CNT  = reg_ctl_vals[0][frame_tick_idx];
+    REG_SND2CNT  = reg_ctl_vals[1][frame_tick_idx];
+    REG_SND3CNT  = reg_ctl_vals[2][frame_tick_idx];
+    REG_SND4CNT  = reg_ctl_vals[3][frame_tick_idx];
+    REG_SND1FREQ = reg_freq_vals[0][frame_tick_idx];
+    REG_SND2FREQ = reg_freq_vals[1][frame_tick_idx];
+    REG_SND3FREQ = reg_freq_vals[2][frame_tick_idx];
+    REG_SND4FREQ = reg_freq_vals[3][frame_tick_idx];
+
+    ++frame_tick_idx;
+    scanline_wait = SCANLINE_WAIT_RESET;
 }

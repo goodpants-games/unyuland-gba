@@ -2,10 +2,10 @@
 #define SOUND_H
 
 #include <tonc_types.h>
+#include "gba_util.h"
 
 #define SND_SLOT_COUNT     8
 #define SND_SOUND_COUNT    12
-#define SND_FRAMES_PER_ROW 2
 
 typedef u16 snd_cmd;
 
@@ -87,7 +87,17 @@ typedef struct snd_slot
 
 typedef enum snd_id
 {
-    SND_ID_PLAYER_JUMP
+    SND_ID_PLAYER_JUMP,
+    SND_ID_PLAYER_SHOOT,
+    SND_ID_PLAYER_SPIT,
+    SND_ID_PLATFORM_PLACE,
+    SND_ID_PLAYER_DIE,
+    SND_ID_CHECKPOINT,
+    SND_ID_SPRING,
+    SND_ID_ENEMY_SPIT,
+    SND_ID_ENEMY_DIE,
+    SND_ID_MENU_MOVE,
+    SND_ID_MENU_SELECT,
 } snd_id_e;
 
 extern snd_slot_s snd_slots[SND_SLOT_COUNT];
@@ -96,6 +106,7 @@ extern const snd_cmd *snd_sounds[SND_SOUND_COUNT];
 void snd_init(void);
 void snd_frame(void);
 void snd_play(snd_id_e id);
+ARM_FUNC void snd_irq_hblank(void);
 
 //
 // 0110xxxxxx------
