@@ -4,6 +4,8 @@
 #include <assert.h>
 #include <ctype.h>
 #include <maxmod.h>
+#include "math_util.h"
+#include "sound.h"
 #include "soundbank.h"
 #include "soundbank_bin.h"
 #include "dialogue.h"
@@ -13,8 +15,11 @@
 #include "gfx.h"
 #include "log.h"
 #include "menu.h"
+#include "tonc_core.h"
+#include "tonc_memdef.h"
+#include "tonc_memmap.h"
 
-#define MAIN_PROFILE
+// #define MAIN_PROFILE
 
 #define HUD_ROW_ORIGIN (GFX_TEXT_BMP_ROWS - 2)
 #define HUD_Y_ORIGIN   (HUD_ROW_ORIGIN * 8 + 6)
@@ -286,12 +291,16 @@ int main(void)
     mmStart(MOD_TESTMOD, MM_PLAY_LOOP);
     mmSetModuleVolume((int)(1024 * 0.25));
 
+    snd_init();
+
     while (true)
     {
         #ifdef MAIN_PROFILE
         uint frame_len = 0;
         profile_start();
         #endif
+
+        snd_frame();
 
         // screen_print(&se_mat[GFX_BG0_INDEX][18][0], "Hello, world!");
 

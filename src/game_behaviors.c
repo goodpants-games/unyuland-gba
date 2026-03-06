@@ -3,6 +3,7 @@
 #include "tonc_math.h"
 #include "tonc_input.h"
 #include "math_util.h"
+#include "sound.h"
 
 #define DEFAULT_DAMP TO_FIXED(0.88)
 
@@ -391,6 +392,7 @@ static void behavior_player_update(entity_s *self)
         {
             self->actor.jump_trigger = 8;
             jumped = true;
+            snd_play(SND_ID_PLAYER_JUMP);
         }
 
         if (can_move && !data->interactable)
