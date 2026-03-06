@@ -258,6 +258,7 @@ static void player_platform_spit(entity_s *self)
     if (droplet)
     {
         g_game.player_ammo -= 10;
+        snd_play(SND_ID_PLAYER_SPIT);
 
         int type, dir;
         FIXED x = self->pos.x + int2fx(3);
@@ -394,7 +395,6 @@ static void behavior_player_update(entity_s *self)
         {
             self->actor.jump_trigger = 8;
             jumped = true;
-            snd_play(SND_ID_PLAYER_JUMP);
         }
 
         if (can_move && !data->interactable)
@@ -437,6 +437,9 @@ static void behavior_player_update(entity_s *self)
         
         self->sprite.flags = flags & 0xFF;
     }
+
+    if (self->actor.flags & ACTOR_FLAG_DID_JUMP)
+        snd_play(SND_ID_PLAYER_JUMP);
 
     // animation
     if (data->spitting)
@@ -1147,6 +1150,8 @@ static void behavior_water_tank_interact(entity_s *self, entity_s *source)
     if (g_game.active_water_tank)
         g_game.active_water_tank->sprite.graphic_id
             = SPRID_GAME_WATER_TANK_NORMAL_INACTIVE;
+
+    snd_play(SND_ID_CHECKPOINT);
 
     g_game.active_water_tank = self;
     g_game.player_ammo = 100;

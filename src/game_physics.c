@@ -1112,8 +1112,7 @@ void game_physics_update(void)
             continue;
         
         if (entity->flags & ENTITY_FLAG_ACTOR)
-            entity->actor.flags &= ~(ACTOR_FLAG_GROUNDED | ACTOR_FLAG_WALL |
-                                    ACTOR_FLAG_DID_JUMP);
+            entity->actor.flags &= ~(ACTOR_FLAG_GROUNDED | ACTOR_FLAG_WALL);
         
         if (!(entity->flags & ENTITY_FLAG_COLLIDE)) continue;
         

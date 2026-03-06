@@ -11,6 +11,7 @@
 
 #define SND_TICK_LENGTH    8
 #define TICKS_PER_FRAME    8
+#define ARPEGGIO_TICK      (2 * TICKS_PER_FRAME)
 
 #define SNDCMD_END 0x0000
 
@@ -88,6 +89,27 @@ static const snd_cmd sound_player_shoot[] = {
     SNDCMD_END,
 };
 
+static const snd_cmd sound_player_spit[] = {
+    SNDCMD_PRIO(SNDCMD_PRIO_PLAYER),
+    SNDCMD_SET_CH(SNDCMD_CH_SQR1, SNDCMD_CH_SQR_DUTY2),
+    SNDCMD_PITCH(0, SNDCMD_KEY(C, 5)),
+    SNDCMD_PITCH(1, SNDCMD_KEY(C, 4)),
+    SNDCMD_PLAY_SWP(3),
+    SNDCMD_PITCH(1, SNDCMD_KEY(D, 7)),
+    SNDCMD_PLAY_SWP(3),
+    SNDCMD_END,
+};
+
+static const snd_cmd sound_checkpoint[] = {
+    SNDCMD_PRIO(SNDCMD_PRIO_PLAYER),
+    SNDCMD_SET_CH(SNDCMD_CH_SQR1, SNDCMD_CH_SQR_DUTY2),
+    SNDCMD_PITCH(0, SNDCMD_KEY(C, 4)),
+    SNDCMD_PITCH(1, SNDCMD_KEY(A, 5)),
+    SNDCMD_ARP2(4),
+    SNDCMD_PLAY_SWP(8),
+    SNDCMD_END,
+};
+
 snd_slot_s snd_slots[SND_SLOT_COUNT];
 const snd_cmd *snd_sounds[SND_SOUND_COUNT];
 
@@ -110,10 +132,10 @@ void snd_init(void)
 {
     snd_sounds[SND_ID_PLAYER_JUMP]    = sound_player_jump;
     snd_sounds[SND_ID_PLAYER_SHOOT]   = sound_player_shoot;
-    snd_sounds[SND_ID_PLAYER_SPIT]    = NULL;
+    snd_sounds[SND_ID_PLAYER_SPIT]    = sound_player_spit;
     snd_sounds[SND_ID_PLATFORM_PLACE] = NULL;
     snd_sounds[SND_ID_PLAYER_DIE]     = NULL;
-    snd_sounds[SND_ID_CHECKPOINT]     = NULL;
+    snd_sounds[SND_ID_CHECKPOINT]     = sound_checkpoint;
     snd_sounds[SND_ID_SPRING]         = NULL;
     snd_sounds[SND_ID_ENEMY_SPIT]     = NULL;
     snd_sounds[SND_ID_ENEMY_DIE]      = NULL;
@@ -135,10 +157,40 @@ static bool proc_snd_slot(snd_slot_s *slot)
     {
         slot->pitch += slot->pitch_increment;
         slot->vol += slot->vol_increment;
+
+        if (slot->flags & SND_SLOT_FLAG_ARP2)
+        {
+            if (++slot->arp_index == (2 * ARPEGGIO_TICK))
+                slot->arp_index = 0;
+
+            FIXED pitches[2];
+            pitches[0] = slot->pitch;
+            pitches[1] = slot->pitch + int2fx(slot->arp_offset0);
+            slot->final_pitch = pitches[(uint)slot->arp_index / ARPEGGIO_TICK];
+        }
+        else if (slot->flags & SND_SLOT_FLAG_ARP3)
+        {
+            if (++slot->arp_index == (3 * ARPEGGIO_TICK))
+                slot->arp_index = 0;
+
+            FIXED pitches[3];
+            pitches[0] = slot->pitch;
+            pitches[1] = slot->pitch + int2fx(slot->arp_offset0);
+            pitches[2] = slot->pitch + int2fx(slot->arp_offset1);
+            slot->final_pitch = pitches[(uint)slot->arp_index / ARPEGGIO_TICK];
+        }
+        else
+        {
+            slot->final_pitch = slot->pitch;
+        }
+
         if (--slot->wait == 0)
         {
             slot->flags &= ~(SND_SLOT_FLAG_ARP2 | SND_SLOT_FLAG_ARP3 |
                              SND_SLOT_FLAG_SWEEP | SND_SLOT_FLAG_VIBRATO);
+            
+            u8 tmp;
+            SWAP3(slot->pitch_reg[0], slot->pitch_reg[1], tmp);
         }
 
         return true;
@@ -161,7 +213,6 @@ static bool proc_snd_slot(snd_slot_s *slot)
             break;
         
         case SNDCMD_OP_ARP2:
-            LOG_DBG("ARP2");
             slot->arp_offset0 = (instr >> 4) & 0xF;
             slot->flags |= SND_SLOT_FLAG_ARP2;
             break;
@@ -184,12 +235,13 @@ static bool proc_snd_slot(snd_slot_s *slot)
             uint len = (instr >> 4) & 0x3F;
             uint vol_start = (instr >> 10) & 7;
             uint vol_end = (instr >> 13) & 7;
-            int denom = (len * SND_TICK_LENGTH);
+            int denom = len * SND_TICK_LENGTH + 1;
             
             slot->pitch = int2fx(slot->pitch_reg[0]);
             slot->vol_increment = int2fx(vol_end - vol_start) / denom;
             slot->vol = vol_start;
             slot->wait = len * SND_TICK_LENGTH;
+            slot->arp_index = 0;
 
             if (opcode == SNDCMD_OP_PLAY_SWP)
             {
@@ -200,6 +252,7 @@ static bool proc_snd_slot(snd_slot_s *slot)
             }
             else
             {
+                slot->pitch_reg[1] = slot->pitch_reg[0];
                 LOG_DBG("PLAY");
             }
             
@@ -264,8 +317,8 @@ static void snd_tick(uint tick_idx)
             continue;
         }
 
-        uint pitch = fx2int(slot->pitch);
-        FIXED pitch_frac = fx2ufrac(slot->pitch);
+        uint pitch = fx2int(slot->final_pitch);
+        FIXED pitch_frac = fx2ufrac(slot->final_pitch);
 
         // uint rate = fx2int(pitch_lut[pitch]);
         // LOG_DBG("pitch: %i, rate: %i", pitch, rate & 0x7FF);

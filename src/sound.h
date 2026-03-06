@@ -76,11 +76,13 @@ typedef struct snd_slot
     u8 vib_strength;
 
     u8 wait;
+    u8 arp_index;
     u8 pitch_reg[2];
 
     FIXED pitch_increment; // per tick
     FIXED vol_increment;  // per tick
     FIXED pitch;
+    FIXED final_pitch;
     FIXED vol;
     const snd_cmd *ip;
 } snd_slot_s;
