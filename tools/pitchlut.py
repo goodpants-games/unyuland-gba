@@ -16,7 +16,6 @@ def generate(ofile) -> None:
     for n in range(0, NOTE_COUNT):
         rate = 2048 - math.pow(2.0, 17 - ((n - NOTE_A4) / 12)) / 440.0
         value = int(math.floor(rate * FIX_ONE))
-        print(str(n) + ": " + str(value / FIX_ONE), file=sys.stderr)
 
         out_bytes[i+0] = value & 0xFF
         out_bytes[i+1] = (value >> 8) & 0xFF

@@ -120,8 +120,6 @@ static bool proc_snd_slot(snd_slot_s *slot)
         return true;
     }
 
-    int a = SNDCMD_KEY(Eb, 6);
-
     while (true)
     {
         snd_cmd instr = *(slot->ip++);
