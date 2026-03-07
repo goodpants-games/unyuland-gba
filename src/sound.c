@@ -3,6 +3,7 @@
 #include <tonc_memdef.h>
 #include <tonc_math.h>
 #include <pitchlut_bin.h>
+#include <tri_wavetable_bin.h>
 #include "sound.h"
 #include "log.h"
 #include "tonc_core.h"
@@ -52,6 +53,13 @@
 #define SNDCMD_OP_PRIORITY 0x0008
 #define SNDCMD_OP_MASK     0x000F
 
+#define SWAV_SEL_DIM(n)    (((n) & 1) << 5)
+#define SWAV_SEL_BANK(n)   (((n) & 1) << 6)
+#define SWAV_SEL_ENABLE(n) (((n) & 1) << 7)
+#define SWAV_SEL_ON        SWAV_SEL_ENABLE(1)
+#define SWAV_SEL_OFF       SWAV_SEL_ENABLE(0)
+#define SWAV_VOL(n)        (((n) & 3) << 13)
+
 // 0:  C2  (MIDI 36,  65.40639 Hz)
 // 33: A4  (MIDI 69,  440.0000 HZ)
 // 84: C9
@@ -73,7 +81,8 @@ enum
 
 static const snd_cmd sound_player_jump[] = {
     SNDCMD_PRIO(SNDCMD_PRIO_PLAYER),
-    SNDCMD_SET_CH(SNDCMD_CH_SQR1, SNDCMD_CH_SQR_DUTY8),
+    // SNDCMD_SET_CH(SNDCMD_CH_SQR1, SNDCMD_CH_SQR_DUTY8),
+    SNDCMD_SET_CH(SNDCMD_CH_WAVE, SNDCMD_CH_WAVE_TRIANGLE),
     SNDCMD_PITCH(0, SNDCMD_KEY(C, 5)),
     SNDCMD_PITCH(1, SNDCMD_KEY(Eb, 6)),
     SNDCMD_PLAY_SWP(6),
@@ -121,6 +130,7 @@ const snd_cmd *snd_sounds[SND_SOUND_COUNT];
 static u16 reg_ctl_vals[4][TICKS_PER_FRAME];
 static u16 reg_freq_vals[4][TICKS_PER_FRAME];
 static u16 reg_dmgctl_vals[TICKS_PER_FRAME];
+static u16 reg_wav_sel_vals[TICKS_PER_FRAME];
 static uint frame_tick_idx = 0;
 static uint scanline_wait = 0;
 
@@ -144,11 +154,14 @@ void snd_init(void)
 
     // turn sound on
     REG_SNDSTAT = SSTAT_ENABLE;
-    REG_SNDDMGCNT = SDMG_BUILD_LR(SDMG_SQR1, 7);
+    REG_SNDDMGCNT = SDMG_BUILD_LR(SDMG_SQR1, 7) | SDMG_BUILD_LR(SDMG_SQR2, 7)
+                    | SDMG_BUILD_LR(SDMG_WAVE, 7);
     REG_SNDDSCNT |= SDS_DMG100;
 
     // no sweep
     REG_SND1SWEEP = SSW_OFF;
+
+    memcpy16((void *)REG_WAVE_RAM, tri_wavetable_bin, 8);
 }
 
 static bool proc_snd_slot(snd_slot_s *slot)
@@ -305,6 +318,8 @@ static void snd_tick(uint tick_idx)
     u16 *reg_dmgctl = &reg_dmgctl_vals[tick_idx];
     *reg_dmgctl = SDMG_RVOL(3) | SDMG_LVOL(3);
 
+    u16 *reg_wavsel = &reg_wav_sel_vals[tick_idx];
+
     for (uint ch = 0; ch < 4; ++ch)
     {
         const snd_slot_s *const slot = channel_slot[ch];
@@ -313,26 +328,43 @@ static void snd_tick(uint tick_idx)
 
         if (!slot)
         {
-            *reg_ctl = SSQR_IVOL(0);
+            if (ch == 2)
+            {
+                *reg_wavsel = 0;
+                *reg_ctl = 0;
+            }
+            else
+            {
+                *reg_ctl = SSQR_IVOL(0);
+            }
+
+            *reg_freq = 0;
             continue;
         }
-
-        uint pitch = fx2int(slot->final_pitch);
-        FIXED pitch_frac = fx2ufrac(slot->final_pitch);
-
-        // uint rate = fx2int(pitch_lut[pitch]);
-        // LOG_DBG("pitch: %i, rate: %i", pitch, rate & 0x7FF);
-
-        FIXED rate0 = pitch_lut[pitch];
-        FIXED rate1 = pitch_lut[pitch + 1];
-        FIXED rate = fxmul((rate1 - rate0), pitch_frac) + rate0;
 
         static const uint duty_flags[] =
             { SSQR_DUTY1_2, SSQR_DUTY1_4, SSQR_DUTY1_8 };
         
         *reg_dmgctl |= (1 << (ch + 0x8)) | (1 << (ch + 0xC));
-        *reg_ctl = SSQR_IVOL(12) | duty_flags[slot->channel_config];
-        *reg_freq = SFREQ_HOLD | SFREQ_RESET | (fx2int(rate) & 0x7FF);
+        
+        uint pitch = fx2int(slot->final_pitch);
+        FIXED pitch_frac = fx2ufrac(slot->final_pitch);
+
+        FIXED rate0 = pitch_lut[pitch];
+        FIXED rate1 = pitch_lut[pitch + 1];
+        FIXED rate = fxmul((rate1 - rate0), pitch_frac) + rate0;
+
+        if (ch == 2)
+        {
+            *reg_wavsel = SWAV_SEL_ON | SWAV_SEL_BANK(0) | SWAV_SEL_DIM(0);
+            *reg_ctl = SWAV_VOL(1);
+        }
+        else
+        {
+            *reg_ctl = SSQR_IVOL(12) | duty_flags[slot->channel_config];
+        }
+
+        *reg_freq = SFREQ_HOLD | SFREQ_RESET | SFREQ_RATE(fx2int(rate) & SFREQ_RATE_MASK);
     }
 }
 
@@ -379,14 +411,15 @@ void snd_irq_hblank(void)
     if (scanline_wait-- != 0) return;
 
     REG_SNDDMGCNT = reg_dmgctl_vals[frame_tick_idx];
-    REG_SND1CNT  = reg_ctl_vals[0][frame_tick_idx];
-    REG_SND2CNT  = reg_ctl_vals[1][frame_tick_idx];
-    REG_SND3CNT  = reg_ctl_vals[2][frame_tick_idx];
-    REG_SND4CNT  = reg_ctl_vals[3][frame_tick_idx];
-    REG_SND1FREQ = reg_freq_vals[0][frame_tick_idx];
-    REG_SND2FREQ = reg_freq_vals[1][frame_tick_idx];
-    REG_SND3FREQ = reg_freq_vals[2][frame_tick_idx];
-    REG_SND4FREQ = reg_freq_vals[3][frame_tick_idx];
+    REG_SND1CNT   = reg_ctl_vals[0][frame_tick_idx];
+    REG_SND1FREQ  = reg_freq_vals[0][frame_tick_idx];
+    REG_SND2CNT   = reg_ctl_vals[1][frame_tick_idx];
+    REG_SND2FREQ  = reg_freq_vals[1][frame_tick_idx];
+    REG_SND3SEL   = reg_wav_sel_vals[frame_tick_idx];
+    REG_SND3CNT   = reg_ctl_vals[2][frame_tick_idx];
+    REG_SND3FREQ  = reg_freq_vals[2][frame_tick_idx];
+    REG_SND4CNT   = reg_ctl_vals[3][frame_tick_idx];
+    REG_SND4FREQ  = reg_freq_vals[3][frame_tick_idx];
 
     ++frame_tick_idx;
     scanline_wait = SCANLINE_WAIT_RESET;

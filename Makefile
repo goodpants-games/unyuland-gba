@@ -125,7 +125,8 @@ export OFILES_MAPS := $(addsuffix .map.o,$(MAPFILES:.tmx=)) world.o
 export OFILES_SPRITES := $(addsuffix _sprdb.bin.o,$(SPRFILES:.sprdb=))\
                          $(addsuffix _sprdb_gfx.s,$(SPRFILES:.sprdb=))
 
-export OFILES_INTERMEDIATE := sinelut.bin.o dlg.bin.o pitchlut.bin.o
+export OFILES_INTERMEDIATE := sinelut.bin.o dlg.bin.o pitchlut.bin.o\
+                              tri_wavetable.bin.o
 
 export OFILES := $(OFILES_BIN) $(OFILES_GRAPHICS) $(OFILES_INTERMEDIATE)\
                  $(OFILES_MAPS) $(OFILES_SPRITES) $(OFILES_SOURCES)
@@ -264,6 +265,14 @@ dlg.bin: $(TOPLEVEL)/data/dialogue.json
 pitchlut.bin:
 #---------------------------------------------------------------------------------
 	@$(PYTHON) $(TOPLEVEL)/tools/pitchlut.py \
+	           $@
+
+#---------------------------------------------------------------------------------
+# This rule precomputes the PSG triangle wave table.
+#---------------------------------------------------------------------------------
+tri_wavetable.bin:
+#---------------------------------------------------------------------------------
+	@$(PYTHON) $(TOPLEVEL)/tools/wavetable.py \
 	           $@
 
 # make likes to delete intermediate files. This prevents it from deleting the
