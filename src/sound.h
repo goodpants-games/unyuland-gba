@@ -79,6 +79,7 @@ typedef struct snd_slot
     u8 arp_index;
     u8 pitch_reg[2];
     u16 wait;
+    u16 vib_tick;
 
     FIXED pitch_increment; // per tick
     FIXED vol_increment;  // per tick

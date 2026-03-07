@@ -52,7 +52,7 @@ enum
     SND_KEY_B
 };
 
-snd_slot_s snd_slots[SND_SLOT_COUNT];
+EWRAM_DATA snd_slot_s snd_slots[SND_SLOT_COUNT];
 const snd_cmd *snd_sounds[SND_SOUND_COUNT];
 
 // static vu16 *const cnt_regs[] =
@@ -124,10 +124,20 @@ static bool proc_snd_slot(snd_slot_s *slot)
             slot->final_pitch = slot->pitch;
         }
 
+        if (slot->flags & SND_SLOT_FLAG_VIBRATO)
+        {
+            slot->final_pitch +=
+                (sine_lut(slot->vib_tick) * slot->vib_strength);
+
+            slot->vib_tick += slot->vib_speed;
+            if (slot->vib_tick >= 256)
+                slot->vib_tick -= 256;
+        }
+
         if (--slot->wait == 0)
         {
             slot->flags &= ~(SND_SLOT_FLAG_ARP2 | SND_SLOT_FLAG_ARP3 |
-                             SND_SLOT_FLAG_SWEEP | SND_SLOT_FLAG_VIBRATO);
+                             SND_SLOT_FLAG_SWEEP);
             
             u8 tmp;
             SWAP3(slot->pitch_reg[0], slot->pitch_reg[1], tmp);
@@ -143,11 +153,9 @@ static bool proc_snd_slot(snd_slot_s *slot)
         switch (opcode)
         {
         case SNDCMD_OP_END:
-            LOG_DBG("END");
             return false;
         
         case SNDCMD_OP_SET_CH:
-            LOG_DBG("SET_CH");
             slot->channel = (instr >> 4) & 3;
             slot->channel_config = (instr >> 6) & 3;
             break;
@@ -158,14 +166,12 @@ static bool proc_snd_slot(snd_slot_s *slot)
             break;
         
         case SNDCMD_OP_ARP3:
-            LOG_DBG("ARP3");
             slot->arp_offset0 = (instr >> 4) & 0xF;
             slot->arp_offset1 = (instr >> 8) & 0xF;
             slot->flags |= SND_SLOT_FLAG_ARP3;
             break;
         
         case SNDCMD_OP_PITCH:
-            LOG_DBG("PITCH: %i", (instr >> 4) & 0xFF);
             slot->pitch_reg[(instr >> 12) & 1] = (instr >> 4) & 0xFF;
             break;
         
@@ -179,13 +185,12 @@ static bool proc_snd_slot(snd_slot_s *slot)
             
             slot->pitch = int2fx(slot->pitch_reg[0]);
             slot->vol_increment = int2fx(vol_end - vol_start) / denom;
-            slot->vol = vol_start;
+            slot->vol = int2fx(vol_start);
             slot->wait = len * TICKS_PER_PART;
             slot->arp_index = 0;
 
             if (opcode == SNDCMD_OP_PLAY_SWP)
             {
-                LOG_DBG("PLAY_SWP");
                 slot->flags |= SND_SLOT_FLAG_SWEEP;
                 slot->pitch_increment = int2fx(slot->pitch_reg[1] - slot->pitch_reg[0])
                                             / denom;
@@ -193,21 +198,24 @@ static bool proc_snd_slot(snd_slot_s *slot)
             else
             {
                 slot->pitch_reg[1] = slot->pitch_reg[0];
-                LOG_DBG("PLAY");
+                slot->pitch_increment = 0;
             }
             
             goto yield;
         }
         
         case SNDCMD_OP_VIBRATO:
-            LOG_DBG("VIBRATO");
             slot->vib_speed = (instr >> 4) & 0x3F;
             slot->vib_strength = (instr >> 10) & 0x3F;
-            slot->flags |= SND_SLOT_FLAG_VIBRATO;
+
+            if (slot->vib_speed == 0 || slot->vib_strength == 0)
+                slot->flags &= ~SND_SLOT_FLAG_VIBRATO;
+            else
+                slot->flags |= SND_SLOT_FLAG_VIBRATO;
+
             break;
         
         case SNDCMD_OP_PRIORITY:
-            LOG_DBG("PRIORITY");
             slot->priority = (instr >> 4) & 0xFF;
             break;
         }
@@ -284,7 +292,8 @@ static void snd_tick(uint tick_idx)
         }
         else
         {
-            *reg_ctl = SSQR_IVOL(7) | duty_flags[slot->channel_config];
+            uint vol = fx2int(slot->vol);
+            *reg_ctl = SSQR_IVOL(vol) | duty_flags[slot->channel_config];
         }
         
         uint pitch1 = fx2int(pitch0);
@@ -479,6 +488,17 @@ static const snd_cmd sound_enemy_death[] = {
     SNDCMD_END,
 };
 
+static const snd_cmd sound_spring[] = {
+    SNDCMD_PRIO(SNDCMD_PRIO_PLAYER),
+    SNDCMD_SET_CH(SNDCMD_CH_SQR1, SNDCMD_CH_SQR_DUTY8),
+    SNDCMD_PITCH(0, SNDCMD_KEY(Eb, 4)),
+    SNDCMD_PITCH(1, SNDCMD_KEY(Gb, 5)),
+    SNDCMD_VIBRATO(5, 6),
+    SNDCMD_PLAY_SWP(12),
+    SNDCMD_PLAY_ENV(24, 7, 0),
+    SNDCMD_END
+};
+
 void init_sound_table(void)
 {
     snd_sounds[SND_ID_PLAYER_JUMP]    = sound_player_jump;
@@ -487,7 +507,7 @@ void init_sound_table(void)
     snd_sounds[SND_ID_PLATFORM_PLACE] = NULL;
     snd_sounds[SND_ID_PLAYER_DIE]     = sound_player_death;
     snd_sounds[SND_ID_CHECKPOINT]     = sound_checkpoint;
-    snd_sounds[SND_ID_SPRING]         = NULL;
+    snd_sounds[SND_ID_SPRING]         = sound_spring;
     snd_sounds[SND_ID_ENEMY_SPIT]     = sound_enemy_spit;
     snd_sounds[SND_ID_ENEMY_DIE]      = sound_enemy_death;
     snd_sounds[SND_ID_MENU_MOVE]      = NULL;

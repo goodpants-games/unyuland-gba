@@ -1019,7 +1019,10 @@ static void behavior_spring_ent_touch(entity_s *self, entity_s *other, int nx,
         return;
     
     if (ny == -1)
+    {
         other->vel.y = self->userdata[0] / (other->mass * 2) * 4;
+        snd_play(SND_ID_SPRING);
+    }
 }
 
 void entity_spring_init(entity_s *self, FIXED px, FIXED py, bool super)
