@@ -15,6 +15,7 @@
 #include "gfx.h"
 #include "log.h"
 #include "menu.h"
+#include "tonc_irq.h"
 
 // #define MAIN_PROFILE
 
@@ -222,8 +223,6 @@ int main(void)
     irq_add(II_VBLANK, mmVBlank);
     irq_add(II_HBLANK, snd_irq_hblank);
 
-    LOG_DBG("IE: %i", REG_IE);
-
     gfx_init();
 
     memcpy32(&tile_mem[0][0] + GFX_CHAR_GAME_TILESET + 2, tileset_gfxTiles,
@@ -268,8 +267,6 @@ int main(void)
         e->sprite.oy = -8;
         e->mass = 4;
     }
-
-    (void)text_test;
 
     mmInit(&(mm_gba_system)
     {
@@ -345,7 +342,6 @@ int main(void)
         #endif
 
         mmFrame();
-
         snd_frame();
         VBlankIntrWait();
         gfx_new_frame();

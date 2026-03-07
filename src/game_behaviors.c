@@ -719,6 +719,8 @@ static void behavior_player_droplet_update(entity_s *self)
             platf->sprite.graphic_id = SPRID_GAME_ICE_PLATFORM;
             platf->sprite.ox = -1;
             platf->sprite.zidx = -10;
+
+            snd_play(SND_ID_PLATFORM_PLACE);
         }
 
         return;

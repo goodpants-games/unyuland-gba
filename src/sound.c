@@ -3,7 +3,8 @@
 #include <tonc_memdef.h>
 #include <tonc_math.h>
 #include <pitchlut_bin.h>
-#include <tri_wavetable_bin.h>
+#include <wave_tri_bin.h>
+#include <wave_noise_bin.h>
 #include "sound.h"
 #include "log.h"
 #include "tonc_core.h"
@@ -32,6 +33,10 @@
 #define SWAV_SEL_ON        SWAV_SEL_ENABLE(1)
 #define SWAV_SEL_OFF       SWAV_SEL_ENABLE(0)
 #define SWAV_VOL(n)        (((n) & 3) << 13)
+
+#define SLFSR_SHIFT(n) (((n) & 15) << 4)
+#define SLFSR_DIV(n)   ((n) & 7)
+#define SLFSR_WIDTH(n) (((n) & 1) << 3)
 
 // 0:  C2  (MIDI 36,  65.40639 Hz)
 // 33: A4  (MIDI 69,  440.0000 HZ)
@@ -86,8 +91,10 @@ void snd_init(void)
     // no sweep
     REG_SND1SWEEP = SSW_OFF;
 
+    REG_SND3SEL = SWAV_SEL_BANK(0) | SWAV_SEL_DIM(0);
+    memcpy32((void *)(REG_WAVE_RAM + 2), wave_noise_bin, 4);
     REG_SND3SEL = SWAV_SEL_BANK(1) | SWAV_SEL_DIM(0);
-    memcpy32((void *)REG_WAVE_RAM, tri_wavetable_bin, 4);
+    memcpy32((void *)(REG_WAVE_RAM + 0), wave_tri_bin, 4);
     REG_SND3SEL = SWAV_SEL_BANK(0) | SWAV_SEL_DIM(0);
 }
 
@@ -227,6 +234,7 @@ static bool proc_snd_slot(snd_slot_s *slot)
 
 static void snd_tick(uint tick_idx)
 {
+    static snd_slot_s *last_channel_slot[4] = { NULL, NULL, NULL, NULL };
     snd_slot_s *channel_slot[4] = { NULL, NULL, NULL, NULL };
 
     for (int i = 0; i < SND_SLOT_COUNT; ++i)
@@ -257,9 +265,12 @@ static void snd_tick(uint tick_idx)
 
     for (uint ch = 0; ch < 4; ++ch)
     {
-        const snd_slot_s *const slot = channel_slot[ch];
+        snd_slot_s *const slot = channel_slot[ch];
         u16 *reg_ctl = &reg_ctl_vals[ch][tick_idx];
         u16 *reg_freq = &reg_freq_vals[ch][tick_idx];
+
+        bool reset = channel_slot[ch] != last_channel_slot[ch];
+        last_channel_slot[ch] = slot;
 
         if (!slot)
         {
@@ -286,14 +297,19 @@ static void snd_tick(uint tick_idx)
 
         if (ch == 2)
         {
-            *reg_wavsel = SWAV_SEL_ON | SWAV_SEL_BANK(0) | SWAV_SEL_DIM(0);
+            uint bank = slot->channel_config;
+            *reg_wavsel = SWAV_SEL_ON | SWAV_SEL_BANK(bank) | SWAV_SEL_DIM(0);
             *reg_ctl = SWAV_VOL(1);
             pitch0 += TO_FIXED(0.5 + 12);
         }
+        else if (ch == 3)
+        {
+            *reg_ctl = SSQR_IVOL(fx2int(slot->vol));
+        }
         else
         {
-            uint vol = fx2int(slot->vol);
-            *reg_ctl = SSQR_IVOL(vol) | duty_flags[slot->channel_config];
+            *reg_ctl = SSQR_IVOL(fx2int(slot->vol)) |
+                       duty_flags[slot->channel_config];
         }
         
         uint pitch1 = fx2int(pitch0);
@@ -303,7 +319,18 @@ static void snd_tick(uint tick_idx)
         FIXED rate1 = pitch_lut[pitch1 + 1];
         FIXED rate = fxmul((rate1 - rate0), pitch_frac) + rate0;
 
-        *reg_freq = SFREQ_HOLD | SFREQ_RESET | SFREQ_RATE(fx2int(rate) & SFREQ_RATE_MASK);
+        if (ch == 3)
+        {
+            *reg_freq = SFREQ_HOLD | SLFSR_SHIFT(pitch1 / 8) |
+                        SLFSR_DIV(0);
+        }
+        else
+        {
+            *reg_freq = SFREQ_HOLD |
+                        SFREQ_RATE(fx2int(rate) & SFREQ_RATE_MASK);
+        }
+        
+        if (reset || ch != 4) *reg_freq |= SFREQ_RESET;
     }
 }
 
@@ -400,6 +427,7 @@ void snd_irq_hblank(void)
 #define SNDCMD_CH_SQR_DUTY4     1
 #define SNDCMD_CH_SQR_DUTY8     2
 #define SNDCMD_CH_WAVE_TRIANGLE 0
+#define SNDCMD_CH_WAVE_NOISE    1
 
 #define SNDCMD_PRIO_PLAYER  1
 #define SNDCMD_PRIO_DEFAULT 0
@@ -499,12 +527,21 @@ static const snd_cmd sound_spring[] = {
     SNDCMD_END
 };
 
+static const snd_cmd sound_platform_place[] = {
+    SNDCMD_PRIO(SNDCMD_PRIO_PLAYER),
+    SNDCMD_SET_CH(SNDCMD_CH_WAVE, SNDCMD_CH_WAVE_NOISE),
+    SNDCMD_PITCH(0, SNDCMD_KEY(C, 6)),
+    SNDCMD_PITCH(1, SNDCMD_KEY(C, 2)),
+    SNDCMD_PLAY_SWP(4),
+    SNDCMD_END,
+};
+
 void init_sound_table(void)
 {
     snd_sounds[SND_ID_PLAYER_JUMP]    = sound_player_jump;
     snd_sounds[SND_ID_PLAYER_SHOOT]   = sound_player_shoot;
     snd_sounds[SND_ID_PLAYER_SPIT]    = sound_player_spit;
-    snd_sounds[SND_ID_PLATFORM_PLACE] = NULL;
+    snd_sounds[SND_ID_PLATFORM_PLACE] = sound_platform_place;
     snd_sounds[SND_ID_PLAYER_DIE]     = sound_player_death;
     snd_sounds[SND_ID_CHECKPOINT]     = sound_checkpoint;
     snd_sounds[SND_ID_SPRING]         = sound_spring;
