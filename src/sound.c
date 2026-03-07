@@ -9,6 +9,7 @@
 #include "tonc_core.h"
 #include "tonc_types.h"
 #include "gba_util.h"
+#include "math_util.h"
 
 #define SND_TICK_LENGTH    8
 #define TICKS_PER_FRAME    8
@@ -81,8 +82,7 @@ enum
 
 static const snd_cmd sound_player_jump[] = {
     SNDCMD_PRIO(SNDCMD_PRIO_PLAYER),
-    // SNDCMD_SET_CH(SNDCMD_CH_SQR1, SNDCMD_CH_SQR_DUTY8),
-    SNDCMD_SET_CH(SNDCMD_CH_WAVE, SNDCMD_CH_WAVE_TRIANGLE),
+    SNDCMD_SET_CH(SNDCMD_CH_SQR1, SNDCMD_CH_SQR_DUTY8),
     SNDCMD_PITCH(0, SNDCMD_KEY(C, 5)),
     SNDCMD_PITCH(1, SNDCMD_KEY(Eb, 6)),
     SNDCMD_PLAY_SWP(6),
@@ -111,7 +111,7 @@ static const snd_cmd sound_player_spit[] = {
 
 static const snd_cmd sound_checkpoint[] = {
     SNDCMD_PRIO(SNDCMD_PRIO_PLAYER),
-    SNDCMD_SET_CH(SNDCMD_CH_SQR1, SNDCMD_CH_SQR_DUTY2),
+    SNDCMD_SET_CH(SNDCMD_CH_WAVE, SNDCMD_CH_WAVE_TRIANGLE),
     SNDCMD_PITCH(0, SNDCMD_KEY(C, 4)),
     SNDCMD_PITCH(1, SNDCMD_KEY(A, 5)),
     SNDCMD_ARP2(4),
@@ -161,7 +161,9 @@ void snd_init(void)
     // no sweep
     REG_SND1SWEEP = SSW_OFF;
 
-    memcpy16((void *)REG_WAVE_RAM, tri_wavetable_bin, 8);
+    REG_SND3SEL = SWAV_SEL_BANK(1) | SWAV_SEL_DIM(0);
+    memcpy32((void *)REG_WAVE_RAM, tri_wavetable_bin, 4);
+    REG_SND3SEL = SWAV_SEL_BANK(0) | SWAV_SEL_DIM(0);
 }
 
 static bool proc_snd_slot(snd_slot_s *slot)
@@ -346,23 +348,26 @@ static void snd_tick(uint tick_idx)
             { SSQR_DUTY1_2, SSQR_DUTY1_4, SSQR_DUTY1_8 };
         
         *reg_dmgctl |= (1 << (ch + 0x8)) | (1 << (ch + 0xC));
-        
-        uint pitch = fx2int(slot->final_pitch);
-        FIXED pitch_frac = fx2ufrac(slot->final_pitch);
 
-        FIXED rate0 = pitch_lut[pitch];
-        FIXED rate1 = pitch_lut[pitch + 1];
-        FIXED rate = fxmul((rate1 - rate0), pitch_frac) + rate0;
+        FIXED pitch0 = slot->final_pitch;
 
         if (ch == 2)
         {
             *reg_wavsel = SWAV_SEL_ON | SWAV_SEL_BANK(0) | SWAV_SEL_DIM(0);
             *reg_ctl = SWAV_VOL(1);
+            pitch0 += TO_FIXED(0.5 + 12);
         }
         else
         {
             *reg_ctl = SSQR_IVOL(12) | duty_flags[slot->channel_config];
         }
+        
+        uint pitch1 = fx2int(pitch0);
+        FIXED pitch_frac = fx2ufrac(pitch0);
+
+        FIXED rate0 = pitch_lut[pitch1];
+        FIXED rate1 = pitch_lut[pitch1 + 1];
+        FIXED rate = fxmul((rate1 - rate0), pitch_frac) + rate0;
 
         *reg_freq = SFREQ_HOLD | SFREQ_RESET | SFREQ_RATE(fx2int(rate) & SFREQ_RATE_MASK);
     }
