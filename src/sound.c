@@ -311,6 +311,8 @@ void snd_frame(void)
 
 void snd_play(snd_id_e id)
 {
+    if (!snd_sounds[id]) return;
+    
     // find inactive sound slot. if none were found, cut off the 0th slot.
     // TODO: this does not properly remove the oldest sound. Fix this.
     snd_slot_s *slot = snd_slots;
