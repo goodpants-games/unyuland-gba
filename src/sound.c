@@ -11,37 +11,9 @@
 #include "gba_util.h"
 #include "math_util.h"
 
-#define SND_TICK_LENGTH    8
+#define TICKS_PER_PART     8
 #define TICKS_PER_FRAME    8
 #define ARPEGGIO_TICK      (2 * TICKS_PER_FRAME)
-
-#define SNDCMD_END 0x0000
-
-#define SNDCMD_CH_SQR1  0
-#define SNDCMD_CH_SQR2  1
-#define SNDCMD_CH_WAVE  2
-#define SNDCMD_CH_NOISE 3
-
-#define SNDCMD_CH_SQR_DUTY2     0
-#define SNDCMD_CH_SQR_DUTY4     1
-#define SNDCMD_CH_SQR_DUTY8     2
-#define SNDCMD_CH_WAVE_TRIANGLE 0
-
-#define SNDCMD_PRIO_PLAYER  1
-#define SNDCMD_PRIO_DEFAULT 0
-
-#define SNDCMD_SET_CH(idx, mode) (0x0001 | ((idx) << 4) | ((mode) << 6))
-#define SNDCMD_ARP2(ofs) (0x0002 | ((ofs) << 4))
-#define SNDCMD_ARP3(ofs) (0x0003 | ((ofs) << 4))
-#define SNDCMD_PITCH(i, key) (0x0004 | ((key) << 4) | ((i) << 12))
-#define SNDCMD_PLAY_ENV(len, start, end) (0x0005 | ((len) << 4) | ((start) << 10) | ((end) << 13))
-#define SNDCMD_PLAY_ENV_SWP(len, start, end) (0x0006 | ((len) << 4) | ((start) << 10) | ((end) << 13))
-#define SNDCMD_PLAY(len) SNDCMD_PLAY_ENV(len, 7, 7)
-#define SNDCMD_PLAY_SWP(len) SNDCMD_PLAY_ENV_SWP(len, 7, 7)
-#define SNDCMD_VIBRATO(spd, pow) (0x0007 | ((spd) << 4) | ((pow) << 10))
-#define SNDCMD_PRIO(prio) (0x0008 | ((prio) << 4))
-
-#define SNDCMD_KEY(key, octave) (SND_KEY_##key + ((octave) - 2) * 12)
 
 #define SNDCMD_OP_END      0x0000
 #define SNDCMD_OP_SET_CH   0x0001
@@ -80,45 +52,6 @@ enum
     SND_KEY_B
 };
 
-static const snd_cmd sound_player_jump[] = {
-    SNDCMD_PRIO(SNDCMD_PRIO_PLAYER),
-    SNDCMD_SET_CH(SNDCMD_CH_SQR1, SNDCMD_CH_SQR_DUTY8),
-    SNDCMD_PITCH(0, SNDCMD_KEY(C, 5)),
-    SNDCMD_PITCH(1, SNDCMD_KEY(Eb, 6)),
-    SNDCMD_PLAY_SWP(6),
-    SNDCMD_END,
-};
-
-static const snd_cmd sound_player_shoot[] = {
-    SNDCMD_PRIO(SNDCMD_PRIO_PLAYER),
-    SNDCMD_SET_CH(SNDCMD_CH_SQR1, SNDCMD_CH_SQR_DUTY2),
-    SNDCMD_PITCH(0, SNDCMD_KEY(C, 7)),
-    SNDCMD_PITCH(1, SNDCMD_KEY(Eb, 4)),
-    SNDCMD_PLAY_SWP(3),
-    SNDCMD_END,
-};
-
-static const snd_cmd sound_player_spit[] = {
-    SNDCMD_PRIO(SNDCMD_PRIO_PLAYER),
-    SNDCMD_SET_CH(SNDCMD_CH_SQR1, SNDCMD_CH_SQR_DUTY2),
-    SNDCMD_PITCH(0, SNDCMD_KEY(C, 5)),
-    SNDCMD_PITCH(1, SNDCMD_KEY(C, 4)),
-    SNDCMD_PLAY_SWP(3),
-    SNDCMD_PITCH(1, SNDCMD_KEY(D, 7)),
-    SNDCMD_PLAY_SWP(3),
-    SNDCMD_END,
-};
-
-static const snd_cmd sound_checkpoint[] = {
-    SNDCMD_PRIO(SNDCMD_PRIO_PLAYER),
-    SNDCMD_SET_CH(SNDCMD_CH_WAVE, SNDCMD_CH_WAVE_TRIANGLE),
-    SNDCMD_PITCH(0, SNDCMD_KEY(C, 4)),
-    SNDCMD_PITCH(1, SNDCMD_KEY(A, 5)),
-    SNDCMD_ARP2(4),
-    SNDCMD_PLAY_SWP(8),
-    SNDCMD_END,
-};
-
 snd_slot_s snd_slots[SND_SLOT_COUNT];
 const snd_cmd *snd_sounds[SND_SOUND_COUNT];
 
@@ -138,25 +71,17 @@ static uint scanline_wait = 0;
 
 #define pitch_lut ((const FIXED *)pitchlut_bin)
 
+static void init_sound_table(void);
+
 void snd_init(void)
 {
-    snd_sounds[SND_ID_PLAYER_JUMP]    = sound_player_jump;
-    snd_sounds[SND_ID_PLAYER_SHOOT]   = sound_player_shoot;
-    snd_sounds[SND_ID_PLAYER_SPIT]    = sound_player_spit;
-    snd_sounds[SND_ID_PLATFORM_PLACE] = NULL;
-    snd_sounds[SND_ID_PLAYER_DIE]     = NULL;
-    snd_sounds[SND_ID_CHECKPOINT]     = sound_checkpoint;
-    snd_sounds[SND_ID_SPRING]         = NULL;
-    snd_sounds[SND_ID_ENEMY_SPIT]     = NULL;
-    snd_sounds[SND_ID_ENEMY_DIE]      = NULL;
-    snd_sounds[SND_ID_MENU_MOVE]      = NULL;
-    snd_sounds[SND_ID_MENU_SELECT]    = NULL;
+    init_sound_table();
 
     // turn sound on
     REG_SNDSTAT = SSTAT_ENABLE;
     REG_SNDDMGCNT = SDMG_BUILD_LR(SDMG_SQR1, 7) | SDMG_BUILD_LR(SDMG_SQR2, 7)
                     | SDMG_BUILD_LR(SDMG_WAVE, 7);
-    REG_SNDDSCNT |= SDS_DMG100;
+    *((vu8 *)&REG_SNDDSCNT) = SDS_DMG100 | SDS_A50 | SDS_B50;
 
     // no sweep
     REG_SND1SWEEP = SSW_OFF;
@@ -250,12 +175,12 @@ static bool proc_snd_slot(snd_slot_s *slot)
             uint len = (instr >> 4) & 0x3F;
             uint vol_start = (instr >> 10) & 7;
             uint vol_end = (instr >> 13) & 7;
-            int denom = len * SND_TICK_LENGTH + 1;
+            int denom = len * TICKS_PER_PART;
             
             slot->pitch = int2fx(slot->pitch_reg[0]);
             slot->vol_increment = int2fx(vol_end - vol_start) / denom;
             slot->vol = vol_start;
-            slot->wait = len * SND_TICK_LENGTH;
+            slot->wait = len * TICKS_PER_PART;
             slot->arp_index = 0;
 
             if (opcode == SNDCMD_OP_PLAY_SWP)
@@ -359,7 +284,7 @@ static void snd_tick(uint tick_idx)
         }
         else
         {
-            *reg_ctl = SSQR_IVOL(12) | duty_flags[slot->channel_config];
+            *reg_ctl = SSQR_IVOL(7) | duty_flags[slot->channel_config];
         }
         
         uint pitch1 = fx2int(pitch0);
@@ -402,11 +327,25 @@ void snd_play(snd_id_e id)
     *slot = (snd_slot_s)
     {
         .flags = SND_SLOT_FLAG_ACTIVE,
+        .sound_id = id,
         .ip = snd_sounds[id]
     };
     
     if (!proc_snd_slot(slot))
         slot->flags = 0;
+}
+
+void snd_play_no_overlap(snd_id_e id)
+{
+    // don't play sound if an active sound slot using the same ID was found
+    for (int i = 0; i < SND_SLOT_COUNT; ++i)
+    {
+        snd_slot_s *v = snd_slots + i;
+        if (!(v->flags & SND_SLOT_FLAG_ACTIVE)) continue;
+        if (v->sound_id == id) return;
+    }
+
+    snd_play(id);
 }
 
 ARM_FUNC
@@ -428,4 +367,127 @@ void snd_irq_hblank(void)
 
     ++frame_tick_idx;
     scanline_wait = SCANLINE_WAIT_RESET;
+}
+
+
+
+
+
+
+
+
+
+
+#define SNDCMD_END 0x0000
+
+#define SNDCMD_CH_SQR1  0
+#define SNDCMD_CH_SQR2  1
+#define SNDCMD_CH_WAVE  2
+#define SNDCMD_CH_NOISE 3
+
+#define SNDCMD_CH_SQR_DUTY2     0
+#define SNDCMD_CH_SQR_DUTY4     1
+#define SNDCMD_CH_SQR_DUTY8     2
+#define SNDCMD_CH_WAVE_TRIANGLE 0
+
+#define SNDCMD_PRIO_PLAYER  1
+#define SNDCMD_PRIO_DEFAULT 0
+
+#define SNDCMD_SET_CH(idx, mode) (0x0001 | ((idx) << 4) | ((mode) << 6))
+#define SNDCMD_ARP2(ofs) (0x0002 | ((ofs) << 4))
+#define SNDCMD_ARP3(ofs) (0x0003 | ((ofs) << 4))
+#define SNDCMD_PITCH(i, key) (0x0004 | ((key) << 4) | ((i) << 12))
+#define SNDCMD_PLAY_ENV(len, start, end) (0x0005 | ((len) << 4) | ((start) << 10) | ((end) << 13))
+#define SNDCMD_PLAY_ENV_SWP(len, start, end) (0x0006 | ((len) << 4) | ((start) << 10) | ((end) << 13))
+#define SNDCMD_PLAY(len) SNDCMD_PLAY_ENV(len, 7, 7)
+#define SNDCMD_PLAY_SWP(len) SNDCMD_PLAY_ENV_SWP(len, 7, 7)
+#define SNDCMD_VIBRATO(spd, pow) (0x0007 | ((spd) << 4) | ((pow) << 10))
+#define SNDCMD_PRIO(prio) (0x0008 | ((prio) << 4))
+
+#define SNDCMD_KEY(key, octave) (SND_KEY_##key + ((octave) - 2) * 12)
+
+static const snd_cmd sound_player_jump[] = {
+    SNDCMD_PRIO(SNDCMD_PRIO_PLAYER),
+    SNDCMD_SET_CH(SNDCMD_CH_SQR1, SNDCMD_CH_SQR_DUTY8),
+    SNDCMD_PITCH(0, SNDCMD_KEY(C, 5)),
+    SNDCMD_PITCH(1, SNDCMD_KEY(Eb, 6)),
+    SNDCMD_PLAY_SWP(6),
+    SNDCMD_END,
+};
+
+static const snd_cmd sound_player_shoot[] = {
+    SNDCMD_PRIO(SNDCMD_PRIO_PLAYER),
+    SNDCMD_SET_CH(SNDCMD_CH_SQR1, SNDCMD_CH_SQR_DUTY2),
+    SNDCMD_PITCH(0, SNDCMD_KEY(C, 7)),
+    SNDCMD_PITCH(1, SNDCMD_KEY(Eb, 4)),
+    SNDCMD_PLAY_SWP(3),
+    SNDCMD_END,
+};
+
+static const snd_cmd sound_player_spit[] = {
+    SNDCMD_PRIO(SNDCMD_PRIO_PLAYER),
+    SNDCMD_SET_CH(SNDCMD_CH_SQR1, SNDCMD_CH_SQR_DUTY2),
+    SNDCMD_PITCH(0, SNDCMD_KEY(C, 5)),
+    SNDCMD_PITCH(1, SNDCMD_KEY(C, 4)),
+    SNDCMD_PLAY_SWP(3),
+    SNDCMD_PITCH(1, SNDCMD_KEY(D, 7)),
+    SNDCMD_PLAY_SWP(3),
+    SNDCMD_END,
+};
+
+static const snd_cmd sound_player_death[] = {
+    SNDCMD_PRIO(SNDCMD_PRIO_PLAYER),
+    SNDCMD_SET_CH(SNDCMD_CH_WAVE, SNDCMD_CH_WAVE_TRIANGLE),
+    SNDCMD_PITCH(0, SNDCMD_KEY(Db, 6)),
+    SNDCMD_PITCH(1, SNDCMD_KEY(C, 5)),
+    SNDCMD_ARP2(10),
+    SNDCMD_PLAY_SWP(20),
+    SNDCMD_END,
+};
+
+static const snd_cmd sound_checkpoint[] = {
+    SNDCMD_PRIO(SNDCMD_PRIO_PLAYER),
+    SNDCMD_SET_CH(SNDCMD_CH_WAVE, SNDCMD_CH_WAVE_TRIANGLE),
+    SNDCMD_PITCH(0, SNDCMD_KEY(C, 4)),
+    SNDCMD_PITCH(1, SNDCMD_KEY(A, 5)),
+    SNDCMD_ARP2(4),
+    SNDCMD_PLAY_SWP(16),
+    SNDCMD_END,
+};
+
+static const snd_cmd sound_enemy_spit[] = {
+    SNDCMD_PRIO(SNDCMD_PRIO_DEFAULT),
+    SNDCMD_SET_CH(SNDCMD_CH_SQR2, SNDCMD_CH_SQR_DUTY2),
+    SNDCMD_PITCH(0, SNDCMD_KEY(C, 3)),
+    SNDCMD_PITCH(1, SNDCMD_KEY(A, 2)),
+    SNDCMD_PLAY_SWP(3),
+    SNDCMD_PITCH(1, SNDCMD_KEY(A, 4)),
+    SNDCMD_PLAY_SWP(3),
+    SNDCMD_END,
+};
+
+static const snd_cmd sound_enemy_death[] = {
+    SNDCMD_PRIO(SNDCMD_PRIO_PLAYER),
+    SNDCMD_SET_CH(SNDCMD_CH_SQR2, SNDCMD_CH_SQR_DUTY2),
+    SNDCMD_PITCH(0, SNDCMD_KEY(Gb, 3)),
+    SNDCMD_PITCH(1, SNDCMD_KEY(A, 2)),
+    SNDCMD_PLAY_SWP(6),
+    SNDCMD_PITCH(1, SNDCMD_KEY(G, 2)),
+    SNDCMD_PLAY_SWP(8),
+    SNDCMD_END,
+};
+
+void init_sound_table(void)
+{
+    snd_sounds[SND_ID_PLAYER_JUMP]    = sound_player_jump;
+    snd_sounds[SND_ID_PLAYER_SHOOT]   = sound_player_shoot;
+    snd_sounds[SND_ID_PLAYER_SPIT]    = sound_player_spit;
+    snd_sounds[SND_ID_PLATFORM_PLACE] = NULL;
+    snd_sounds[SND_ID_PLAYER_DIE]     = sound_player_death;
+    snd_sounds[SND_ID_CHECKPOINT]     = sound_checkpoint;
+    snd_sounds[SND_ID_SPRING]         = NULL;
+    snd_sounds[SND_ID_ENEMY_SPIT]     = sound_enemy_spit;
+    snd_sounds[SND_ID_ENEMY_DIE]      = sound_enemy_death;
+    snd_sounds[SND_ID_MENU_MOVE]      = NULL;
+    snd_sounds[SND_ID_MENU_SELECT]    = NULL;
 }

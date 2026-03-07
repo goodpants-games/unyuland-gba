@@ -36,13 +36,13 @@ typedef u16 snd_cmd;
 //
 // 0101xxxxxxaaabbb
 //  OP5: Play Note (pitch register 0)
-//  x - Length in ticks
+//  x - Length in parts
 //  a - Start volume
 //  b - End volume
 //
 // 0110xxxxxxaaabbb
 //  OP6: Play Note + pitch sweep (between the pitch registers)
-//  x - Length in ticks
+//  x - Length in parts
 //  a - Start volume
 //  b - End volume
 //
@@ -64,6 +64,7 @@ typedef u16 snd_cmd;
 typedef struct snd_slot
 {
     u8 flags;
+    u8 sound_id;
 
     u8 channel;
     u8 channel_config;
@@ -75,9 +76,9 @@ typedef struct snd_slot
     u8 vib_speed;
     u8 vib_strength;
 
-    u8 wait;
     u8 arp_index;
     u8 pitch_reg[2];
+    u16 wait;
 
     FIXED pitch_increment; // per tick
     FIXED vol_increment;  // per tick
@@ -108,6 +109,7 @@ extern const snd_cmd *snd_sounds[SND_SOUND_COUNT];
 void snd_init(void);
 void snd_frame(void);
 void snd_play(snd_id_e id);
+void snd_play_no_overlap(snd_id_e id);
 ARM_FUNC void snd_irq_hblank(void);
 
 //

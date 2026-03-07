@@ -166,7 +166,7 @@ static void unpause_game(void)
 {
     game_paused = false;
     close_pause_menu();
-    mmSetModuleVolume((int)(1024 * 0.25));
+    mmSetModuleVolume((int)(1024 * 0.3));
     gfx_set_palette_multiplied(FIX_ONE);
 }
 
@@ -289,7 +289,7 @@ int main(void)
 
     setup_game_hud();
     mmStart(MOD_TESTMOD, MM_PLAY_LOOP);
-    mmSetModuleVolume((int)(1024 * 0.25));
+    mmSetModuleVolume((int)(1024 * 0.3));
 
     snd_init();
 

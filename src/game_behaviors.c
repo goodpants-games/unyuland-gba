@@ -1,7 +1,8 @@
+#include <tonc_math.h>
+#include <tonc_input.h>
+#include <tonc_video.h>
 #include "game.h"
 #include "log.h"
-#include "tonc_math.h"
-#include "tonc_input.h"
 #include "math_util.h"
 #include "sound.h"
 
@@ -97,6 +98,8 @@ static bool enemy_base_proj_touch(entity_s *self, projectile_s *proj,
         self->vel.x = TO_FIXED(0.5) * sgn(proj->vx);
         self->vel.y = TO_FIXED(-1.5);
         self->gmult = TO_FIXED(1.2);
+
+        snd_play(SND_ID_ENEMY_DIE);
     }
     else
     {
@@ -529,6 +532,7 @@ static void behavior_player_update(entity_s *self)
         self->sprite.frame = 0;
         self->sprite.accum = 0;
         data->death_timer = 0;
+        snd_play(SND_ID_PLAYER_DIE);
     }
 }
 
@@ -564,6 +568,8 @@ static void behavior_player_attacked(entity_s *self, entity_s *attacker,
         self->sprite.flags |= SPRITE_FLAG_FLIP_X;
 
     data->death_timer = 0;
+
+    snd_play(SND_ID_PLAYER_DIE);
 }
 
 static bool behavior_player_proj_touch(entity_s *self, projectile_s *proj)
@@ -933,6 +939,12 @@ static void behavior_gun_enemy_update(entity_s *self)
         self->sprite.frame = 0;
         self->sprite.accum = 0;
         self->sprite.flags |= SPRITE_FLAG_PLAYING;
+
+        int screen_dx = fx2int(self->pos.x) - (g_game.cam_x + SCREEN_WIDTH / 4);
+        int screen_dy = fx2int(self->pos.y) - (g_game.cam_y + SCREEN_HEIGHT / 4);
+        int screen_dist_sq = screen_dx * screen_dx + screen_dy * screen_dy;
+        if (screen_dist_sq < 100 * 100)
+            snd_play_no_overlap(SND_ID_ENEMY_SPIT);
     }
 }
 
