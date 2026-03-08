@@ -165,6 +165,14 @@ void game_load_entity(const entity_load_s *load_data)
     {
         entity_fragile_block_init(ent, load_data->x, load_data->y);
     }
+    STR_CASE("red_orb")
+    {
+        entity_orb(ent, load_data->x, load_data->y, false);
+    }
+    STR_CASE("blue_orb")
+    {
+        entity_orb(ent, load_data->x, load_data->y, true);
+    }
     STR_CASE_FALLBACK
     {
         LOG_DBG("unknown entity type %s", name);

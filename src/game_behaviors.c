@@ -1257,3 +1257,58 @@ const behavior_def_s behavior_fragile_block = {
 };
 
 #pragma endregion
+
+
+
+
+
+
+
+
+
+/////////
+// orb //
+/////////
+#pragma region orb
+
+static const behavior_def_s behavior_orb;
+
+typedef struct orb_data
+{
+    uint frame;
+}
+orb_data_s;
+
+void entity_orb(entity_s *self, FIXED px, FIXED py, bool blue)
+{
+    self->pos.x = px + int2fx(1);
+    self->pos.y = py;
+    self->col.w = 6;
+    self->col.h = 6;
+    self->sprite.graphic_id = blue ? SPRID_GAME_FIRE_ORB_BLUE
+                                   : SPRID_GAME_FIRE_ORB_RED;
+    self->sprite.ox = -1;
+    self->sprite.oy = -1;
+    self->sprite.flags |= SPRITE_FLAG_PLAYING;
+    self->behavior = &behavior_orb;
+
+    orb_data_s *data = (orb_data_s *)self->userdata;
+    data->frame = 0;
+}
+
+static void behavior_orb_update(entity_s *self)
+{
+    orb_data_s *data = (orb_data_s *)self->userdata;
+
+    int oy = sine_lut(data->frame * 256 / 120) * 2 + 128;
+    self->sprite.oy = -1 + (oy / 256);
+
+    if (++data->frame == 120)
+        data->frame = 120;
+}
+
+static const behavior_def_s behavior_orb = {
+    .update = behavior_orb_update
+};
+
+#pragma endregion
