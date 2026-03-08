@@ -155,7 +155,7 @@ static bool proc_snd_slot(snd_slot_s *slot)
 
     while (true)
     {
-        snd_cmd instr = *(slot->ip++);
+        uint instr = (uint) *(slot->ip++);
         uint opcode = instr & SNDCMD_OP_MASK;
         switch (opcode)
         {

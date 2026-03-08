@@ -4,5 +4,9 @@
       a real GBA, since they are covered by a shadow.
 - maybemake substep processing local rather than global, like how it is in the
   code for the original unyuland.
-- sound:
-    - noise channel
+- strange bug i don't know how to replicate, where:
+   - inter-entity collision does not work at all anymore
+   - pause menu graphics are glitch y
+  possible theory is that the oob writes are occuring in IWRAM and messing with
+  the physics and printing code... could also be related to the sound system,
+  since it only started happening after i finished it.
