@@ -25,7 +25,6 @@ def gen_noise() -> list[float]:
         smp = float(drum_buf & 1)
         smp = (smp * 2.0 - 1.0) / 2
         smp = (smp + 1.0) / 2.0
-        print(smp)
         new_buf = drum_buf >> 1
         if ((drum_buf + new_buf) & 1) == 1:
             new_buf += 10 << 2
