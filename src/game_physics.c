@@ -270,7 +270,7 @@ static void col_ent_removed(int col_ent_idx)
 
 // sweep and prune
 ARM_FUNC
-static inline void sort_edge_list(col_bp_edge_s *const list,
+static void sort_edge_list(col_bp_edge_s *const list,
                            const int list_count,
                            u8 contact_pairs[ENTITY_PAIR_SIZE],
                            col_bp_overlap_s *overlaps, int *overlap_count)
