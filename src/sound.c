@@ -188,6 +188,12 @@ static bool proc_snd_slot(snd_slot_s *slot)
         case SNDCMD_OP_PLAY_SWP:
         {
             uint len = (instr >> 4) & 0x3F;
+            if (len == 0)
+            {
+                LOG_WRN("sound.c: note length is 0");
+                len = 1;
+            }
+
             uint vol_start = (instr >> 10) & 7;
             uint vol_end = (instr >> 13) & 7;
             int denom = len * TICKS_PER_PART;
@@ -236,6 +242,8 @@ static bool proc_snd_slot(snd_slot_s *slot)
 
 static void stop_sound(snd_slot_s *slot)
 {
+    if (next_snd_slot == 0) return;
+
     snd_slot_s *end = snd_slots + (next_snd_slot - 1);
     while (slot != end)
     {
@@ -259,6 +267,7 @@ static void snd_tick(uint tick_idx)
         if (!proc_snd_slot(slot))
         {
             stop_sound(slot);
+            --i;
             continue;
         }
 
@@ -344,7 +353,7 @@ static void snd_tick(uint tick_idx)
                         SFREQ_RATE(fx2int(rate) & SFREQ_RATE_MASK);
         }
         
-        if (reset || ch != 4) *reg_freq |= SFREQ_RESET;
+        if (reset || ch != 3) *reg_freq |= SFREQ_RESET;
     }
 }
 
