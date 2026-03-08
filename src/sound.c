@@ -15,6 +15,7 @@
 #define TICKS_PER_PART     8
 #define TICKS_PER_FRAME    8
 #define ARPEGGIO_TICK      (2 * TICKS_PER_FRAME)
+#define MAX_ACTIVE_SOUNDS  8
 
 #define SNDCMD_OP_END      0x0000
 #define SNDCMD_OP_SET_CH   0x0001
@@ -57,8 +58,9 @@ enum
     SND_KEY_B
 };
 
-EWRAM_DATA snd_slot_s snd_slots[SND_SLOT_COUNT];
-const snd_cmd *snd_sounds[SND_SOUND_COUNT];
+EWRAM_BSS static snd_slot_s snd_slots[MAX_ACTIVE_SOUNDS];
+EWRAM_DATA static u16 next_snd_slot = 0;
+static const snd_cmd *snd_sounds[SND_SOUND_COUNT];
 
 // static vu16 *const cnt_regs[] =
 //     { &REG_SND1CNT, &REG_SND2CNT, &REG_SND3CNT, &REG_SND4CNT };
@@ -232,19 +234,31 @@ static bool proc_snd_slot(snd_slot_s *slot)
     return true;
 }
 
+static void stop_sound(snd_slot_s *slot)
+{
+    snd_slot_s *end = snd_slots + (next_snd_slot - 1);
+    while (slot != end)
+    {
+        *slot = *(slot + 1);
+        ++slot;
+    }
+
+    --next_snd_slot;
+}
+
 static void snd_tick(uint tick_idx)
 {
     static snd_slot_s *last_channel_slot[4] = { NULL, NULL, NULL, NULL };
     snd_slot_s *channel_slot[4] = { NULL, NULL, NULL, NULL };
 
-    for (int i = 0; i < SND_SLOT_COUNT; ++i)
+    for (int i = 0; i < next_snd_slot; ++i)
     {
         snd_slot_s *slot = snd_slots + i;
         if (!(slot->flags & SND_SLOT_FLAG_ACTIVE)) continue;
 
         if (!proc_snd_slot(slot))
         {
-            slot->flags = 0;
+            stop_sound(slot);
             continue;
         }
 
@@ -348,20 +362,9 @@ void snd_frame(void)
 void snd_play(snd_id_e id)
 {
     if (!snd_sounds[id]) return;
+    if (next_snd_slot == MAX_ACTIVE_SOUNDS) return;
     
-    // find inactive sound slot. if none were found, cut off the 0th slot.
-    // TODO: this does not properly remove the oldest sound. Fix this.
-    snd_slot_s *slot = snd_slots;
-    for (int i = 0; i < SND_SLOT_COUNT; ++i)
-    {
-        snd_slot_s *v = snd_slots + i;
-        if (!(v->flags & SND_SLOT_FLAG_ACTIVE))
-        {
-            slot = v;
-            break;
-        }
-    }
-
+    snd_slot_s *slot = snd_slots + next_snd_slot++;
     *slot = (snd_slot_s)
     {
         .flags = SND_SLOT_FLAG_ACTIVE,
@@ -370,17 +373,31 @@ void snd_play(snd_id_e id)
     };
     
     if (!proc_snd_slot(slot))
-        slot->flags = 0;
+        stop_sound(slot);
 }
 
 void snd_play_no_overlap(snd_id_e id)
 {
     // don't play sound if an active sound slot using the same ID was found
-    for (int i = 0; i < SND_SLOT_COUNT; ++i)
+    const uint e = next_snd_slot;
+    snd_slot_s *slot_cut;
+    for (uint i = 0; i < e; ++i)
     {
-        snd_slot_s *v = snd_slots + i;
-        if (!(v->flags & SND_SLOT_FLAG_ACTIVE)) continue;
-        if (v->sound_id == id) return;
+        slot_cut = snd_slots + i;
+        if (slot_cut->sound_id == id)
+        {
+            *slot_cut = (snd_slot_s)
+            {
+                .flags = SND_SLOT_FLAG_ACTIVE,
+                .sound_id = id,
+                .ip = snd_sounds[id]
+            };
+            
+            if (!proc_snd_slot(slot_cut))
+                stop_sound(slot_cut);
+
+            return;
+        }
     }
 
     snd_play(id);

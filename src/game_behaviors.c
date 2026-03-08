@@ -1023,7 +1023,7 @@ static void behavior_spring_ent_touch(entity_s *self, entity_s *other, int nx,
     if (ny == -1)
     {
         other->vel.y = self->userdata[0] / (other->mass * 2) * 4;
-        snd_play(SND_ID_SPRING);
+        snd_play_no_overlap(SND_ID_SPRING);
     }
 }
 

@@ -4,8 +4,6 @@
 #include <tonc_types.h>
 #include "gba_util.h"
 
-#define SND_SLOT_COUNT     8
-
 typedef u16 snd_cmd;
 
 // 16 bits
@@ -104,9 +102,6 @@ typedef enum snd_id
     SND_ID_MENU_BACK,
     SND_SOUND_COUNT,
 } snd_id_e;
-
-extern snd_slot_s snd_slots[SND_SLOT_COUNT];
-extern const snd_cmd *snd_sounds[SND_SOUND_COUNT];
 
 void snd_init(void);
 void snd_frame(void);

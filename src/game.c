@@ -41,8 +41,8 @@ typedef struct game_state
 game_state_s;
 
 game_s g_game;
-EWRAM_DATA game_state_s game_saved_state;
-EWRAM_DATA static u8 game_room_collision[GAME_COLLISION_MAP_SIZE];
+EWRAM_BSS game_state_s game_saved_state;
+EWRAM_BSS static u8 game_room_collision[GAME_COLLISION_MAP_SIZE];
 
 static uint render_object_count = 0;
 static render_obj_s render_objects[MAX_RENDER_OBJS];
