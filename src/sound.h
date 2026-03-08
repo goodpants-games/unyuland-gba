@@ -5,7 +5,6 @@
 #include "gba_util.h"
 
 #define SND_SLOT_COUNT     8
-#define SND_SOUND_COUNT    12
 
 typedef u16 snd_cmd;
 
@@ -102,6 +101,8 @@ typedef enum snd_id
     SND_ID_ENEMY_DIE,
     SND_ID_MENU_MOVE,
     SND_ID_MENU_SELECT,
+    SND_ID_MENU_BACK,
+    SND_SOUND_COUNT,
 } snd_id_e;
 
 extern snd_slot_s snd_slots[SND_SLOT_COUNT];

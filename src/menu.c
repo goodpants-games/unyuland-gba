@@ -2,6 +2,7 @@
 
 #include "menu.h"
 #include "gfx.h"
+#include "sound.h"
 
 #define TEXT_OFFSET 8 // origin_x is location of dot
 
@@ -33,11 +34,13 @@ menu_status_e menu_update(menu_s *menu, int *result)
     {
         *result = menu->selected;
         status = MENU_STATUS_SELECT;
+        snd_play_no_overlap(SND_ID_MENU_SELECT);
         goto no_sync;
     }
     else if (key_hit(KEY_B))
     {
         status = MENU_STATUS_BACK;
+        snd_play_no_overlap(SND_ID_MENU_BACK);
         goto no_sync;
     }
     else if (key_hit(KEY_DOWN))
@@ -63,6 +66,8 @@ menu_status_e menu_update(menu_s *menu, int *result)
                             menu->selection_labels[menu->selected],
                             TEXT_COLOR_YELLOW);
         gfx_text_bmap_print(dot_x, text_y, "*", TEXT_COLOR_YELLOW);
+
+        snd_play_no_overlap(SND_ID_MENU_MOVE);
     }
     else if (key_hit(KEY_UP))
     {
@@ -88,6 +93,8 @@ menu_status_e menu_update(menu_s *menu, int *result)
                             menu->selection_labels[menu->selected],
                             TEXT_COLOR_YELLOW);
         gfx_text_bmap_print(dot_x, text_y, "*", TEXT_COLOR_YELLOW);
+
+        snd_play_no_overlap(SND_ID_MENU_MOVE);
     }
     else if (menu->timer == 20)
     {

@@ -517,8 +517,8 @@ static const snd_cmd sound_enemy_death[] = {
 };
 
 static const snd_cmd sound_spring[] = {
-    SNDCMD_PRIO(SNDCMD_PRIO_PLAYER),
-    SNDCMD_SET_CH(SNDCMD_CH_SQR1, SNDCMD_CH_SQR_DUTY8),
+    SNDCMD_PRIO(SNDCMD_PRIO_DEFAULT),
+    SNDCMD_SET_CH(SNDCMD_CH_SQR2, SNDCMD_CH_SQR_DUTY8),
     SNDCMD_PITCH(0, SNDCMD_KEY(Eb, 4)),
     SNDCMD_PITCH(1, SNDCMD_KEY(Gb, 5)),
     SNDCMD_VIBRATO(5, 6),
@@ -536,6 +536,33 @@ static const snd_cmd sound_platform_place[] = {
     SNDCMD_END,
 };
 
+static const snd_cmd sound_menu_move[] = {
+    SNDCMD_PRIO(SNDCMD_PRIO_DEFAULT),
+    SNDCMD_SET_CH(SNDCMD_CH_SQR2, SNDCMD_CH_SQR_DUTY2),
+    SNDCMD_PITCH(0, SNDCMD_KEY(G, 6)),
+    SNDCMD_PLAY_ENV(3, 7, 0),
+    SNDCMD_END,
+};
+
+static const snd_cmd sound_menu_select[] = {
+    SNDCMD_PRIO(SNDCMD_PRIO_DEFAULT),
+    SNDCMD_SET_CH(SNDCMD_CH_WAVE, SNDCMD_CH_WAVE_TRIANGLE),
+    SNDCMD_PITCH(0, SNDCMD_KEY(A, 5)),
+    SNDCMD_ARP2(4),
+    SNDCMD_PLAY(4),
+    SNDCMD_END,
+};
+
+static const snd_cmd sound_menu_back[] = {
+    SNDCMD_PRIO(SNDCMD_PRIO_DEFAULT),
+    SNDCMD_SET_CH(SNDCMD_CH_WAVE, SNDCMD_CH_WAVE_TRIANGLE),
+    SNDCMD_PITCH(0, SNDCMD_KEY(A, 5)),
+    SNDCMD_PLAY(2),
+    SNDCMD_PITCH(0, SNDCMD_KEY(E, 5)),
+    SNDCMD_PLAY(2),
+    SNDCMD_END,
+};
+
 void init_sound_table(void)
 {
     snd_sounds[SND_ID_PLAYER_JUMP]    = sound_player_jump;
@@ -547,6 +574,7 @@ void init_sound_table(void)
     snd_sounds[SND_ID_SPRING]         = sound_spring;
     snd_sounds[SND_ID_ENEMY_SPIT]     = sound_enemy_spit;
     snd_sounds[SND_ID_ENEMY_DIE]      = sound_enemy_death;
-    snd_sounds[SND_ID_MENU_MOVE]      = NULL;
-    snd_sounds[SND_ID_MENU_SELECT]    = NULL;
+    snd_sounds[SND_ID_MENU_MOVE]      = sound_menu_move;
+    snd_sounds[SND_ID_MENU_SELECT]    = sound_menu_select;
+    snd_sounds[SND_ID_MENU_BACK]      = sound_menu_back;
 }
