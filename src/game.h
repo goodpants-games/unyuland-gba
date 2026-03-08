@@ -82,6 +82,13 @@ typedef enum proj_kind
     PROJ_KIND_ENEMY
 } proj_kind_e;
 
+typedef enum player_spit_mode
+{
+    PLAYER_SPIT_MODE_PLATFORM,
+    PLAYER_SPIT_MODE_BULLET,
+}
+player_spit_mode_e;
+
 struct entity;
 
 typedef struct projectile
@@ -190,10 +197,12 @@ typedef struct game {
     uint active_interactable_timer;
     FIXED interactable_indicator_offset;
     
-    int player_ammo;
-    int collected_rorbs;
-    int collected_borbs;
+    uint player_ammo;
+    uint player_spit_mode;
+    uint collected_rorbs;
+    uint collected_borbs;
 
+    bool player_is_dead;
     bool dialogue_active;
     bool queue_dialogue_start;
     const char *dialogue_page;

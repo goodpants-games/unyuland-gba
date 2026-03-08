@@ -36,7 +36,8 @@ typedef struct game_state
     int cam_x, cam_y;
     room_trans_state_s room_trans;
     entity_s *active_water_tank;
-    int player_ammo;
+    uint player_ammo;
+    uint player_spit_mode;
 }
 game_state_s;
 
@@ -463,6 +464,7 @@ void game_init(void)
     g_game.cam_y = 0;
     g_game.input_enabled = true;
     g_game.player_ammo = 100;
+    g_game.player_spit_mode = 0;
     
     for (int i = 0; i < MAX_ENTITY_COUNT; ++i)
     {
@@ -1093,6 +1095,7 @@ void game_save_state(void)
     game_saved_state.room_trans = g_game.room_trans;
     game_saved_state.active_water_tank = g_game.active_water_tank;
     game_saved_state.player_ammo = g_game.player_ammo;
+    game_saved_state.player_spit_mode = g_game.player_spit_mode;
 }
 
 void game_restore_state(void)
@@ -1146,6 +1149,8 @@ void game_restore_state(void)
     g_game.room_trans = game_saved_state.room_trans;
     g_game.active_water_tank = game_saved_state.active_water_tank;
     g_game.player_ammo = game_saved_state.player_ammo;
+    g_game.player_spit_mode = game_saved_state.player_spit_mode;
+    g_game.player_is_dead = false;
 
     gfx_mark_scroll_dirty();
 }

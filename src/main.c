@@ -1,3 +1,5 @@
+#include <stdint.h>
+#include <limits.h>
 #include <tonc.h>
 #include <game_sprdb.h>
 #include <tileset_gfx.h>
@@ -16,6 +18,7 @@
 #include "log.h"
 #include "menu.h"
 #include "tonc_irq.h"
+#include "tonc_video.h"
 
 // #define MAIN_PROFILE
 
@@ -50,23 +53,6 @@ static void int_to_str(int n, char *buf)
     while (ch > buf);
 }
 
-static void text_test(void)
-{
-    gfx_text_bmap_dst_assign(0, 6, 0, 2);
-
-    u32 black8[8] = {0x11111111, 0x11111111, 0x11111111, 0x11111111,
-                    0x11111111, 0x11111111, 0x11111111, 0x11111111};
-    u32 black2[8] = {0x11111111, 0x11111111, 0x00000000, 0x00000000,
-                    0x00000000, 0x00000000, 0x00000000, 0x00000000};
-    
-    gfx_text_bmap_fill(0, 0, 30, 4, black8);
-    gfx_text_bmap_fill(0, 4, 30, 1, black2);
-
-    gfx_text_bmap_print(0, 0, "Hello, world!", TEXT_COLOR_WHITE);
-    gfx_text_bmap_print(0, 12, "lorem ipsum dolor", TEXT_COLOR_WHITE);
-    gfx_text_bmap_print(2, 24, "sit amet", TEXT_COLOR_WHITE);
-}
-
 // DURING GAMEPLAY OR WHEN PAUSED:
 //   (0-7)  ->(0-7): pause menu
 //   (10-11)->(18->19): HUD
@@ -83,6 +69,26 @@ static void clear_game_hud(void)
     gfx_text_bmap_fill(0, HUD_ROW_ORIGIN + 1, GFX_TEXT_BMP_COLS, 1, bg2);
 }
 
+static void update_hud_sprites(uint face_frame, uint mode_frame)
+{
+    gfx_sprdb_s sprdb = gfx_get_sprdb((const gfx_root_header_s *)game_sprdb_bin);
+    gfx_draw_sprite_state_s state = (gfx_draw_sprite_state_s)
+    {
+        .sprdb = &sprdb,
+        .dst_obj = &gfx_oam_buffer[0],
+        .dst_obj_count = 16,
+        .a1 = ATTR2_PRIO(0),
+    };
+
+    const int ypos = SCREEN_HEIGHT - 10;
+    gfx_draw_sprite(&state, SPRID_GAME_UI_ICONS, 0, 0, ypos);
+    gfx_draw_sprite(&state, SPRID_GAME_UI_ICONS, 5 + face_frame, 48, ypos);
+    gfx_draw_sprite(&state, SPRID_GAME_UI_ICONS, 3 + mode_frame, 62, ypos);
+
+    gfx_draw_sprite(&state, SPRID_GAME_UI_ICONS, 1, 240 - 48, ypos);
+    gfx_draw_sprite(&state, SPRID_GAME_UI_ICONS, 2, 240 - 24, ypos);
+}
+
 static void setup_game_hud(void)
 {
     // set up pause menu display
@@ -92,17 +98,7 @@ static void setup_game_hud(void)
     gfx_text_bmap_dst_assign(18, 2, HUD_ROW_ORIGIN, 3);
 
     clear_game_hud();
-
-    gfx_sprdb_s sprdb = gfx_get_sprdb((const gfx_root_header_s *)game_sprdb_bin);
-    gfx_draw_sprite_state_s state = (gfx_draw_sprite_state_s)
-    {
-        .sprdb = &sprdb,
-        .dst_obj = &gfx_oam_buffer[0],
-        .dst_obj_count = 16,
-        .a1 = ATTR2_PRIO(0),
-    };
-    
-    gfx_draw_sprite(&state, SPRID_GAME_UI_ICONS, 0, 0, SCREEN_HEIGHT - 10);
+    update_hud_sprites(0, 0);
 }
 
 #define PAUSE_MENU_OPTION_COUNT 4
@@ -201,6 +197,56 @@ static void update_pause_menu(void)
 
         default: break;
     }
+}
+
+static void update_hud(void)
+{
+    char buf[8];
+    static uint last_player_ammo = UINT_MAX;
+    static uint last_rorbs = UINT_MAX;
+    static uint last_borbs = UINT_MAX;
+    static uint blink_timer = 150;
+
+    if (g_game.player_ammo != last_player_ammo)
+    {
+        last_player_ammo = g_game.player_ammo;
+        
+        int_to_str(g_game.player_ammo, buf);
+        gfx_text_bmap_print(12, HUD_Y_ORIGIN, "\x7F\x7F\x7F", TEXT_COLOR_BLACK);
+        gfx_text_bmap_print(12, HUD_Y_ORIGIN, buf, TEXT_COLOR_WHITE);
+    }
+
+    if (g_game.collected_rorbs != last_rorbs)
+    {
+        last_rorbs = g_game.collected_rorbs;
+        int_to_str(g_game.collected_rorbs, buf);
+
+        gfx_text_bmap_print(240 - 12, HUD_Y_ORIGIN, "\x7F", TEXT_COLOR_BLACK);
+        gfx_text_bmap_print(240 - 12, HUD_Y_ORIGIN, buf, TEXT_COLOR_WHITE);
+    }
+
+    if (g_game.collected_borbs != last_borbs)
+    {
+        last_borbs = g_game.collected_borbs;
+        int_to_str(g_game.collected_borbs, buf);
+
+        gfx_text_bmap_print(240 - 36, HUD_Y_ORIGIN, "\x7F", TEXT_COLOR_BLACK);
+        gfx_text_bmap_print(240 - 36, HUD_Y_ORIGIN, buf, TEXT_COLOR_WHITE);
+    }
+
+    uint face_frame = 0;
+    if (g_game.player_spit_mode == PLAYER_SPIT_MODE_BULLET)
+        face_frame = 1;
+
+    if (blink_timer <= 4)
+        face_frame = 2;
+
+    if (--blink_timer == 0) blink_timer = 150;
+
+    if (g_game.player_is_dead)
+        face_frame = 3;
+    
+    update_hud_sprites(face_frame, g_game.player_spit_mode);
 }
 
 __attribute__((section(".ewram")))
@@ -316,18 +362,7 @@ int main(void)
         if (!game_paused)
         {
             game_update();
-
-            static int last_player_ammo = -1;
-            if (g_game.player_ammo != last_player_ammo)
-            {
-                last_player_ammo = g_game.player_ammo;
-                LOG_DBG("print!!!");
-                
-                char buf[8];
-                int_to_str(g_game.player_ammo, buf);
-                gfx_text_bmap_print(12, HUD_Y_ORIGIN, "\x7F\x7F\x7F", TEXT_COLOR_BLACK);
-                gfx_text_bmap_print(12, HUD_Y_ORIGIN, buf, TEXT_COLOR_WHITE);
-            }
+            update_hud();
         }
         else
         {

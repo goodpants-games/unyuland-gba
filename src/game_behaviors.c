@@ -126,19 +126,11 @@ static bool enemy_base_proj_touch(entity_s *self, projectile_s *proj,
 
 const behavior_def_s behavior_player;
 
-typedef enum player_spit_mode
-{
-    PLAYER_SPIT_MODE_PLATFORM,
-    PLAYER_SPIT_MODE_BULLET,
-}
-player_spit_mode_e;
-
 typedef struct player_data
 {
     entity_s *interactable;
     entity_s *cursor;
     bool spitting;
-    u8 spit_mode;
     u8 cursor_frame;
     s8 death_timer;
 } player_data_s;
@@ -403,20 +395,20 @@ static void behavior_player_update(entity_s *self)
         if (can_move && !data->interactable)
         {
             show_cursor = (self->actor.flags & ACTOR_FLAG_GROUNDED) &&
-                          data->spit_mode == PLAYER_SPIT_MODE_PLATFORM;
+                          g_game.player_spit_mode == PLAYER_SPIT_MODE_PLATFORM;
             if (key_hit(KEY_B))
             {
-                if (data->spit_mode == PLAYER_SPIT_MODE_PLATFORM)
+                if (g_game.player_spit_mode == PLAYER_SPIT_MODE_PLATFORM)
                     player_platform_spit(self);
-                else if (data->spit_mode == PLAYER_SPIT_MODE_BULLET)
+                else if (g_game.player_spit_mode == PLAYER_SPIT_MODE_BULLET)
                     player_bullet_spit(self);
             }
         }
 
         if (key_hit(KEY_L))
         {
-            if (++data->spit_mode >= 2)
-                data->spit_mode = 0;
+            if (++g_game.player_spit_mode >= 2)
+                g_game.player_spit_mode = 0;
         }
     }
 
@@ -532,6 +524,7 @@ static void behavior_player_update(entity_s *self)
         self->sprite.frame = 0;
         self->sprite.accum = 0;
         data->death_timer = 0;
+        g_game.player_is_dead = true;
         snd_play(SND_ID_PLAYER_DIE);
     }
 }
@@ -568,7 +561,8 @@ static void behavior_player_attacked(entity_s *self, entity_s *attacker,
         self->sprite.flags |= SPRITE_FLAG_FLIP_X;
 
     data->death_timer = 0;
-
+    g_game.player_is_dead = true;
+    
     snd_play(SND_ID_PLAYER_DIE);
 }
 
