@@ -377,8 +377,8 @@ int main(void)
         #endif
 
         mmFrame();
-        snd_frame();
         VBlankIntrWait();
+        snd_frame();
         gfx_new_frame();
     }
 
