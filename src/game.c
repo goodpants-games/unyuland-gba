@@ -38,6 +38,9 @@ typedef struct game_state
     entity_s *active_water_tank;
     uint player_ammo;
     uint player_spit_mode;
+    bool did_collect_orb;
+    u8 collected_rorbs;
+    u8 collected_borbs;
 }
 game_state_s;
 
@@ -465,6 +468,8 @@ void game_init(void)
     g_game.input_enabled = true;
     g_game.player_ammo = 100;
     g_game.player_spit_mode = 0;
+    g_game.collected_orbs_count = 0;
+    g_game.did_collect_orb = false;
     
     for (int i = 0; i < MAX_ENTITY_COUNT; ++i)
     {
@@ -839,6 +844,21 @@ void game_render(void)
 
 static void change_room(const map_header_s *new_room)
 {
+    // if an orb was collected, commit the change
+    if (g_game.did_collect_orb)
+    {
+        if (g_game.collected_orbs_count >= MAX_ORB_COUNT)
+        {
+            LOG_ERR("collected orb count list is full!");
+            return;
+        }
+        g_game.collected_orbs[g_game.collected_orbs_count++] = g_game.map;
+        g_game.did_collect_orb = false;
+
+        g_game.committed_collected_rorbs = g_game.collected_rorbs;
+        g_game.committed_collected_borbs = g_game.collected_borbs;
+    }
+
     // remove all entities in the world, except ones with the
     // keep-on-room-change flag (i.e. the player and the platform cursor)
     for (int i = 0; i < MAX_ENTITY_COUNT; ++i)
@@ -1096,6 +1116,9 @@ void game_save_state(void)
     game_saved_state.active_water_tank = g_game.active_water_tank;
     game_saved_state.player_ammo = g_game.player_ammo;
     game_saved_state.player_spit_mode = g_game.player_spit_mode;
+    game_saved_state.did_collect_orb = g_game.did_collect_orb;
+    game_saved_state.collected_rorbs = g_game.collected_rorbs;
+    game_saved_state.collected_borbs = g_game.collected_borbs;
 }
 
 void game_restore_state(void)
@@ -1150,6 +1173,9 @@ void game_restore_state(void)
     g_game.active_water_tank = game_saved_state.active_water_tank;
     g_game.player_ammo = game_saved_state.player_ammo;
     g_game.player_spit_mode = game_saved_state.player_spit_mode;
+    g_game.did_collect_orb = game_saved_state.did_collect_orb;
+    g_game.collected_rorbs = game_saved_state.collected_rorbs;
+    g_game.collected_borbs = game_saved_state.collected_borbs;
     g_game.player_is_dead = false;
 
     gfx_mark_scroll_dirty();

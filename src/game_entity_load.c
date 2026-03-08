@@ -102,6 +102,18 @@ static const char* parse_sign_text(const entity_load_s *load_data)
     return NULL;
 }
 
+static void load_orb(entity_s *ent, const entity_load_s *load_data, bool blue)
+{
+    // don't spawn the orb if the orb in this room was already collected
+    for (uint i = 0; i < g_game.collected_orbs_count; ++i)
+    {
+        if (g_game.collected_orbs[i] == g_game.map)
+            return;
+    }
+
+    entity_orb(ent, load_data->x, load_data->y, blue);
+}
+
 void game_load_entity(const entity_load_s *load_data)
 {
     const char *name = load_data->name;
@@ -167,11 +179,11 @@ void game_load_entity(const entity_load_s *load_data)
     }
     STR_CASE("red_orb")
     {
-        entity_orb(ent, load_data->x, load_data->y, false);
+        load_orb(ent, load_data, false);
     }
     STR_CASE("blue_orb")
     {
-        entity_orb(ent, load_data->x, load_data->y, true);
+        load_orb(ent, load_data, true);
     }
     STR_CASE_FALLBACK
     {

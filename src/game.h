@@ -11,6 +11,7 @@
 // not the actual tile rendered tile size, which is 16. but tiles are supposed
 // to be 8x8.
 #define WORLD_TILE_SIZE 8
+#define MAX_ORB_COUNT   8
 
 #define ENTITY_FLAG_ENABLED              1
 #define ENTITY_FLAG_MOVING               2
@@ -189,6 +190,8 @@ typedef struct game {
 
     bool input_enabled;
     bool queue_restore;
+    bool player_is_dead;
+    bool did_collect_orb;
 
     room_trans_state_s room_trans;
 
@@ -199,13 +202,18 @@ typedef struct game {
     
     uint player_ammo;
     uint player_spit_mode;
-    uint collected_rorbs;
-    uint collected_borbs;
+    u8 collected_rorbs;
+    u8 collected_borbs;
+    u8 committed_collected_rorbs;
+    u8 committed_collected_borbs;
 
-    bool player_is_dead;
     bool dialogue_active;
     bool queue_dialogue_start;
     const char *dialogue_page;
+
+    u8 collected_orbs_count;
+    // list of rooms in which the orb was collected
+    const map_header_s *collected_orbs[MAX_ORB_COUNT];
 } game_s;
 
 typedef enum entity_load_prop_type

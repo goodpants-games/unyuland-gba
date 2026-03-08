@@ -1276,15 +1276,18 @@ static const behavior_def_s behavior_orb;
 typedef struct orb_data
 {
     uint frame;
+    bool blue;
 }
 orb_data_s;
 
 void entity_orb(entity_s *self, FIXED px, FIXED py, bool blue)
 {
+    self->flags |= ENTITY_FLAG_COLLIDE;
     self->pos.x = px + int2fx(1);
     self->pos.y = py;
     self->col.w = 6;
     self->col.h = 6;
+    self->col.flags = COL_FLAG_MONITOR_ONLY;
     self->sprite.graphic_id = blue ? SPRID_GAME_FIRE_ORB_BLUE
                                    : SPRID_GAME_FIRE_ORB_RED;
     self->sprite.ox = -1;
@@ -1294,6 +1297,7 @@ void entity_orb(entity_s *self, FIXED px, FIXED py, bool blue)
 
     orb_data_s *data = (orb_data_s *)self->userdata;
     data->frame = 0;
+    data->blue = blue;
 }
 
 static void behavior_orb_update(entity_s *self)
@@ -1307,8 +1311,26 @@ static void behavior_orb_update(entity_s *self)
         data->frame = 120;
 }
 
+static void behavior_orb_ent_touch(entity_s *self, entity_s *other, int nx,
+                                   int ny)
+{
+    orb_data_s *data = (orb_data_s *)self->userdata;
+    if (other != &g_game.entities[0]) return;
+
+    LOG_DBG("Collect orab");
+
+    if (data->blue)
+        ++g_game.collected_borbs;
+    else
+        ++g_game.collected_rorbs;
+
+    entity_queue_free(self);
+    g_game.did_collect_orb = true;
+}
+
 static const behavior_def_s behavior_orb = {
-    .update = behavior_orb_update
+    .update = behavior_orb_update,
+    .ent_touch = behavior_orb_ent_touch
 };
 
 #pragma endregion

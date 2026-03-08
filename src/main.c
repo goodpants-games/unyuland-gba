@@ -221,8 +221,8 @@ static void update_hud(void)
         last_rorbs = g_game.collected_rorbs;
         int_to_str(g_game.collected_rorbs, buf);
 
-        gfx_text_bmap_print(240 - 12, HUD_Y_ORIGIN, "\x7F", TEXT_COLOR_BLACK);
-        gfx_text_bmap_print(240 - 12, HUD_Y_ORIGIN, buf, TEXT_COLOR_WHITE);
+        gfx_text_bmap_print(240 - 36, HUD_Y_ORIGIN, "\x7F", TEXT_COLOR_BLACK);
+        gfx_text_bmap_print(240 - 36, HUD_Y_ORIGIN, buf, TEXT_COLOR_WHITE);
     }
 
     if (g_game.collected_borbs != last_borbs)
@@ -230,8 +230,8 @@ static void update_hud(void)
         last_borbs = g_game.collected_borbs;
         int_to_str(g_game.collected_borbs, buf);
 
-        gfx_text_bmap_print(240 - 36, HUD_Y_ORIGIN, "\x7F", TEXT_COLOR_BLACK);
-        gfx_text_bmap_print(240 - 36, HUD_Y_ORIGIN, buf, TEXT_COLOR_WHITE);
+        gfx_text_bmap_print(240 - 12, HUD_Y_ORIGIN, "\x7F", TEXT_COLOR_BLACK);
+        gfx_text_bmap_print(240 - 12, HUD_Y_ORIGIN, buf, TEXT_COLOR_WHITE);
     }
 
     uint face_frame = 0;

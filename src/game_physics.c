@@ -422,6 +422,14 @@ static void physics_substeps_collect_contacts(void)
         entity_s *entity = col_ent->ent;
         entity_s *ent2 = entc2->ent;
 
+        // don't handle collision if one of the entities is queued to be
+        // freed
+        if ((entity->flags & ENTITY_FLAG_QFREE) ||
+            (ent2->flags & ENTITY_FLAG_QFREE))
+        {
+            continue;   
+        }
+
         // if both entities are static objects, collision cannot happen
         // between them.
         if (!(entity->flags & ENTITY_FLAG_MOVING) &&
