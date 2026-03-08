@@ -58,5 +58,151 @@
             "But the darker brown ones you should definitely read! You might die if you don't.",
             "I hope this information is useful!"
         ]
+    },
+    {
+        "id": "b02_useless",
+        "pages": [
+            "Did you know? Oh no! There's a wall here that's two feet tall!.",
+            "Fortunately, if you try really hard, you can jump over two-foot walls!",
+            "Isn't that great?",
+            "I hope this information was useful!"
+        ]
+    },
+    {
+        "id": "funny",
+        "pages": [
+            "why do i have to write these stupid signs.",
+            "my brother died last week writing the sign in the other room.",
+            "truthfully he was always a bit of a dimwit, but he was",
+            "well. he used his last breath to ask me to continue his work.",
+            "that i needed to finish off writing the last of the signs.",
+            "it's really dangerous around these parts though. and i don't think these signs help make it much safer.",
+            "but i want him to rest easy in the afterlife."
+        ]
+    },
+    {
+        "id": "home_unfinished",
+        "pages": [
+            "You can't leave yet! You need to collect four red fire orbs."
+        ]
+    },
+    {
+        "id": "lake_hint",
+        "pages": [
+            "Did you know? I'm a world-renowned writer,",
+            "with prose that matches the likes of William Shakespeare and and Anton Chekhov.",
+            "Here is a poem I made:",
+            "In that lake of sparkling blue / In that large and spacious roo- /",
+            "m, There is more than meets the eyes. / Obscured by darkness, its spaciousness hides. /",
+            "This poem's quality will make you cry / of laughter. Not of sad cry.",
+            "Yay!!"
+        ]
+    },
+    {
+        "id": "room01_hint",
+        "pages": [
+            "Yikes. This nook here is pretty dangerous!",
+            "Well, for an Unyu. I can just shoot that bottom Blux from here.",
+            "But Unyus can't do that for whatever reason. I don't get it. How is it hard???",
+            "Anyway, here's some advice. You should formulate a plan first.",
+            "Observe the paths the projectiles take to find safe areas.",
+            "Then you should be able to kill both of them without getting hit.",
+            "I hope this information is useful!"
+        ]
+    },
+    {
+        "id": "room07_hint",
+        "pages": [
+            "Did you know? There's a platform up there! I really wonder what's on it.",
+            "But I can't bring that spring over here! There's this dumb pit!",
+            "If only there was a way I could make a bridge over it...",
+            "I hope this information was useful! it probably isn't though :("
+        ]
+    },
+    {
+        "id": "room08_hint",
+        "pages": [
+            "Did you know? If you jump up into a moveable block above you, the block will get bumped upwards.",
+            "It's called the Law of Conservation, Newton's 7th Law. I think. Something about a cradle...",
+            "I dunno. I'm not a physician.",
+            "Actually I don't think this information is very useful...",
+            "Also if anyone knows how to get up that wall please tell me."
+        ]
+    },
+    {
+        "id": "room09_hint",
+        "pages": [
+            "Did you know? Pushable objects can bounce on springs too, not just you!",
+            "...",
+            "Nevermind. Obviously!",
+            "Why would only living beings be able to bounce on springs?",
+            "It's not like this is a game.",
+            "Ugh, sorry. I don't have any useful information. What a waste of wood."
+        ]
+    },
+    {
+        "id": "room11_hint",
+        "pages": [
+            "Obscured by view resides a tiny room",
+            "Across the pond. Approach by shooting ice.",
+            "Within this alcove lies a little shroom.",
+            "I recommend to fire upwards thrice.",
+            "Revealed to you will be a yellow 'key'."
+        ]
+    },
+    {
+        "id": "sign_b05_hint",
+        "pages": [
+            "Did you know? There's an ice block on the ceiling to the left.",
+            "Although, I don't know how to get it.",
+            "Oh! Did you know? There's an enemy below this platform!",
+            "It holds up the ice block, and...",
+            "Nevermind, I don't think I have any useful information. Sorry.",
+            "Well, if you get truly stuck, you can reset the room by leaving and re-entering it.",
+            "Oh, well, you probably already read the sign that told you that. Nevermind."
+        ]
+    },
+    {
+        "id": "sign_beware",
+        "pages": [
+            "Beware the enemies! They shoot corrosive black goop everywhere.",
+            "You could get seriously injured if one of their projectiles hit you!",
+            "Did you know? You can shoot back at them. If you want.",
+            "I hope this information was useful!"
+        ]
+    },
+    {
+        "id": "sign_room_reset",
+        "pages": [
+            "Did you know? Your dispenser checkpoints save the state of the room at the time you triggered it.",
+            "To go back, select \"RESPAWN\" from the pause menu.",
+            "And if you want to reset the room completely, you do so by leaving and re-entering it.",
+            "This cave is really weird sometimes.",
+            "I hope this information was useful!"
+        ]
+    },
+    {
+        "id": "sign_stupid1",
+        "pages": [
+            "Did you know?",
+            "I'm a sign!",
+            "I hope this information was useful!"
+        ]
+    },
+    {
+        "id": "sign_stupid2",
+        "pages": [
+            "Did you know?",
+            "Statistically, 60.59% of the people who read this sign found it useful.",
+            "I hope this information is useful!"
+        ]
+    },
+    {
+        "id": "tut_shoot_ceiling",
+        "pages": [
+            "Did you know? You can shoot these ceiling-mounted enemies from below.",
+            "Just quickly go under them, shoot upwards, move out of the way, and repeat until they're down!",
+            "I hope this infor"
+        ]
     }
 ]

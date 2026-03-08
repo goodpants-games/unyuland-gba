@@ -254,7 +254,7 @@ sinelut.bin:
 #---------------------------------------------------------------------------------
 # This rule creates the dialogue file.
 #---------------------------------------------------------------------------------
-dlg.bin: $(TOPLEVEL)/data/dialogue.json
+dlg.bin: $(TOPLEVEL)/data/dialogue.json $(TOPLEVEL)/tools/dlgc.py
 #---------------------------------------------------------------------------------
 	@$(PYTHON) $(TOPLEVEL)/tools/dlgc.py \
 	           $< $@

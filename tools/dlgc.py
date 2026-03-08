@@ -34,16 +34,24 @@ def eprint(*args, **kwargs):
 
 def wrap_text(text: str, max_cols: int):
     out: list[str] = []
-
-    while len(text) > max_cols:
-        ch = max_cols
-        while not text[ch].isspace():
-            ch = ch - 1
-        
-        out.append(text[:ch] + '\n')
-        text = text[ch:].lstrip()
     
-    out.append(text)
+    write_nl = False
+    for line in text.splitlines():
+        if write_nl:
+            out.append("\n")
+        write_nl = True
+        
+        while len(line) > max_cols:
+            ch = max_cols
+            while not line[ch].isspace():
+                ch = ch - 1
+            
+            # assert len(text[:ch]) <= max_cols
+            out.append(line[:ch] + '\n')
+            line = line[ch:].lstrip()
+    
+        # assert len(text) <= max_cols
+        out.append(line)
     
     return out
 

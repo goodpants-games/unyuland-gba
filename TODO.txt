@@ -10,3 +10,4 @@
   possible theory is that the oob writes are occuring in IWRAM and messing with
   the physics and printing code... could also be related to the sound system,
   since it only started happening after i finished it.
+- need more symbols for the font
