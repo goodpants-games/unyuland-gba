@@ -5,6 +5,7 @@
 #include "log.h"
 #include "math_util.h"
 #include "sound.h"
+#include "printf.h"
 
 #define DEFAULT_DAMP TO_FIXED(0.88)
 
@@ -1311,6 +1312,57 @@ static void behavior_orb_update(entity_s *self)
         data->frame = 120;
 }
 
+static void orb_display_dialogue(bool blue)
+{
+    const uint red_required = 4;
+    const uint red_max = 5;
+    const uint blue_max = 4;
+
+    char *buf_ptr = game_dialogue_buffer;
+
+    if (blue)
+    {
+        uint count = g_game.collected_borbs;
+        if (count == blue_max)
+        {
+            buf_ptr += sprintf(buf_ptr, "Wow! You found all\nof the secret orbs!\f");
+            buf_ptr += sprintf(buf_ptr, "Awesome!\f");
+        }
+        else
+        {
+            buf_ptr += sprintf(buf_ptr, "You found a secret\nfire orb!\f");
+            buf_ptr += sprintf(buf_ptr, "%i more orbs left!\f", blue_max - count);
+        }
+    }
+    else
+    {
+        uint count = g_game.collected_rorbs;
+
+        if (count == red_max)
+        {
+            buf_ptr += sprintf(buf_ptr, "Wow! You found all\nred fire orbs!\f");
+            buf_ptr += sprintf(buf_ptr, "You may return back\nhome to complete the\ngame.\f");
+        }
+        else if (count > red_required)
+        {
+            buf_ptr += sprintf(buf_ptr, "You found an extra\nfire orb!\f");
+            buf_ptr += sprintf(buf_ptr, "You may return back\nhome to complete the\ngame.\f");
+        }
+        else if (count == red_required)
+        {
+            buf_ptr += sprintf(buf_ptr, "You found the last\nnecessary fire orb!\f");
+            buf_ptr += sprintf(buf_ptr, "You may return back\nhome to complete the\ngame.\f");
+        }
+        else
+        {
+            buf_ptr += sprintf(buf_ptr, "You found a fire\norb!\f");
+            buf_ptr += sprintf(buf_ptr, "%i more orbs left!\f", red_required - count);
+        }
+    }
+
+    game_start_dialogue(game_dialogue_buffer);
+}
+
 static void behavior_orb_ent_touch(entity_s *self, entity_s *other, int nx,
                                    int ny)
 {
@@ -1326,6 +1378,8 @@ static void behavior_orb_ent_touch(entity_s *self, entity_s *other, int nx,
 
     entity_queue_free(self);
     g_game.did_collect_orb = true;
+
+    orb_display_dialogue(data->blue);
 }
 
 static const behavior_def_s behavior_orb = {

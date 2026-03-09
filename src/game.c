@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <tonc.h>
 #include <world.h>
+#include <string.h>
 
 #include "game.h"
 #include "game_physics.h"
@@ -58,6 +59,8 @@ static int proj_free_queue_count = 0;
 static projectile_s *proj_free_queue[FREE_QUEUE_MAX_SIZE];
 
 static int last_obj_index = 0;
+
+EWRAM_BSS char game_dialogue_buffer[DIALOGUE_BUFFER_SIZE];
 
 static bool game_transition_update(entity_s *player);
 
@@ -404,7 +407,7 @@ void dialogue_show_page(void)
     }
     
     int line_count = 1;
-    for (const char *c = g_game.dialogue_page; *c != '\0'; ++c)
+    for (const char *c = g_game.dialogue_page; *c != '\f'; ++c)
         if (*c == '\n') ++line_count;
     
     const int row_count = ceil_div(line_count * 12, 8);
@@ -426,7 +429,7 @@ void dialogue_show_page(void)
     uint lb_i = 0;
     int ypos = 0;
     const char *ch = g_game.dialogue_page;
-    for (; *ch != '\0'; ++ch)
+    for (; *ch != '\f'; ++ch)
     {
         if (*ch == '\n')
         {

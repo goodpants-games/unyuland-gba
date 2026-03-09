@@ -19,11 +19,15 @@
 #include "menu.h"
 #include "tonc_irq.h"
 #include "tonc_video.h"
+#include "gba_util.h"
 
 // #define MAIN_PROFILE
 
 #define HUD_ROW_ORIGIN (GFX_TEXT_BMP_ROWS - 2)
 #define HUD_Y_ORIGIN   (HUD_ROW_ORIGIN * 8 + 6)
+
+#define MM_MODCH_COUNT 8
+#define MM_MIXCH_COUNT 8
 
 static void int_to_str(int n, char *buf)
 {
@@ -249,24 +253,42 @@ static void update_hud(void)
     update_hud_sprites(face_frame, g_game.player_spit_mode);
 }
 
-__attribute__((section(".ewram")))
-static u8 mm_memory[8 * (MM_SIZEOF_MODCH
-                         + MM_SIZEOF_ACTCH
-                         + MM_SIZEOF_MIXCH)
-                         + MM_MIXLEN_21KHZ];
+struct
+{
+    u8 mod_ch[MM_MODCH_COUNT * MM_SIZEOF_MODCH];
+    u8 act_ch[MM_MIXCH_COUNT * MM_SIZEOF_ACTCH];
+    u8 mix_ch[MM_MIXCH_COUNT * MM_SIZEOF_MIXCH];
+    u8 wave[MM_MIXLEN_16KHZ] __attribute__((aligned(4)));
+    u8 Filler_useless_data_to_make_sure_oob_memory_writes_of_a_source_i_cannot_ascertain_dont_mess_up_anything_important[1024];
+} static mm_memory EWRAM_DATA;
+
+// __attribute__((section(".ewram")))
+// u8 mm_memory[MM_MIXLEN_21KHZ + 8 * (MM_SIZEOF_MODCH
+//                                            +MM_SIZEOF_ACTCH
+//                                            +MM_SIZEOF_MIXCH)];
 
 // Mixing buffer (globals should go in IWRAM)
 // Mixing buffer SHOULD be in IWRAM, otherwise the CPU load
 // will _drastially_ increase
 __attribute((aligned(4)))
-static u8 mm_mixing_buf[MM_MIXLEN_21KHZ];
+static u8 mm_mixing_buf[MM_MIXLEN_16KHZ];
+
+#define DBG_ENABLE_BREAKPOINT_FLAG *((vu8 *)0x0203FFF0)
+
+ARM_FUNC IWRAM_CODE
+static void mm_vblank_wrapper(void)
+{
+    DBG_ENABLE_BREAKPOINT_FLAG = false;
+    mmVBlank();
+    DBG_ENABLE_BREAKPOINT_FLAG = true;
+}
 
 int main(void)
 {
     LOG_INIT();
 
     irq_init(NULL);
-    irq_add(II_VBLANK, mmVBlank);
+    irq_add(II_VBLANK, mm_vblank_wrapper);
     irq_add(II_HBLANK, snd_irq_hblank);
 
     gfx_init();
@@ -314,27 +336,29 @@ int main(void)
         e->mass = 4;
     }
 
-    mmInit(&(mm_gba_system)
+    mm_gba_system mm_sys = (mm_gba_system)
     {
-        .mixing_mode = MM_MIX_21KHZ,
-        .mod_channel_count = 8,
-        .mix_channel_count = 8,
-        .module_channels   = (mm_addr)(mm_memory+0),
-        .active_channels   = (mm_addr)(mm_memory+(8*MM_SIZEOF_MODCH)),
-        .mixing_channels   = (mm_addr)(mm_memory+(8*(MM_SIZEOF_MODCH
-                                                     + MM_SIZEOF_ACTCH))),
-        .mixing_memory     = (mm_addr)mm_mixing_buf,
-        .wave_memory       = (mm_addr)(mm_memory+(8*(MM_SIZEOF_MODCH
-                                                     + MM_SIZEOF_ACTCH
-                                                     + MM_SIZEOF_MIXCH))),
-        .soundbank         = (mm_addr)soundbank_bin
-    });
+        .mixing_mode = MM_MIX_16KHZ,
+        .mod_channel_count = MM_MODCH_COUNT,
+        .mix_channel_count = MM_MIXCH_COUNT,
+        .module_channels   = (mm_addr) mm_memory.mod_ch,
+        .active_channels   = (mm_addr) mm_memory.act_ch,
+        .mixing_channels   = (mm_addr) mm_memory.mix_ch,
+        .mixing_memory     = (mm_addr) mm_mixing_buf,
+        .wave_memory       = (mm_addr) mm_memory.wave,
+        .soundbank         = (mm_addr) soundbank_bin
+    };
+    mmInit(&mm_sys);
 
     setup_game_hud();
     mmStart(MOD_TESTMOD, MM_PLAY_LOOP);
     mmSetModuleVolume((int)(1024 * 0.3));
 
+    DBG_ENABLE_BREAKPOINT_FLAG = true;
+
     snd_init();
+
+    LOG_DBG("mm_memory: %p - %p", &mm_memory, (uintptr_t)&mm_memory + sizeof(mm_memory));
 
     while (true)
     {
@@ -376,7 +400,10 @@ int main(void)
         LOG_DBG("frame usage: %.1f%%", (float)frame_len / 280896.f * 100.f);
         #endif
 
+        DBG_ENABLE_BREAKPOINT_FLAG = false;
         mmFrame();
+        DBG_ENABLE_BREAKPOINT_FLAG = true;
+
         VBlankIntrWait();
         snd_frame();
         gfx_new_frame();

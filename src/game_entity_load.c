@@ -108,7 +108,10 @@ static void load_orb(entity_s *ent, const entity_load_s *load_data, bool blue)
     for (uint i = 0; i < g_game.collected_orbs_count; ++i)
     {
         if (g_game.collected_orbs[i] == g_game.map)
+        {
+            entity_free(ent);
             return;
+        }
     }
 
     entity_orb(ent, load_data->x, load_data->y, blue);

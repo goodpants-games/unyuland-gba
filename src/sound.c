@@ -259,7 +259,10 @@ static void snd_tick(uint tick_idx)
     static snd_slot_s *last_channel_slot[4] = { NULL, NULL, NULL, NULL };
     snd_slot_s *channel_slot[4] = { NULL, NULL, NULL, NULL };
 
-    for (int i = 0; i < next_snd_slot; ++i)
+    if ((uint)next_snd_slot > MAX_ACTIVE_SOUNDS)
+        __builtin_trap();
+    
+    for (uint i = 0; i < (uint)next_snd_slot; ++i)
     {
         snd_slot_s *slot = snd_slots + i;
         if (!(slot->flags & SND_SLOT_FLAG_ACTIVE)) continue;

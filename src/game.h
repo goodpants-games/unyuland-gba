@@ -60,6 +60,8 @@
 #define GUN_ENEMY_DIRFLAG_R   16
 #define GUN_ENEMY_DIRFLAG_ALL 0x1F
 
+#define DIALOGUE_BUFFER_SIZE 512
+
 #define ENTITY_ENABLED(ent) ((ent)->flags & ENTITY_FLAG_ENABLED)
 #define IS_PROJ_ACTIVE(proj) ((proj)->flags & PROJ_FLAG_ACTIVE)
 
@@ -264,6 +266,9 @@ void game_render(void);
 void game_save_state(void);
 void game_restore_state(void);
 void game_start_dialogue(const char *dialogue);
+
+// buffer for dynamic construction of dialogue
+EWRAM_BSS extern char game_dialogue_buffer[DIALOGUE_BUFFER_SIZE];
 
 void game_load_entity(const entity_load_s *load_data);
 

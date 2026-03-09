@@ -32,8 +32,6 @@
 #define REG_DEBUG_FLAGS (vu16*) 0x4FFF700
 #define REG_DEBUG_STRING (char*) 0x4FFF600
 
-void _putchar(char character) {}
-
 ssize_t mgba_stdout_write(struct _reent* r __attribute__((unused)), void* fd __attribute__((unused)), const char* ptr, size_t len) {
 	if (len > 0x100) {
 		len = 0x100;

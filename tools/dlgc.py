@@ -77,7 +77,7 @@ def process(in_json: dict, out_path: str):
             for line in lines:
                 chat_data += bytes(line, 'ascii')
             
-            chat_data.append(0)
+            chat_data.append(0x0C)
         
         chat_data.append(0)
 
