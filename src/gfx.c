@@ -502,6 +502,22 @@ void gfx_text_bmap_print(uint x, uint y, const char *text, text_color_e text_col
             id = TEXT_CHAR_ID(43);
             break;
         
+        case '\'':
+            id = TEXT_CHAR_ID(45);
+            break;
+        
+        case '/':
+            id = TEXT_CHAR_ID(46);
+            break;
+        
+        case '"':
+            id = TEXT_CHAR_ID(47);
+            break;
+        
+        case '%':
+            id = TEXT_CHAR_ID(48);
+            break;
+        
         case '\x7F':
             id = TEXT_CHAR_ID(44);
             break;
