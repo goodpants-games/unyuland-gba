@@ -11,7 +11,7 @@
 #include "gba_util.h"
 
 #define MAX_RENDER_OBJS ((MAX_ENTITY_COUNT + MAX_PROJECTILE_COUNT))
-#define FREE_QUEUE_MAX_SIZE 16
+#define FREE_QUEUE_MAX_SIZE 32
 
 // 1 KiB for the copy of the map collision. stored in ewram.
 #define GAME_COLLISION_MAP_SIZE (1024)
@@ -206,7 +206,10 @@ bool projectile_queue_free(projectile_s *proj)
 {
     if (proj->flags & PROJ_FLAG_QFREE) return true;
     if (proj_free_queue_count >= FREE_QUEUE_MAX_SIZE)
+    {
+        LOG_WRN("free queue is full!");
         return false;
+    }
 
     proj_free_queue[proj_free_queue_count++] = proj;
     proj->flags |= PROJ_FLAG_QFREE;
@@ -562,7 +565,7 @@ void game_load_room(const map_header_s *map)
 
     const u8 *col_data = map_collision_data(map);
     const int col_data_size = map_collision_data_size(map);
-    if (col_data_size > GAME_COLLISION_MAP_SIZE)
+    if (CEIL_DIV(col_data_size, 4) > GAME_COLLISION_MAP_SIZE)
     {
         LOG_ERR("map collision too large to copy to iwram!");
         DBG_CRASH();
@@ -1152,7 +1155,7 @@ void game_restore_state(void)
     const projectile_s *src_proj = game_saved_state.projectiles;
     projectile_s *dst_proj = g_game.projectiles;
 
-    for (int i = 0; i < MAX_ENTITY_COUNT; ++i)
+    for (int i = 0; i < MAX_PROJECTILE_COUNT; ++i)
     {
         if (!IS_PROJ_ACTIVE(src_proj) && IS_PROJ_ACTIVE(dst_proj))
         {

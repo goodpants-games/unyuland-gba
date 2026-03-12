@@ -259,13 +259,8 @@ struct
     u8 act_ch[MM_MIXCH_COUNT * MM_SIZEOF_ACTCH];
     u8 mix_ch[MM_MIXCH_COUNT * MM_SIZEOF_MIXCH];
     u8 wave[MM_MIXLEN_16KHZ] __attribute__((aligned(4)));
-    u8 Filler_useless_data_to_make_sure_oob_memory_writes_of_a_source_i_cannot_ascertain_dont_mess_up_anything_important[1024];
+    u8 Filler_useless_data_to_make_sure_oob_memory_writes_of_a_source_i_cannot_ascertain_dont_mess_up_anything_important[512];
 } static mm_memory EWRAM_DATA;
-
-// __attribute__((section(".ewram")))
-// u8 mm_memory[MM_MIXLEN_21KHZ + 8 * (MM_SIZEOF_MODCH
-//                                            +MM_SIZEOF_ACTCH
-//                                            +MM_SIZEOF_MIXCH)];
 
 // Mixing buffer (globals should go in IWRAM)
 // Mixing buffer SHOULD be in IWRAM, otherwise the CPU load
@@ -273,14 +268,26 @@ struct
 __attribute((aligned(4)))
 static u8 mm_mixing_buf[MM_MIXLEN_16KHZ];
 
-#define DBG_ENABLE_BREAKPOINT_FLAG *((vu8 *)0x0203FFF0)
-
-ARM_FUNC IWRAM_CODE
-static void mm_vblank_wrapper(void)
+// Fuck you maxmod documentation. Fuckign hell.
+// Shows me code that runs mmFrame in the main loop before VBlankIntrWait. As if
+// that's how you were supposed to do it. Guess what. I wasted two days of
+// development trying to figure out why my game randomly crashed. Turns out it
+// was maxmod writing out of bounds. Then spent the next three days of
+// development trying to figure out why the hell maxmod was writing out of
+// bounds. The documentation showed me this is how you were supposed to call
+// it!! Why would it be wrong? Fucking hell. Turns out there was nothing wrong
+// with my code after all. Maxmod is just being stupid. Why did the
+// documentation not mention you probably aren't supposed to run mmFrame before
+// VBlankIntrWait because if the frame takes too long mmFrame can overlap with
+// vblank and wreak havoc. Is the developer aware of that fact. Where is the
+// source code for the "GBA examples". What source code. What "GBA examples".
+// The fuck?
+// Also make mmFrame run in the interrupt instead of in main because why not.
+ARM_FUNC static void vbl(void)
 {
-    DBG_ENABLE_BREAKPOINT_FLAG = false;
     mmVBlank();
-    DBG_ENABLE_BREAKPOINT_FLAG = true;
+    REG_IME = 1; // enable nested interrupts
+    mmFrame();
 }
 
 int main(void)
@@ -288,7 +295,7 @@ int main(void)
     LOG_INIT();
 
     irq_init(NULL);
-    irq_add(II_VBLANK, mm_vblank_wrapper);
+    irq_add(II_VBLANK, vbl);
     irq_add(II_HBLANK, snd_irq_hblank);
 
     gfx_init();
@@ -304,37 +311,7 @@ int main(void)
     game_load_room(map);
     LOG_DBG("room pos: %i %i", (int) map->px, (int) map->py);
 
-    if (false)
-    {
-        entity_s *e = entity_alloc();
-        e->flags |= ENTITY_FLAG_ENABLED | ENTITY_FLAG_COLLIDE | ENTITY_FLAG_MOVING;
-        e->pos.x = int2fx(32);
-        e->pos.y = int2fx(32);
-        e->col.w = 6;
-        e->col.h = 8;
-        e->actor.move_speed = (FIXED)(FIX_SCALE * 1);
-        e->actor.move_accel = (FIXED)(FIX_SCALE / 8);
-        e->actor.jump_velocity = (FIXED)(FIX_SCALE * 2.0);
-        e->sprite.ox = -1;
-        e->sprite.oy = -8;
-        e->mass = 2;
-    }
-
-    if (false)
-    {
-        entity_s *e = entity_alloc();
-        e->flags |= ENTITY_FLAG_ENABLED | ENTITY_FLAG_COLLIDE | ENTITY_FLAG_MOVING;
-        e->pos.x = int2fx(32);
-        e->pos.y = int2fx(64);
-        e->col.w = 6;
-        e->col.h = 8;
-        e->actor.move_speed = (FIXED)(FIX_SCALE * 1);
-        e->actor.move_accel = (FIXED)(FIX_SCALE / 8);
-        e->actor.jump_velocity = (FIXED)(FIX_SCALE * 2.0);
-        e->sprite.ox = -1;
-        e->sprite.oy = -8;
-        e->mass = 4;
-    }
+    setup_game_hud();
 
     mm_gba_system mm_sys = (mm_gba_system)
     {
@@ -348,17 +325,12 @@ int main(void)
         .wave_memory       = (mm_addr) mm_memory.wave,
         .soundbank         = (mm_addr) soundbank_bin
     };
-    mmInit(&mm_sys);
 
-    setup_game_hud();
+    mmInit(&mm_sys);
     mmStart(MOD_TESTMOD, MM_PLAY_LOOP);
     mmSetModuleVolume((int)(1024 * 0.3));
 
-    DBG_ENABLE_BREAKPOINT_FLAG = true;
-
     snd_init();
-
-    LOG_DBG("mm_memory: %p - %p", &mm_memory, (uintptr_t)&mm_memory + sizeof(mm_memory));
 
     while (true)
     {
@@ -400,15 +372,10 @@ int main(void)
         LOG_DBG("frame usage: %.1f%%", (float)frame_len / 280896.f * 100.f);
         #endif
 
-        DBG_ENABLE_BREAKPOINT_FLAG = false;
-        mmFrame();
-        DBG_ENABLE_BREAKPOINT_FLAG = true;
-
         VBlankIntrWait();
         snd_frame();
         gfx_new_frame();
     }
-
 
     return 0;
 }

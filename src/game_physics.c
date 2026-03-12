@@ -952,6 +952,7 @@ static partgrid_node_s* partgrid_cell_remove(partgrid_node_s **cell,
         if (next->projectile == proj)
         {
             node->next = next->next;
+            next->next = NULL;
             return next;
         }
 
@@ -970,12 +971,11 @@ static void partgrid_cell_insert(partgrid_node_s **cell,
 }
 
 void game_physics_move_projs(FIXED vel_mult)
-{    
-    projectile_s *projectile_end = g_game.projectiles + MAX_PROJECTILE_COUNT;
-    proj_part_data_s *pdata = proj_data;
-    for (projectile_s *proj = g_game.projectiles; proj != projectile_end;
-        ++proj, ++pdata)
+{
+    for (uint i = 0; i < MAX_PROJECTILE_COUNT; ++i)
     {
+        projectile_s *proj = g_game.projectiles + i;
+        proj_part_data_s *pdata = proj_data + i;
         if (!IS_PROJ_ACTIVE(proj) || (proj->flags & PROJ_FLAG_QFREE)) continue;
 
         proj->px += fxmul(proj->vx, vel_mult);
@@ -1019,6 +1019,7 @@ void game_physics_move_projs(FIXED vel_mult)
             {
                 // LOG_DBG("old partition cell had no data");
                 node = partgrid_node_alloc(proj);
+                if (!node) DBG_CRASH();
             }
 
             // move node to new cell (or create a new node if not exists)
@@ -1208,6 +1209,7 @@ void game_physics_update(void)
         else if (max_py >= PARTGRID_ROWS) max_py = PARTGRID_ROWS - 1;
 
         for (int y = min_py; y <= max_py; ++y)
+        {
             for (int x = min_px; x <= max_px; ++x)
             {
                 // traverse linked list
@@ -1215,6 +1217,7 @@ void game_physics_update(void)
                     node = node->next)
                 {
                     projectile_s *proj = node->projectile;
+
                     if (proj->flags & PROJ_FLAG_QFREE) continue;
 
                     FIXED px = proj->px;
@@ -1222,7 +1225,7 @@ void game_physics_update(void)
 
                     if (!(px > el && px < er && py > et && py < eb))
                         continue;
-
+                    
                     bool keep;
                     if (entity->behavior &&
                         entity->behavior->proj_touch)
@@ -1238,6 +1241,7 @@ void game_physics_update(void)
                         projectile_queue_free(proj);
                 }
             }
+        }
     }
 
     PROFILE_END(projectiles_t);
@@ -1269,11 +1273,13 @@ void game_physics_on_proj_alloc(projectile_s *proj)
 void game_physics_on_proj_free(projectile_s *proj)
 {
     intptr_t idx = proj - g_game.projectiles; // does this do division??
+    proj_part_data_s *data = proj_data + idx;
 
-    if (proj_data[idx].part_cell)
+    if (data->part_cell)
     {
-        partgrid_node_s *cell = partgrid_cell_remove(proj_data[idx].part_cell,
-                                                     proj);
+        partgrid_node_s *cell = partgrid_cell_remove(data->part_cell, proj);
+        *data = (proj_part_data_s){0};
+
         if (!cell)
         {
             LOG_WRN("game_physics_on_proj_free: projectile is not in partgrid?");
@@ -1282,5 +1288,4 @@ void game_physics_on_proj_free(projectile_s *proj)
 
         partgrid_node_free(cell);
     }
-
 }
