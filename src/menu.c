@@ -8,7 +8,8 @@
 
 void menu_show(menu_s *menu)
 {
-    for (int i = 0, yp = menu->origin_y; i < 4; ++i, yp += 12)
+    int yp = menu->origin_y;
+    for (int i = 0; i < menu->selection_count; ++i, yp += 12)
     {
         bool sel = i == menu->selected;
         const text_color_e col = sel ? TEXT_COLOR_YELLOW : TEXT_COLOR_WHITE;
@@ -37,7 +38,7 @@ menu_status_e menu_update(menu_s *menu, int *result)
         snd_play_no_overlap(SND_ID_MENU_SELECT);
         goto no_sync;
     }
-    else if (key_hit(KEY_B))
+    else if (key_hit(KEY_B) && !menu->no_back)
     {
         status = MENU_STATUS_BACK;
         snd_play_no_overlap(SND_ID_MENU_BACK);

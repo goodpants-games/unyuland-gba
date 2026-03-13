@@ -78,7 +78,7 @@ int main(void)
     mmInit(&mm_sys);
     snd_init();
 
-    scenemgr_init(&scene_desc_game, 0);
+    scenemgr_init(&scene_desc_menu, 0);
 
     while (true)
     {

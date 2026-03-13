@@ -29,24 +29,45 @@ static const int rainbow_pal[] = {
 static int rainbow_shift = 0;
 static int rainbow_shift_time_accum = 0;
 
-u16 gfx_palette[16] = {
+static const u16 gfx_palette_normal[16] = {
     0x0000,
-    0x28a3,
+    0x28a4,
     0x288f,
     0x2a00,
-    0x1955,
-    0x254b,
+    0x1d55,
+    0x296c,
     0x6318,
-    0x77df,
+    0x73bf,
     0x241f,
     0x029f,
-    0x13bf,
-    0x1b80,
+    0x17bf,
+    0x1f80,
     0x7ea5,
     0x4dd0,
-    0x55df,
-    0x573f,
+    0x51df,
+    0x573f
 };
+
+static const u16 gfx_palette_corrected[16] = {
+    0x0000,
+    0x3807,
+    0x3452,
+    0x3e80,
+    0x0d19,
+    0x2d8e,
+    0x779c,
+    0x6fbf,
+    0x241f,
+    0x029f,
+    0x039f,
+    0x1fe0,
+    0x7e60,
+    0x5e12,
+    0x455f,
+    0x4aff
+};
+
+EWRAM_BSS u16 gfx_palette[16];
 
 static void update_rainbow_palette(void)
 {
@@ -56,6 +77,24 @@ static void update_rainbow_palette(void)
         pal_obj_bank[1][i] = gfx_mul_palette[rainbow_pal[j]];
         if (++j == RAINBOW_PALETTE_LENGTH) j = 0;
     }
+}
+
+void gfx_set_palette_mode(gfx_pal_mode_e mode)
+{
+    switch (mode)
+    {
+        case GFX_PAL_MODE_NORMAL:
+            memcpy16(gfx_palette, gfx_palette_normal, 16);
+            break;
+
+        case GFX_PAL_MODE_LCD_CORRECTED:
+            memcpy16(gfx_palette, gfx_palette_corrected, 16);
+            break;
+
+        default: return;
+    }
+
+    gfx_reset_palette();
 }
 
 void gfx_reset_palette(void)
@@ -202,6 +241,7 @@ static void write_scr_block(const uint map_entry, u32 *const dest)
 
 void gfx_init(void)
 {
+    memcpy16(gfx_palette, gfx_palette_normal, 16);
     oam_init(gfx_oam_buffer, 128);
     gfx_reset_palette();
 
@@ -234,6 +274,9 @@ void gfx_new_frame(void)
 
     if (gfx_loaded_map)
     {
+        LOG_DBG("scroll x: %i", gfx_scroll_x);
+        LOG_DBG("scroll y: %i", gfx_scroll_y);
+
         const u16 *map_data = map_graphics_data(gfx_loaded_map);
         u32 *se32 = (u32 *)se_mem[GFX_BG1_INDEX];
 
@@ -581,6 +624,7 @@ void gfx_text_bmap_fill(uint oc, uint or, uint cols, uint rows, u32 data[8])
     }
 }
 
+ARM_FUNC NO_INLINE
 void gfx_text_bmap_dst_clear(uint row, uint row_count)
 {
     uint i = row * 32;
@@ -592,6 +636,7 @@ void gfx_text_bmap_dst_clear(uint row, uint row_count)
     }
 }
 
+ARM_FUNC NO_INLINE
 void gfx_text_bmap_dst_assign(uint row, uint row_count, uint src_row, uint pal)
 {
     uint i = src_row * GFX_TEXT_BMP_COLS + 1;

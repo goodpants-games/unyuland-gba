@@ -1041,6 +1041,12 @@ void game_physics_move_projs(FIXED vel_mult)
 
 void game_physics_init(void)
 {
+    col_ent_count = 0;
+    col_contact_count = 0;
+    x_overlap_count = 0;
+    x_edge_count = 0;
+    y_edge_count = 0;
+    
     for (int i = 0; i < MAX_ENTITY_COUNT; ++i)
         col_ent_map[i] = (entity_coldata_s){0};
 

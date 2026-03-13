@@ -20,6 +20,7 @@ typedef struct menu
     int origin_y;
     int selected;
     int timer;
+    bool no_back;
 }
 menu_s;
 

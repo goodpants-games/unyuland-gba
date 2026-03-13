@@ -560,8 +560,15 @@ void game_init(void)
         .room_trans = (room_trans_state_s)
         {
             .phase = 0
-        }
+        },
+        .cam_x = int2fx(SCREEN_WIDTH / 4),
+        .cam_y = int2fx(SCREEN_HEIGHT / 4),
     };
+
+    last_obj_index = 0;
+    ent_free_queue_count = 0;
+    proj_free_queue_count = 0;
+    render_object_count = 0;
 
     game_physics_init();
 

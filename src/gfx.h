@@ -4,10 +4,12 @@
 #include <tonc_core.h>
 #include "map_data.h"
 #include "log.h"
+#include "gba_util.h"
 
 #define SCRW_T16 (SCREEN_WIDTH / 16)
 #define SCRH_T16 (SCREEN_HEIGHT / 16)
 
+#define GFX_OBJ_COUNT 128
 #define GFX_BG0_INDEX 28 // ui layer
 #define GFX_BG1_INDEX 29 // foreground/play layer
 #define GFX_BG2_INDEX 30 // mountain parallax (for that one room)
@@ -50,6 +52,13 @@ typedef enum gfx_pal
     GFX_PAL_PINK,
     GFX_PAL_PEACH
 } gfx_pal_e;
+
+typedef enum gfx_pal_mode
+{
+    GFX_PAL_MODE_NORMAL,
+    GFX_PAL_MODE_LCD_CORRECTED,
+}
+gfx_pal_mode_e;
 
 typedef struct gfx_frame
 {
@@ -103,7 +112,7 @@ typedef struct gfx_draw_sprite_state
 }
 gfx_draw_sprite_state_s;
 
-extern OBJ_ATTR gfx_oam_buffer[128];
+extern OBJ_ATTR gfx_oam_buffer[GFX_OBJ_COUNT];
 extern int gfx_scroll_x;
 extern int gfx_scroll_y;
 extern uint gfx_map_width;
@@ -123,13 +132,20 @@ INLINE void gfx_unload_map(void)
     gfx_map_height = 0;
 }
 
+void gfx_set_palette_mode(gfx_pal_mode_e mode);
 void gfx_reset_palette(void);
 void gfx_set_palette_multiplied(FIXED factor);
 
-void gfx_text_bmap_fill(uint oc, uint or_, uint cols, uint rows, u32 data[8]);
-void gfx_text_bmap_print(uint x, uint y, const char *text, text_color_e color);
-void gfx_text_bmap_dst_clear(uint row, uint row_count);
-void gfx_text_bmap_dst_assign(uint row, uint row_count, uint src_row, uint pal);
+ARM_FUNC void gfx_text_bmap_fill(uint oc, uint or_, uint cols, uint rows, u32 data[8]);
+ARM_FUNC void gfx_text_bmap_print(uint x, uint y, const char *text, text_color_e color);
+ARM_FUNC void gfx_text_bmap_dst_clear(uint row, uint row_count);
+ARM_FUNC void gfx_text_bmap_dst_assign(uint row, uint row_count, uint src_row, uint pal);
+
+static inline void gfx_text_bmap_clear(uint oc, uint or_, uint cols, uint rows)
+{
+    u32 bmap[8] = {0, 0, 0, 0, 0, 0, 0};
+    gfx_text_bmap_fill(oc, or_, cols, rows, bmap);
+}
 
 static inline gfx_sprdb_s gfx_get_sprdb(const gfx_root_header_s *header)
 {

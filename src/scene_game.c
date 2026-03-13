@@ -18,6 +18,11 @@
 #define HUD_ROW_ORIGIN (GFX_TEXT_BMP_ROWS - 2)
 #define HUD_Y_ORIGIN   (HUD_ROW_ORIGIN * 8 + 6)
 
+EWRAM_BSS static uint last_player_ammo;
+EWRAM_BSS static uint last_rorbs;
+EWRAM_BSS static uint last_borbs;
+EWRAM_BSS static uint blink_timer;
+
 static void int_to_str(int n, char *buf)
 {
     if (n < 0)
@@ -98,9 +103,9 @@ static void setup_game_hud(void)
 static const char *pause_menu_options[PAUSE_MENU_OPTION_COUNT] =
     {"RESUME", "RESPAWN", "MAP", "QUIT"};
 
-static bool game_paused = false;
+EWRAM_DATA static bool game_paused = false;
 
-static menu_s pause_menu = (menu_s)
+EWRAM_DATA static menu_s pause_menu = (menu_s)
 {
     .selection_count = PAUSE_MENU_OPTION_COUNT,
     .selection_labels = pause_menu_options,
@@ -134,6 +139,7 @@ static void open_pause_menu(void)
     // print text
     gfx_text_bmap_print(4, 0 + 4, "PAUSED", TEXT_COLOR_BLUE);
 
+    pause_menu.selected = 0;
     menu_show(&pause_menu);
 }
 
@@ -179,7 +185,7 @@ static void update_pause_menu(void)
                     game_save_state();
                     break;
                 case 3: // quit
-                    SoftReset();
+                    scenemgr_change(&scene_desc_menu, 0);
                     break;
             }
             break;
@@ -195,10 +201,6 @@ static void update_pause_menu(void)
 static void update_hud(void)
 {
     char buf[8];
-    static uint last_player_ammo = UINT_MAX;
-    static uint last_rorbs = UINT_MAX;
-    static uint last_borbs = UINT_MAX;
-    static uint blink_timer = 150;
 
     if (g_game.player_ammo != last_player_ammo)
     {
@@ -248,13 +250,22 @@ static void scene_load(uintptr_t data)
              tileset_gfxTilesLen / sizeof(u32));
     memcpy32(tile_mem_obj[0][0].data, game_sprdb_gfxTiles, game_sprdb_gfxTilesLen / sizeof(u32));
 
+    u32 bmap[8] = { 0, 0, 0, 0, 0, 0, 0 };
+    gfx_text_bmap_fill(0, 0, GFX_TEXT_BMP_COLS, GFX_TEXT_BMP_ROWS, bmap);
+
+    game_paused = false;
+    last_player_ammo = UINT_MAX;
+    last_rorbs = UINT_MAX;
+    last_borbs = UINT_MAX;
+    blink_timer = 150;
+
     const map_header_s *map = world_rooms[0];
     gfx_load_map(map);
+    gfx_scroll_x = 0;
+    gfx_scroll_y = 0;
     game_init();
 
     game_load_room(map);
-    LOG_DBG("room pos: %i %i", (int) map->px, (int) map->py);
-
     setup_game_hud();
 
     mmStart(MOD_TESTMOD, MM_PLAY_LOOP);
@@ -264,6 +275,14 @@ static void scene_load(uintptr_t data)
 static void scene_unload(void)
 {
     mmStop();
+    gfx_unload_map();
+    gfx_text_bmap_dst_clear(0, SCREEN_HEIGHT_T);
+    u32 bmap[8] = { 0, 0, 0, 0, 0, 0, 0 };
+    gfx_text_bmap_fill(0, 0, GFX_TEXT_BMP_COLS, GFX_TEXT_BMP_ROWS, bmap);
+    gfx_reset_palette();
+    obj_hide_multi(gfx_oam_buffer, GFX_OBJ_COUNT);
+
+    memset16(se_mem[GFX_BG1_INDEX], 0, 1024);
 }
 
 static void scene_frame(void)
