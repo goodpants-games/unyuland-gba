@@ -17,16 +17,20 @@
 #define MENU_CENTER_Y(sel_count) \
     (SCREEN_HEIGHT / 2 - 12 * (sel_count)) / 2
 
-static const char *main_menu_options[] =
-    {"START", "CONTROLS", "CREDITS"};
+static const char *const main_menu_options[] =
+    {"START", "CONTROLS", "OPTIONS", "CREDITS"};
 
-static const char *page_menu_options[] =
+static const char *const page_menu_options[] =
     {"BACK"};
+
+static const char *options_options[] =
+    {"LCD Color: Off", "Back"};
 
 enum
 {
     MENU_MODE_MAIN,
-    MENU_MODE_PAGE
+    MENU_MODE_PAGE,
+    MENU_MODE_OPTIONS,
 };
 
 struct
@@ -36,6 +40,8 @@ struct
     int mode;
 }
 static state EWRAM_BSS;
+
+static EWRAM_BSS bool option_lcd_color = false;
 
 
 static int text_center_x(const char *str)
@@ -72,6 +78,74 @@ static void render_page(const char *header, const char *lines[],
 
     menu_show(&state.page_menu);
     state.mode = MENU_MODE_PAGE;
+}
+
+static void open_options_menu(bool clean)
+{
+    gfx_text_bmap_clear(0, 0, GFX_TEXT_BMP_COLS, GFX_TEXT_BMP_ROWS);
+
+    int yp = MENU_CENTER_Y(1 + ARRLEN(options_options));
+    gfx_text_bmap_print(text_center_x("Options"), yp,
+                        "Options", TEXT_COLOR_BLUE);
+    yp += 12;
+
+    state.page_menu = (menu_s)
+    {
+        .selected = clean ? 0 : state.page_menu.selected,
+        .selection_count = ARRLEN(options_options),
+        .selection_labels = options_options,
+
+        .origin_x = SCREEN_WIDTH / 2,
+        .centered = true,
+        .origin_y = yp
+    };
+
+    menu_show(&state.page_menu);
+    state.mode = MENU_MODE_OPTIONS;
+}
+
+static void options_menu_update(void)
+{
+    int res;
+    switch (menu_update(&state.page_menu, &res))
+    {
+    case MENU_STATUS_SELECT:
+        switch (res)
+        {
+        case 0:
+            if ((option_lcd_color = !option_lcd_color))
+            {
+                options_options[0] = "LCD Color: On";
+                gfx_set_palette_mode(GFX_PAL_MODE_LCD_CORRECTED);
+            }
+            else
+            {
+                options_options[0] = "LCD Color: Off";
+                gfx_set_palette_mode(GFX_PAL_MODE_NORMAL);
+            }
+            
+            open_options_menu(false);
+
+            break;
+
+        case 1:
+            goto exit;
+        }
+
+        break;
+    
+    case MENU_STATUS_BACK:
+        goto exit;
+
+    default: break;
+    }
+
+    return;
+
+    exit:
+        state.mode = MENU_MODE_MAIN;
+        gfx_text_bmap_clear(0, 0, GFX_TEXT_BMP_COLS, GFX_TEXT_BMP_ROWS);
+        menu_show(&state.menu);
 }
 
 static void scene_load(uintptr_t data)
@@ -132,7 +206,12 @@ static void scene_frame(void)
                 }
                 break;
             
+
             case 2:
+                open_options_menu(true);
+                break;
+            
+            case 3:
                 {
                     static const char *lines[] = {
                         "pkhead: code, art,",
@@ -147,6 +226,10 @@ static void scene_frame(void)
         
         default: break;
         }
+    }
+    else if (state.mode == MENU_MODE_OPTIONS)
+    {
+        options_menu_update();
     }
     else if (state.mode == MENU_MODE_PAGE)
     {
