@@ -467,24 +467,100 @@ static void update_dialogue()
     }
 }
 
-void game_init(void)
+static void update_camera(entity_s *player)
 {
-    g_game.cam_x = 0;
-    g_game.cam_y = 0;
-    g_game.input_enabled = true;
-    g_game.player_ammo = 100;
-    g_game.player_spit_mode = 0;
-    g_game.collected_orbs_count = 0;
-    g_game.did_collect_orb = false;
-    
-    for (int i = 0; i < MAX_ENTITY_COUNT; ++i)
+    const FIXED dx_max = FX(10);
+    FIXED dx = player->pos.x - g_game.cam_x;
+    FIXED dy = player->pos.y - g_game.cam_y;
+
+    game_camera_s *const cam_data = &g_game.cam_data;
+
+    // if (dx > dx_max)
+    // {
+    //     cam_data->move_x = 1;
+    // }
+    // else if (dx < -dx_max)
+    // {
+    //     cam_data->move_x = -1;
+    // }
+
+    // if (cam_data->move_x != 0)
+    // {
+    //     cam_data->target_x = player->pos.x + FX(8) * cam_data->move_x;
+    // }
+
+    // if (abs(dy) > FX(20)) cam_data->y_follow = true;
+
+    // bool grounded = player->actor.flags & ACTOR_FLAG_GROUNDED;
+    // if (grounded) cam_data->y_follow = false;
+
+    // if (grounded || cam_data->y_follow)
+    //     cam_data->target_y = player->pos.y;
+
+    FIXED target_x = player->actor.face_dir * FX(12);
+
+    // cam_data->vx += fxmul(target_x - cam_data->rel_x, FX(0.01))
+    //                 - fxmul(cam_data->vx, FX(0.15));
     {
-        g_game.entities[i].flags = 0;
+        int sgn = sgn3(target_x - cam_data->rel_x);
+        cam_data->rel_x += fxmul(FX(sgn), FX(0.5));
+        if (sgn3(target_x - cam_data->rel_x) != sgn)
+            cam_data->rel_x = target_x;
     }
 
-    g_game.room_trans = (room_trans_state_s)
+    // cam_data->rel_x += cam_data->vx;
+    g_game.cam_x = player->pos.x + cam_data->rel_x;
+
+    // cam_data->vy += fxmul(cam_data->target_y - g_game.cam_y, FX(0.01))
+    //                 - fxmul(cam_data->vy, FX(0.15));
+    // g_game.cam_y += cam_data->vy;
+
+    const FIXED dy_max = FX(12);
+
+    if (dy > dy_max)
     {
-        .phase = 0
+        g_game.cam_y = player->pos.y - dy_max;
+        // cam_data->move_y = 1;
+    }
+
+    if (dy < -dy_max)
+    {
+        g_game.cam_y = player->pos.y + dy_max;
+        // cam_data->move_y = -1;
+    }
+
+    // if (cam_data->move_y != 0)
+    // {
+    //     g_game.cam_y += FX(1) * cam_data->move_y;
+    //     FIXED new_dy = player->pos.y - g_game.cam_y;
+    //     if (new_dy > dy_max)
+    //         g_game.cam_y = player->pos.y - dy_max;
+    //     else if (new_dy < -dy_max)
+    //         g_game.cam_y = player->pos.y + dy_max;
+
+    //     if (sgn3(dy) != sgn3(new_dy))
+    //     {
+    //         g_game.cam_y = player->pos.y;
+    //         cam_data->move_y = 0;
+    //     }   
+    // }
+
+    // if (abs(cam_data->vx) < FX(0.2))
+    // {
+    //     cam_data->move_x = 0;
+    // }
+}
+
+void game_init(void)
+{
+    g_game = (game_s)
+    {
+        .input_enabled = true,
+        .player_ammo = 100,
+        .room_trans = (room_trans_state_s)
+        {
+            .phase = 0
+        }
     };
 
     game_physics_init();
@@ -525,14 +601,15 @@ void game_update(void)
         game_restore_state();
     }
 
-    g_game.cam_x = (player->pos.x >> FIX_SHIFT) - SCREEN_WIDTH / 4;
-    g_game.cam_y = (player->pos.y >> FIX_SHIFT) - SCREEN_HEIGHT / 4;
+    update_camera(player);
 
-    int x_max = gfx_map_width * 8 - SCREEN_WIDTH / 2;
-    int y_max = gfx_map_height * 8 - SCREEN_HEIGHT / 2;
+    const FIXED x_min = int2fx(SCREEN_WIDTH / 4);
+    const FIXED y_min = int2fx(SCREEN_HEIGHT / 4);
+    const FIXED x_max = int2fx(gfx_map_width * 8 - SCREEN_WIDTH / 4);
+    const FIXED y_max = int2fx(gfx_map_height * 8 - SCREEN_HEIGHT / 4);
 
-    if (g_game.cam_x < 0)     g_game.cam_x = 0;
-    if (g_game.cam_y < 0)     g_game.cam_y = 0;
+    if (g_game.cam_x < x_min) g_game.cam_x = x_min;
+    if (g_game.cam_y < y_min) g_game.cam_y = y_min;
     if (g_game.cam_x > x_max) g_game.cam_x = x_max;
     if (g_game.cam_y > y_max) g_game.cam_y = y_max;
 
@@ -692,24 +769,28 @@ static void sort_render_list(void)
     }
 }
 
-static inline bool renderer_cam_calc(int draw_x, int draw_y, int *draw_cam_x,
-                                     int *draw_cam_y)
+static inline bool renderer_cam_calc(int obj_x, int obj_y, int cam_x,
+                                     int cam_y, int *draw_x,
+                                     int *draw_y)
 {
-    *draw_cam_x = (draw_x - g_game.cam_x) * 2;
-    *draw_cam_y = (draw_y - g_game.cam_y) * 2;
+    *draw_x = (obj_x - cam_x) * 2 + SCREEN_WIDTH / 2;
+    *draw_y = (obj_y - cam_y) * 2 + SCREEN_HEIGHT / 2;
 
     // frustum culling. needed so sprites don't wrap around the screen.
     // and also obviously the performance benefit.
-    return (*draw_cam_x < -32 ||
-            *draw_cam_y < -32 ||
-            *draw_cam_x > SCREEN_WIDTH + 32 ||
-            *draw_cam_y > SCREEN_HEIGHT + 32);
+    return (*draw_x < -32 ||
+            *draw_y < -32 ||
+            *draw_x > SCREEN_WIDTH + 32 ||
+            *draw_y > SCREEN_HEIGHT + 32);
 }
 
 void game_render(void)
 {
-    gfx_scroll_x = g_game.cam_x * 2;
-    gfx_scroll_y = g_game.cam_y * 2;
+    const int cam_x = fx2int(g_game.cam_x);
+    const int cam_y = fx2int(g_game.cam_y);
+
+    gfx_scroll_x = cam_x * 2 - SCREEN_WIDTH / 2;
+    gfx_scroll_y = cam_y * 2 - SCREEN_HEIGHT / 2;
 
     gfx_sprdb_s sprdb =
         gfx_get_sprdb((const gfx_root_header_s *)game_sprdb_bin);
@@ -738,10 +819,11 @@ void game_render(void)
         FIXED pos_y = ent->pos.y - int2fx(5) + dy;
 
         int draw_cam_x, draw_cam_y;
-        FIXED draw_x = (pos_x >> FIX_SHIFT) - 4;
-        FIXED draw_y = (pos_y >> FIX_SHIFT) - 2;
+        int draw_x = fx2int(pos_x) - 4;
+        int draw_y = fx2int(pos_y) - 2;
 
-        renderer_cam_calc(draw_x, draw_y, &draw_cam_x, &draw_cam_y);
+        renderer_cam_calc(draw_x, draw_y, cam_x, cam_y, &draw_cam_x,
+                          &draw_cam_y);
         gfx_draw_sprite(&draw_state, SPRID_GAME_DOWN_ARROW, 0,
                         draw_cam_x, draw_cam_y);
 
@@ -751,11 +833,11 @@ void game_render(void)
         draw_state.a2 = ATTR2_PALBANK(0) | ATTR2_PRIO(1);
 
         pos_y -= int2fx(6);
-        draw_x = (pos_x >> FIX_SHIFT) - 4;
-        draw_y = (pos_y >> FIX_SHIFT) - 2;
+        draw_x = fx2int(pos_x) - 4;
+        draw_y = fx2int(pos_y) - 2;
 
-        renderer_cam_calc(draw_x, draw_y, &draw_cam_x, &draw_cam_y);
-        
+        renderer_cam_calc(draw_x, draw_y, cam_x, cam_y, &draw_cam_x,
+                          &draw_cam_y);
         gfx_draw_sprite(&draw_state, SPRID_GAME_BUTTON_B, 0,
                         draw_cam_x, draw_cam_y);
 
@@ -785,10 +867,11 @@ void game_render(void)
         {
             entity_s *ent = (entity_s *)robj->item;
             
-            int draw_x = (ent->pos.x >> FIX_SHIFT) + ent->sprite.ox;
-            int draw_y = (ent->pos.y >> FIX_SHIFT) + ent->sprite.oy;
+            int draw_x = fx2int(ent->pos.x) + ent->sprite.ox;
+            int draw_y = fx2int(ent->pos.y) + ent->sprite.oy;
 
-            if (renderer_cam_calc(draw_x, draw_y, &draw_cam_x, &draw_cam_y))
+            if (renderer_cam_calc(draw_x, draw_y, cam_x, cam_y, &draw_cam_x,
+                                  &draw_cam_y))
                 continue;
 
             sprite_graphic_id = (int) ent->sprite.graphic_id;
@@ -802,10 +885,11 @@ void game_render(void)
         {
             projectile_s *proj = (projectile_s *)robj->item;
 
-            int draw_x = (proj->px >> FIX_SHIFT) - 4;
-            int draw_y = (proj->py >> FIX_SHIFT) - 4;
+            int draw_x = fx2int(proj->px) - 4;
+            int draw_y = fx2int(proj->py) - 4;
 
-            if (renderer_cam_calc(draw_x, draw_y, &draw_cam_x, &draw_cam_y))
+            if (renderer_cam_calc(draw_x, draw_y, cam_x, cam_y, &draw_cam_x,
+                                  &draw_cam_y))
                 continue;
 
             sprite_graphic_id = (int) proj->graphic_id;
@@ -1037,15 +1121,17 @@ static bool room_transition_phase1_update(entity_s *player)
         .player_move_x = player_mx,
         .override_player_move_x = true,
     };
+    
+    g_game.cam_x = player->pos.x;
+    g_game.cam_y = player->pos.y;
 
-    g_game.cam_x = (player->pos.x >> FIX_SHIFT) - SCREEN_WIDTH / 4;
-    g_game.cam_y = (player->pos.y >> FIX_SHIFT) - SCREEN_HEIGHT / 4;
+    const FIXED x_min = int2fx(SCREEN_WIDTH / 4);
+    const FIXED y_min = int2fx(SCREEN_HEIGHT / 4);
+    const FIXED x_max = int2fx(gfx_map_width * 8 - SCREEN_WIDTH / 4);
+    const FIXED y_max = int2fx(gfx_map_height * 8 - SCREEN_HEIGHT / 4);
 
-    int x_max = gfx_map_width * 8 - SCREEN_WIDTH / 2;
-    int y_max = gfx_map_height * 8 - SCREEN_HEIGHT / 2;
-
-    if (g_game.cam_x < 0)     g_game.cam_x = 0;
-    if (g_game.cam_y < 0)     g_game.cam_y = 0;
+    if (g_game.cam_x < x_min) g_game.cam_x = x_min;
+    if (g_game.cam_y < y_min) g_game.cam_y = y_min;
     if (g_game.cam_x > x_max) g_game.cam_x = x_max;
     if (g_game.cam_y > y_max) g_game.cam_y = y_max;
 

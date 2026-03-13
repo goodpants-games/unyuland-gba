@@ -178,6 +178,16 @@ typedef struct room_trans_state
     bool override_player_move_x;
 } room_trans_state_s;
 
+typedef struct game_camera
+{
+    s8 move_x;
+    // s8 move_y;
+    FIXED rel_x;
+    // FIXED target_y;
+    // FIXED vx, vy;
+}
+game_camera_s;
+
 typedef struct game {
     entity_s entities[MAX_ENTITY_COUNT];
     projectile_s projectiles[MAX_PROJECTILE_COUNT];
@@ -187,8 +197,9 @@ typedef struct game {
     int room_width;
     int room_height;
     
-    int cam_x;
-    int cam_y;
+    FIXED cam_x;
+    FIXED cam_y;
+    game_camera_s cam_data;
 
     bool input_enabled;
     bool queue_restore;

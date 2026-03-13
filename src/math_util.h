@@ -11,6 +11,7 @@
 
 #define FX_FLOOR(n) ((n) & ~(FIX_ONE - 1))
 #define TO_FIXED(n) (FIXED)(FIX_ONE * (n))
+#define FX(n) TO_FIXED(n)
 
 static inline int ceil_div(int a, int b)
 {
