@@ -16,6 +16,8 @@
 // 1 KiB for the copy of the map collision. stored in ewram.
 #define GAME_COLLISION_MAP_SIZE (1024)
 
+#define GAME_BG_IDX 1
+
 typedef enum render_obj_t
 {
     RENDER_OBJ_SPRITE,
@@ -612,8 +614,10 @@ void game_update(void)
 
     const FIXED x_min = int2fx(SCREEN_WIDTH / 4);
     const FIXED y_min = int2fx(SCREEN_HEIGHT / 4);
-    const FIXED x_max = int2fx(gfx_map_width * 8 - SCREEN_WIDTH / 4);
-    const FIXED y_max = int2fx(gfx_map_height * 8 - SCREEN_HEIGHT / 4);
+    const FIXED x_max = int2fx(gfx_bg[GAME_BG_IDX].map_width * 8
+                               - SCREEN_WIDTH / 4);
+    const FIXED y_max = int2fx(gfx_bg[GAME_BG_IDX].map_height * 8
+                               - SCREEN_HEIGHT / 4);
 
     if (g_game.cam_x < x_min) g_game.cam_x = x_min;
     if (g_game.cam_y < y_min) g_game.cam_y = y_min;
@@ -796,8 +800,8 @@ void game_render(void)
     const int cam_x = fx2int(g_game.cam_x);
     const int cam_y = fx2int(g_game.cam_y);
 
-    gfx_scroll_x = cam_x * 2 - SCREEN_WIDTH / 2;
-    gfx_scroll_y = cam_y * 2 - SCREEN_HEIGHT / 2;
+    gfx_bg[GAME_BG_IDX].offset_x = cam_x * 2 - SCREEN_WIDTH / 2;
+    gfx_bg[GAME_BG_IDX].offset_y = cam_y * 2 - SCREEN_HEIGHT / 2;
 
     gfx_sprdb_s sprdb =
         gfx_get_sprdb((const gfx_root_header_s *)game_sprdb_bin);
@@ -977,7 +981,7 @@ static void change_room(const map_header_s *new_room)
     }
 
     game_load_room(new_room);
-    gfx_load_map(new_room);
+    gfx_load_map(GAME_BG_IDX, new_room);
 }
 
 static void room_transition_inactive_update(entity_s *player)
@@ -1134,8 +1138,10 @@ static bool room_transition_phase1_update(entity_s *player)
 
     const FIXED x_min = int2fx(SCREEN_WIDTH / 4);
     const FIXED y_min = int2fx(SCREEN_HEIGHT / 4);
-    const FIXED x_max = int2fx(gfx_map_width * 8 - SCREEN_WIDTH / 4);
-    const FIXED y_max = int2fx(gfx_map_height * 8 - SCREEN_HEIGHT / 4);
+    const FIXED x_max = int2fx(gfx_bg[GAME_BG_IDX].map_width * 8
+                               - SCREEN_WIDTH / 4);
+    const FIXED y_max = int2fx(gfx_bg[GAME_BG_IDX].map_height * 8
+                               - SCREEN_HEIGHT / 4);
 
     if (g_game.cam_x < x_min) g_game.cam_x = x_min;
     if (g_game.cam_y < y_min) g_game.cam_y = y_min;
@@ -1277,7 +1283,7 @@ void game_restore_state(void)
     g_game.collected_borbs = game_saved_state.collected_borbs;
     g_game.player_is_dead = false;
 
-    gfx_mark_scroll_dirty();
+    gfx_mark_scroll_dirty(GAME_BG_IDX);
 }
 
 void game_start_dialogue(const char *dialogue)

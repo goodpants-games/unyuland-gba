@@ -3,24 +3,37 @@
 #include <font_gfx.h>
 #include "gfx.h"
 #include "gba_util.h"
+#include <string.h>
 
 #define TEXT_CHAR_ID(i) ((i) * 4)
+#define COPY_QUEUE_MAX_SIZE 8
+
+typedef struct bg_scroll_data
+{
+    uint old_offset_x;
+    uint old_offset_y;
+    bool screen_dirty;
+} bg_scroll_data_s;
+
+typedef struct copy_request
+{
+    const void *src;
+    void *dst;
+    size_t size;
+    void (*copy_proc)(void *dst, const void *src, uint count);
+}
+copy_request_s;
 
 OBJ_ATTR gfx_oam_buffer[128];
-int gfx_scroll_x = 0;
-int gfx_scroll_y = 0;
-uint gfx_map_width = 0;
-uint gfx_map_height = 0;
-const map_header_s *gfx_loaded_map = NULL;
-
 static u16 gfx_mul_palette[16];
 
-static uint old_scroll_x = 0;
-static uint old_scroll_y = 0;
-static bool screen_dirty = false;
+EWRAM_BSS gfx_bg_s gfx_bg[4];
+static EWRAM_BSS bg_scroll_data_s bg_scroll_data[4];
+
+static uint copy_queue_count = 0;
+static EWRAM_BSS copy_request_s copy_queue[COPY_QUEUE_MAX_SIZE];
 
 #define RAINBOW_PALETTE_LENGTH (sizeof(rainbow_pal) / sizeof(*rainbow_pal))
-
 static const int rainbow_pal[] = {
     GFX_PAL_RED, GFX_PAL_ORANGE, GFX_PAL_YELLOW, GFX_PAL_GREEN,
     GFX_PAL_BLUE, GFX_PAL_PINK
@@ -201,6 +214,122 @@ void gfx_set_palette_multiplied(FIXED factor)
     update_rainbow_palette();
 }
 
+void gfx_init(void)
+{
+    memcpy16(gfx_palette, gfx_palette_normal, 16);
+    oam_init(gfx_oam_buffer, 128);
+    gfx_reset_palette();
+
+    for (uint i = 0; i < 4; ++i)
+    {
+        gfx_bg[i] = (gfx_bg_s)
+        {
+            .bpp = GFX_BG_4BPP,
+            .enabled = false,
+        };
+
+        bg_scroll_data[i] = (bg_scroll_data_s){0};
+    };
+
+    gfx_bg[0].enabled = true;
+    gfx_bg[0].char_block = GFX_TEXT_BMP_BLOCK;
+    gfx_bg[0].priority = 0;
+    gfx_bg[1].priority = 1;
+    gfx_bg[2].priority = 2;
+    gfx_bg[3].priority = 2;
+
+    // REG_DISPCNT = DCNT_OBJ_1D;
+
+    // REG_BG0CNT = BG_CBB(GFX_TEXT_BMP_BLOCK) | BG_SBB(GFX_BG0_INDEX) | BG_4BPP |
+    //              BG_REG_32x32 | BG_PRIO(0);
+    // REG_BG0HOFS = 0;
+    // REG_BG0VOFS = 0;
+
+    // REG_BG1CNT = BG_CBB(0) | BG_SBB(GFX_BG1_INDEX) | BG_8BPP | BG_REG_32x32 |
+    //              BG_PRIO(1);
+    // REG_BG1HOFS = 0;
+    // REG_BG1VOFS = 0;
+
+    // REG_BG2CNT = BG_SBB(GFX_BG2_INDEX) | BG_4BPP | BG_PRIO(2);
+    // REG_BG3CNT = BG_SBB(GFX_BG2_INDEX) | BG_4BPP | BG_PRIO(2);
+}
+
+static void my_memcpy8(void *dst, const void *src, uint count)
+{ memcpy(dst, src, count); }
+
+static void my_memset8(void *dst, const void *src, uint count)
+{ memset(dst, (int)(uintptr_t) src, count); }
+
+static void my_memset16(void *dst, const void *src, uint count)
+{ memset16(dst, (u16)(uintptr_t) src, count); }
+
+static void my_memset32(void *dst, const void *src, uint count)
+{ memset32(dst, (u32)(uintptr_t) src, count); }
+
+static bool impl_queue_memcpy(void *dst, const void *src, size_t icount,
+                              void (*copy_proc)(void *dst,
+                                                const void *src, uint count))
+{
+    if (copy_queue_count == COPY_QUEUE_MAX_SIZE)
+    {
+        LOG_ERR("gfx_queue_memcpy: gfx copy queue is full!");
+        return false;
+    }
+
+    copy_queue[copy_queue_count++] = (copy_request_s)
+    {
+        .dst = dst,
+        .src = src,
+        .size = icount,
+        .copy_proc = copy_proc
+    };
+
+    return true;
+}
+
+// defer memcpy to next call to gfx_new_frame
+bool gfx_queue_memcpy8(void *dst, const void *src, size_t bcount)
+{ return impl_queue_memcpy(dst, src, bcount, my_memcpy8); }
+
+bool gfx_queue_memcpy16(void *dst, const void *src, size_t hwcount)
+{ return impl_queue_memcpy(dst, src, hwcount, memcpy16); }
+
+bool gfx_queue_memcpy32(void *dst, const void *src, size_t wcount)
+{ return impl_queue_memcpy(dst, src, wcount, memcpy32); }
+
+// defer memset to next call to gfx_new_frame
+bool gfx_queue_memset8(void *dst, u8 value, size_t bcount)
+{
+    return impl_queue_memcpy(dst, (void *)(uintptr_t)value, bcount, my_memset8);
+}
+
+bool gfx_queue_memset16(void *dst, u16 value, size_t hwcount)
+{
+    return impl_queue_memcpy(dst, (void *)(uintptr_t)value, hwcount,
+                             my_memset16);
+}
+
+bool gfx_queue_memset32(void *dst, u32 value, size_t wcount)
+{
+    return impl_queue_memcpy(dst, (void *)(uintptr_t)value, wcount,
+                             my_memset32);
+}
+
+static void proc_copy_queue(void)
+{
+    if (copy_queue_count == 0) return;
+
+    LOG_DBG("%u copies", copy_queue_count);
+    for (uint i = 0; i < copy_queue_count; ++i)
+    {
+        copy_request_s *cr = copy_queue + i;
+        LOG_DBG("%p, %p, %u", cr->dst, cr->src, cr->size);
+        cr->copy_proc(cr->dst, cr->src, cr->size);
+    }
+
+    copy_queue_count = 0;
+}
+
 static void write_scr_block(const uint map_entry, u32 *const dest)
 {
     if (map_entry == 0)
@@ -239,56 +368,29 @@ static void write_scr_block(const uint map_entry, u32 *const dest)
     *(dest + 16) = lower;;
 }
 
-void gfx_init(void)
+static void update_map_scroll(uint bg_idx)
 {
-    memcpy16(gfx_palette, gfx_palette_normal, 16);
-    oam_init(gfx_oam_buffer, 128);
-    gfx_reset_palette();
+    static const uint gfx_bg_indices[4] = {
+        GFX_BG0_INDEX, GFX_BG1_INDEX, GFX_BG2_INDEX, GFX_BG3_INDEX
+    };
 
-    REG_DISPCNT = DCNT_OBJ_1D;
+    gfx_bg_s *bg = gfx_bg + bg_idx;
+    bg_scroll_data_s *scroll_data = bg_scroll_data + bg_idx;
 
-    REG_BG0CNT = BG_CBB(GFX_TEXT_BMP_BLOCK) | BG_SBB(GFX_BG0_INDEX) | BG_4BPP |
-                 BG_REG_32x32 | BG_PRIO(0);
-    REG_BG0HOFS = 0;
-    REG_BG0VOFS = 0;
-
-    REG_BG1CNT = BG_CBB(0) | BG_SBB(GFX_BG1_INDEX) | BG_8BPP | BG_REG_32x32 |
-                 BG_PRIO(1);
-    REG_BG1HOFS = 0;
-    REG_BG1VOFS = 0;
-
-    REG_BG2CNT = BG_SBB(GFX_BG2_INDEX) | BG_4BPP | BG_PRIO(2);
-    REG_BG3CNT = BG_SBB(GFX_BG2_INDEX) | BG_4BPP | BG_PRIO(2);
-}
-
-void gfx_new_frame(void)
-{
-    REG_DISPCNT |= DCNT_OBJ | DCNT_BG0 | DCNT_BG1;
-
-    if (++rainbow_shift_time_accum == 4)
+    if (bg->map)
     {
-        rainbow_shift_time_accum = 0;
-        if (++rainbow_shift == RAINBOW_PALETTE_LENGTH) rainbow_shift = 0;
-        update_rainbow_palette();
-    }
+        const u16 *map_data = map_graphics_data(bg->map);
+        u32 *se32 = (u32 *)se_mem[gfx_bg_indices[bg_idx]];
 
-    if (gfx_loaded_map)
-    {
-        LOG_DBG("scroll x: %i", gfx_scroll_x);
-        LOG_DBG("scroll y: %i", gfx_scroll_y);
+        int prev_cam_tx = scroll_data->old_offset_x / 16;
+        int cam_tx = bg->offset_x / 16;
 
-        const u16 *map_data = map_graphics_data(gfx_loaded_map);
-        u32 *se32 = (u32 *)se_mem[GFX_BG1_INDEX];
+        int prev_cam_ty = scroll_data->old_offset_y / 16;
+        int cam_ty = bg->offset_y / 16;
 
-        int prev_cam_tx = old_scroll_x / 16;
-        int cam_tx = gfx_scroll_x / 16;
-
-        int prev_cam_ty = old_scroll_y / 16;
-        int cam_ty = gfx_scroll_y / 16;
-
-        if (screen_dirty)
+        if (scroll_data->screen_dirty)
         {
-            screen_dirty = false;
+            scroll_data->screen_dirty = false;
             int ey = cam_ty + SCRH_T16 + 1;
             int ex = cam_tx + SCRW_T16 + 1;
 
@@ -296,7 +398,7 @@ void gfx_new_frame(void)
             {
                 for (int x = cam_tx; x < ex; ++x)
                 {
-                    uint ii = y * gfx_map_width + x;
+                    uint ii = y * bg->map_width + x;
                     uint oi = (y % 16) * 32 + (x % 16);
                     uint entry = (uint) map_data[ii];
                     write_scr_block(entry, se32 + oi);
@@ -327,7 +429,7 @@ void gfx_new_frame(void)
                 {
                     for (int y = sy; y <= ey; ++y)
                     {
-                        uint ii = y * gfx_map_width + x;
+                        uint ii = y * bg->map_width + x;
                         uint oi = (y % 16) * 32 + (x % 16);
                         uint entry = (uint) map_data[ii];
                         write_scr_block(entry, se32 + oi);
@@ -357,7 +459,7 @@ void gfx_new_frame(void)
                 {
                     for (int x = sx; x <= ex; ++x)
                     {
-                        uint ii = y * gfx_map_width + x;
+                        uint ii = y * bg->map_width + x;
                         uint oi = (y % 16) * 32 + (x % 16);
                         uint entry = (uint) map_data[ii];
                         write_scr_block(entry, se32 + oi);
@@ -367,25 +469,79 @@ void gfx_new_frame(void)
         }
     }
 
-    old_scroll_x = gfx_scroll_x;
-    old_scroll_y = gfx_scroll_y;
+    scroll_data->old_offset_x = bg->offset_x;
+    scroll_data->old_offset_y = bg->offset_y;
+}
+
+void gfx_new_frame(void)
+{
+    if (++rainbow_shift_time_accum == 4)
+    {
+        rainbow_shift_time_accum = 0;
+        if (++rainbow_shift == RAINBOW_PALETTE_LENGTH) rainbow_shift = 0;
+        update_rainbow_palette();
+    }
+
+    for (uint i = 0; i < 4; ++i)
+        update_map_scroll(i);
+
+    proc_copy_queue();
 
     oam_copy(oam_mem, gfx_oam_buffer, 128);
-    REG_BG1HOFS = gfx_scroll_x;
-    REG_BG1VOFS = gfx_scroll_y;
+
+    REG_BG0HOFS = gfx_bg[0].offset_x;
+    REG_BG0VOFS = gfx_bg[0].offset_y;
+    REG_BG1HOFS = gfx_bg[1].offset_x;
+    REG_BG1VOFS = gfx_bg[1].offset_y;
+    REG_BG2HOFS = gfx_bg[2].offset_x;
+    REG_BG2VOFS = gfx_bg[2].offset_y;
+    REG_BG3HOFS = gfx_bg[3].offset_x;
+    REG_BG3VOFS = gfx_bg[3].offset_y;
+    
+    u32 reg_dispcnt = DCNT_OBJ | DCNT_OBJ_1D;
+    u16 bg_cnt[4] = { 0, 0, 0, 0 };
+    
+    bg_cnt[0] = BG_SBB(GFX_BG0_INDEX) | BG_REG_32x32;
+    bg_cnt[1] = BG_SBB(GFX_BG1_INDEX) | BG_REG_32x32;
+    bg_cnt[2] = BG_SBB(GFX_BG2_INDEX) | BG_REG_32x32;
+    bg_cnt[3] = BG_SBB(GFX_BG2_INDEX) | BG_REG_32x32;
+
+    for (uint i = 0; i < 4; ++i)
+    {
+        gfx_bg_s *config = gfx_bg + i;
+        if (config->enabled)
+            reg_dispcnt |= DCNT_BG0 << i;
+
+        u16 *const cnt = bg_cnt + i;
+
+        *cnt |= BG_PRIO(config->priority) | BG_CBB(config->char_block);
+        if (config->bpp == GFX_BG_8BPP)
+            *cnt |= BG_8BPP;
+        else
+            *cnt |= BG_4BPP;
+    }
+
+    REG_DISPCNT = reg_dispcnt;
+    REG_BG0CNT = bg_cnt[0];
+    REG_BG1CNT = bg_cnt[1];
+    REG_BG2CNT = bg_cnt[2];
+    REG_BG3CNT = bg_cnt[3]; 
 }
 
-void gfx_mark_scroll_dirty()
+void gfx_mark_scroll_dirty(uint bg_idx)
 {
-    screen_dirty = true;
+    bg_scroll_data[bg_idx].screen_dirty = true;
 }
 
-void gfx_load_map(const map_header_s *map)
+void gfx_load_map(uint bg_idx, const map_header_s *map)
 {
-    gfx_loaded_map = map;
-    gfx_map_width = gfx_loaded_map->width;
-    gfx_map_height = gfx_loaded_map->height;
-    screen_dirty = true;
+    gfx_bg_s *bg = gfx_bg + bg_idx;
+    bg_scroll_data_s *sdata = bg_scroll_data + bg_idx;
+
+    bg->map = map;
+    bg->map_width = map->width;
+    bg->map_height = map->height;
+    sdata->screen_dirty = true;
 }
 
 // static inline u32* get_pixel_row(const int x, const int y)

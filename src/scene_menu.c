@@ -7,6 +7,8 @@
 #include "menu.h"
 #include "gfx.h"
 
+#include <game_logo_gfx.h>
+
 #define HUD_ROW_ORIGIN (GFX_TEXT_BMP_ROWS - 2)
 #define HUD_Y_ORIGIN   (HUD_ROW_ORIGIN * 8 + 6)
 #define ARRLEN(arr) (sizeof(arr) / sizeof(*arr))
@@ -52,6 +54,8 @@ static int text_center_x(const char *str)
 static void render_page(const char *header, const char *lines[],
                         uint line_count)
 {
+    gfx_bg[1].enabled = false;
+
     gfx_text_bmap_clear(0, 0, GFX_TEXT_BMP_COLS, GFX_TEXT_BMP_ROWS);
     gfx_text_bmap_dst_clear(SCREEN_HEIGHT_T / 2, GFX_TEXT_BMP_ROWS);
     gfx_text_bmap_dst_assign(SCREEN_HEIGHT_T / 4, GFX_TEXT_BMP_ROWS, 0, 2);
@@ -143,6 +147,7 @@ static void options_menu_update(void)
     return;
 
     exit:
+        gfx_bg[1].enabled = true;
         state.mode = MENU_MODE_MAIN;
         gfx_text_bmap_clear(0, 0, GFX_TEXT_BMP_COLS, GFX_TEXT_BMP_ROWS);
         menu_show(&state.menu);
@@ -150,6 +155,10 @@ static void options_menu_update(void)
 
 static void scene_load(uintptr_t data)
 {
+    gfx_bg[1].bpp = GFX_BG_4BPP;
+    gfx_bg[1].char_block = 0;
+    gfx_bg[1].enabled = true;
+
     mmStart(MOD_SAC08, MM_PLAY_LOOP);
     mmSetModuleVolume((int)(1024 * 0.3));
 
@@ -166,6 +175,22 @@ static void scene_load(uintptr_t data)
 
     menu_show(&state.menu);
     gfx_text_bmap_dst_assign(SCREEN_HEIGHT_T / 2, GFX_TEXT_BMP_ROWS, 0, 2);
+
+    memcpy32(&tile_mem[0][0].data, game_logo_gfxTiles,
+             game_logo_gfxTilesLen / 4);
+    
+    const u16 *src = (const u16 *)game_logo_gfxMap;
+    uint oy = 2;
+    uint ox = 4;
+    for (uint y = oy; y < oy + 9; ++y)
+    {
+        for (uint x = ox; x < ox + 22; ++x)
+        {
+            se_mat[GFX_BG1_INDEX][y][x] = *(src++);
+        }
+    }
+    
+    // memcpy16(se_mem[GFX_BG1_INDEX], game_logo_gfxMap, game_logo_gfxMapLen / 2);
 }
 
 static void scene_unload(void)
@@ -239,6 +264,7 @@ static void scene_frame(void)
         case MENU_STATUS_SELECT:
         case MENU_STATUS_BACK:
             state.mode = MENU_MODE_MAIN;
+            gfx_bg[1].enabled = true;
             gfx_text_bmap_clear(0, 0, GFX_TEXT_BMP_COLS, GFX_TEXT_BMP_ROWS);
             gfx_text_bmap_dst_clear(SCREEN_HEIGHT_T / 4, GFX_TEXT_BMP_ROWS);
             gfx_text_bmap_dst_assign(SCREEN_HEIGHT_T / 2, GFX_TEXT_BMP_ROWS, 0, 2);

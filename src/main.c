@@ -99,8 +99,8 @@ int main(void)
         #endif
 
         VBlankIntrWait();
-        snd_frame();
         gfx_new_frame();
+        snd_frame();
     }
 
     return 0;
