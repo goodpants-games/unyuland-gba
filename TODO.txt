@@ -6,3 +6,4 @@
   code for the original unyuland.
 - why does (seemingly psg channel 2) mute sometimes?
   (or maybe it's just the same sound id is unable to be retriggered?)
+- text print command queue. then it gets flushed on next vsync.

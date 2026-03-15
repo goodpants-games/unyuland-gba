@@ -47,6 +47,7 @@ ARCH	:=	-mthumb -mthumb-interwork
 CFLAGS	:=	-g -Wall -O2\
 		-mcpu=arm7tdmi -mtune=arm7tdmi\
 		-DPRINTF_INCLUDE_CONFIG_H\
+		-std=c11\
 		$(ARCH)
 
 CFLAGS	+=	$(INCLUDE)

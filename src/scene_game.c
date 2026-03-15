@@ -244,16 +244,20 @@ static void update_hud(void)
     update_hud_sprites(face_frame, g_game.player_spit_mode);
 }
 
+static void scene_load_vram(void *_)
+{
+    memset32(&tile_mem[0][0], 0, (GFX_CHAR_GAME_TILESET + 2) * sizeof(TILE));
+    memcpy32(&tile_mem[0][0] + GFX_CHAR_GAME_TILESET + 2,
+             tileset_gfxTiles, tileset_gfxTilesLen / sizeof(u32));
+    memcpy32(tile_mem_obj[0][0].data, game_sprdb_gfxTiles,
+             game_sprdb_gfxTilesLen / sizeof(u32));
+}
+
 static void scene_load(uintptr_t data)
 {
     gfx_bg[1].bpp = GFX_BG_8BPP;
     gfx_bg[1].char_block = 0;
     gfx_bg[1].enabled = true;
-    
-    memcpy32(&tile_mem[0][0] + GFX_CHAR_GAME_TILESET + 2,
-             tileset_gfxTiles, tileset_gfxTilesLen / sizeof(u32));
-    memcpy32(tile_mem_obj[0][0].data, game_sprdb_gfxTiles,
-             game_sprdb_gfxTilesLen / sizeof(u32));
 
     u32 bmap[8] = { 0, 0, 0, 0, 0, 0, 0 };
     gfx_text_bmap_fill(0, 0, GFX_TEXT_BMP_COLS, GFX_TEXT_BMP_ROWS, bmap);
@@ -275,6 +279,8 @@ static void scene_load(uintptr_t data)
 
     mmStart(MOD_TESTMOD, MM_PLAY_LOOP);
     mmSetModuleVolume((int)(1024 * 0.3));
+
+    gfx_defer_vblank(scene_load_vram, NULL);
 }
 
 static void scene_unload(void)
@@ -287,8 +293,6 @@ static void scene_unload(void)
     gfx_text_bmap_clear(0, 0, GFX_TEXT_BMP_COLS, GFX_TEXT_BMP_ROWS);
     gfx_reset_palette();
     obj_hide_multi(gfx_oam_buffer, GFX_OBJ_COUNT);
-
-    memset16(se_mem[GFX_BG1_INDEX], 0, 1024);
 }
 
 static void scene_frame(void)

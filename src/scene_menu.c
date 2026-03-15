@@ -153,6 +153,26 @@ static void options_menu_update(void)
         menu_show(&state.menu);
 }
 
+static void scene_load_vram(void *_)
+{
+    memset32(se_mem[GFX_BG1_INDEX], 0, 1024 / 2);
+    memcpy32(&tile_mem[0][0].data, game_logo_gfxTiles,
+             game_logo_gfxTilesLen / 4);
+    
+    const u16 *src = (const u16 *)game_logo_gfxMap;
+    uint oy = 2;
+    uint ox = 4;
+    for (uint y = oy; y < oy + 9; ++y)
+    {
+        for (uint x = ox; x < ox + 22; ++x)
+        {
+            se_mat[GFX_BG1_INDEX][y][x] = *(src++);
+        }
+    }
+    
+    // memcpy16(se_mem[GFX_BG1_INDEX], game_logo_gfxMap, game_logo_gfxMapLen / 2);
+}
+
 static void scene_load(uintptr_t data)
 {
     gfx_bg[1].bpp = GFX_BG_4BPP;
@@ -176,21 +196,7 @@ static void scene_load(uintptr_t data)
     menu_show(&state.menu);
     gfx_text_bmap_dst_assign(SCREEN_HEIGHT_T / 2, GFX_TEXT_BMP_ROWS, 0, 2);
 
-    memcpy32(&tile_mem[0][0].data, game_logo_gfxTiles,
-             game_logo_gfxTilesLen / 4);
-    
-    const u16 *src = (const u16 *)game_logo_gfxMap;
-    uint oy = 2;
-    uint ox = 4;
-    for (uint y = oy; y < oy + 9; ++y)
-    {
-        for (uint x = ox; x < ox + 22; ++x)
-        {
-            se_mat[GFX_BG1_INDEX][y][x] = *(src++);
-        }
-    }
-    
-    // memcpy16(se_mem[GFX_BG1_INDEX], game_logo_gfxMap, game_logo_gfxMapLen / 2);
+    gfx_defer_vblank(scene_load_vram, NULL);
 }
 
 static void scene_unload(void)

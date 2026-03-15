@@ -80,13 +80,13 @@ int main(void)
 
     scenemgr_init(&scene_desc_menu, 0);
 
+    #ifdef MAIN_PROFILE
+    uint frame_len = 0;
+    profile_start();
+    #endif
+
     while (true)
     {
-        #ifdef MAIN_PROFILE
-        uint frame_len = 0;
-        profile_start();
-        #endif
-
         // screen_print(&se_mat[GFX_BG0_INDEX][18][0], "Hello, world!");
 
         key_poll();
@@ -99,6 +99,12 @@ int main(void)
         #endif
 
         VBlankIntrWait();
+
+        #ifdef MAIN_PROFILE
+        frame_len = 0;
+        profile_start();
+        #endif
+
         gfx_new_frame();
         snd_frame();
     }

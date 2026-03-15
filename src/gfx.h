@@ -1,6 +1,22 @@
 #ifndef GFX_H
 #define GFX_H
 
+#define GFX_TEXT_BMP_COLS  30  // tiles per column
+#define GFX_TEXT_BMP_ROWS  12 // in tiles; (12 * 8) / 8, where 12 is the size in
+                              // pixels of each line
+#define GFX_TEXT_BMP_SIZE  (GFX_TEXT_BMP_COLS * GFX_TEXT_BMP_ROWS) // in tiles
+#define GFX_TEXT_BMP_BLOCK 2
+
+#ifdef __ASSEMBLER__
+#   define MEM_VRAM          0x06000000
+#   define SIZEOF_TILE       0x20
+#   define SIZEOF_CHARBLOCK  (SIZEOF_TILE * 512)
+#   define GFX_TEXT_BMP_VRAM (MEM_VRAM                                         \
+                             + SIZEOF_CHARBLOCK * GFX_TEXT_BMP_BLOCK           \
+                             + SIZEOF_TILE * 1)
+#else
+#   define GFX_TEXT_BMP_VRAM (&(tile_mem[GFX_TEXT_BMP_BLOCK][1]))
+
 #include <tonc_core.h>
 #include "map_data.h"
 #include "log.h"
@@ -16,13 +32,6 @@
 #define GFX_BG3_INDEX 31 // sky background (for that one room)
 
 #define GFX_CHAR_GAME_TILESET 0
-
-#define GFX_TEXT_BMP_COLS  30  // tiles per column
-#define GFX_TEXT_BMP_ROWS  12 // in tiles; (12 * 8) / 8, where 12 is the size in
-                              // pixels of each line
-#define GFX_TEXT_BMP_SIZE  (GFX_TEXT_BMP_COLS * GFX_TEXT_BMP_ROWS) // in tiles
-#define GFX_TEXT_BMP_BLOCK 2
-#define GFX_TEXT_BMP_VRAM  (&(tile_mem[GFX_TEXT_BMP_BLOCK][1]))
 
 typedef enum text_color
 {
@@ -151,14 +160,16 @@ INLINE void gfx_unload_map(uint bg_idx)
     gfx_bg[bg_idx].map_height = 0;
 }
 
+bool gfx_defer_vblank(void (*func)(void *userdata), void *userdata);
+
 void gfx_set_palette_mode(gfx_pal_mode_e mode);
 void gfx_reset_palette(void);
 void gfx_set_palette_multiplied(FIXED factor);
 
-ARM_FUNC void gfx_text_bmap_fill(uint oc, uint or_, uint cols, uint rows, u32 data[8]);
-ARM_FUNC void gfx_text_bmap_print(uint x, uint y, const char *text, text_color_e color);
-ARM_FUNC void gfx_text_bmap_dst_clear(uint row, uint row_count);
-ARM_FUNC void gfx_text_bmap_dst_assign(uint row, uint row_count, uint src_row, uint pal);
+bool gfx_text_bmap_fill(uint oc, uint or_, uint cols, uint rows, u32 data[8]);
+bool gfx_text_bmap_print(uint x, uint y, const char *text, text_color_e color);
+bool gfx_text_bmap_dst_clear(uint row, uint row_count);
+bool gfx_text_bmap_dst_assign(uint row, uint row_count, uint src_row, uint pal);
 
 static inline void gfx_text_bmap_clear(uint oc, uint or_, uint cols, uint rows)
 {
@@ -178,5 +189,7 @@ static inline gfx_sprdb_s gfx_get_sprdb(const gfx_root_header_s *header)
 
 void gfx_draw_sprite(gfx_draw_sprite_state_s *state, uint spr_idx,
                      uint frame_idx, int draw_x, int draw_y);
+
+#endif // !defined(__ASSEMBLER__)
 
 #endif
