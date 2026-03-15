@@ -1,5 +1,4 @@
 #include <tonc.h>
-#include <ctype.h>
 #include <font_gfx.h>
 #include "gfx.h"
 #include "gba_util.h"
@@ -437,8 +436,11 @@ void gfx_load_map(uint bg_idx, const map_header_s *map)
 EWRAM_BSS TILE gfx_text_bmp_buf[GFX_TEXT_BMP_SIZE];
 EWRAM_BSS bool gfx_text_bmp_dirty_rows[GFX_TEXT_BMP_ROWS];
 
+ARM_FUNC void _gfx_text_blit_tile(uint x, uint y, const TILE4 *src_tile);
+
+/*
 ARM_FUNC NO_INLINE
-static void blit_tile(uint x, uint y, const TILE4 *src_tile)
+static void _gfx_text_blit_tileC(uint x, uint y, const TILE4 *src_tile)
 {
     const uint shf = (x & 7) << 2;
     uint ry = y & 7;
@@ -482,6 +484,7 @@ static void blit_tile(uint x, uint y, const TILE4 *src_tile)
         }
     }
 }
+*/
 
 ARM_FUNC NO_INLINE
 static void blit_tile_colored(uint x, uint y, const TILE4 *src_tile,
@@ -579,6 +582,136 @@ void gfx_text_bmap_dst_assign(uint row, uint row_count, uint src_row,
     }
 }
 
+/*
+#include <stdio.h>
+#include <ctype.h>
+
+#define TEXT_CHAR_ID(i) ((i) * 4)
+
+static int get_id(char ch)
+{
+    unsigned int id;
+    
+    switch (ch)
+    {
+    case '.':
+        id = TEXT_CHAR_ID(36);
+        break;
+
+    case ',':
+        id = TEXT_CHAR_ID(37);
+        break;
+
+    case '!':
+        id = TEXT_CHAR_ID(38);
+        break;
+
+    case '?':
+        id = TEXT_CHAR_ID(39);
+        break;
+
+    case '-':
+        id = TEXT_CHAR_ID(40);
+        break;
+
+    case '_':
+        id = TEXT_CHAR_ID(41);
+        break;
+
+    case ':':
+        id = TEXT_CHAR_ID(42);
+        break;
+    
+    case '*': // not actually the asterisk character but whatever. sure.
+        id = TEXT_CHAR_ID(43);
+        break;
+    
+    case '\'':
+        id = TEXT_CHAR_ID(45);
+        break;
+    
+    case '/':
+        id = TEXT_CHAR_ID(46);
+        break;
+    
+    case '"':
+        id = TEXT_CHAR_ID(47);
+        break;
+    
+    case '%':
+        id = TEXT_CHAR_ID(48);
+        break;
+    
+    case '\x7F':
+        id = TEXT_CHAR_ID(44);
+        break;
+
+    // assume [a-zA-Z0-9]
+    default:
+        if (ch >= '0' && ch <= '9')
+            id = TEXT_CHAR_ID(ch - '0' + 26);
+        else if ((ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z'))
+            // assume it's a letter
+            id = TEXT_CHAR_ID(toupper(ch) - 'A');
+        else
+            id = 0;
+        
+        break;
+    }
+    
+    return id;
+}
+
+int main()
+{
+    for (int ch = 0; ch < 256; ch++)
+    {
+        if (ch % 8 == 0) printf("\n");
+        printf("0x%02X,", get_id((char) ch));
+    }
+    
+    printf("\n");
+
+    return 0;
+}
+*/
+
+static const u8 char_map[256] = {
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x98,0xBC,0x00,0x00,0xC0,0x00,0xB4,
+    0x00,0x00,0xAC,0x00,0x94,0xA0,0x90,0xB8,
+    0x68,0x6C,0x70,0x74,0x78,0x7C,0x80,0x84,
+    0x88,0x8C,0xA8,0x00,0x00,0x00,0x00,0x9C,
+    0x00,0x00,0x04,0x08,0x0C,0x10,0x14,0x18,
+    0x1C,0x20,0x24,0x28,0x2C,0x30,0x34,0x38,
+    0x3C,0x40,0x44,0x48,0x4C,0x50,0x54,0x58,
+    0x5C,0x60,0x64,0x00,0x00,0x00,0x00,0xA4,
+    0x00,0x00,0x04,0x08,0x0C,0x10,0x14,0x18,
+    0x1C,0x20,0x24,0x28,0x2C,0x30,0x34,0x38,
+    0x3C,0x40,0x44,0x48,0x4C,0x50,0x54,0x58,
+    0x5C,0x60,0x64,0x00,0x00,0x00,0x00,0xB0,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+};
+
+ARM_FUNC NO_INLINE
 void gfx_text_bmap_print(uint x, uint y, const char *text,
                          text_color_e text_color)
 {
@@ -600,82 +733,18 @@ void gfx_text_bmap_print(uint x, uint y, const char *text,
     for (; *text != '\0'; ++text)
     {
         char ch = *text;
-        uint id;
-        switch (ch)
-        {
-        case ' ':
-            goto next_char;
-            break;
+        if (ch == ' ') goto next_char;
 
-        case '.':
-            id = TEXT_CHAR_ID(36);
-            break;
-
-        case ',':
-            id = TEXT_CHAR_ID(37);
-            break;
-
-        case '!':
-            id = TEXT_CHAR_ID(38);
-            break;
-
-        case '?':
-            id = TEXT_CHAR_ID(39);
-            break;
-
-        case '-':
-            id = TEXT_CHAR_ID(40);
-            break;
-
-        case '_':
-            id = TEXT_CHAR_ID(41);
-            break;
-
-        case ':':
-            id = TEXT_CHAR_ID(42);
-            break;
-        
-        case '*': // not actually the asterisk character but whatever. sure.
-            id = TEXT_CHAR_ID(43);
-            break;
-        
-        case '\'':
-            id = TEXT_CHAR_ID(45);
-            break;
-        
-        case '/':
-            id = TEXT_CHAR_ID(46);
-            break;
-        
-        case '"':
-            id = TEXT_CHAR_ID(47);
-            break;
-        
-        case '%':
-            id = TEXT_CHAR_ID(48);
-            break;
-        
-        case '\x7F':
-            id = TEXT_CHAR_ID(44);
-            break;
-
-        // assume [a-zA-Z0-9]
-        default:
-            if (ch >= '0' && ch <= '9')
-                id = TEXT_CHAR_ID(ch - '0' + 26);
-            else
-                // assume it's a letter
-                id = TEXT_CHAR_ID(toupper(ch) - 'A');
-        }
+        uint id = char_map[(u8) ch];
 
         const TILE *src_tile = text_data + id;
 
         if (is_white)
         {
-            blit_tile(x, y, src_tile);
-            blit_tile(x + 8, y, ++src_tile);
-            blit_tile(x, y + 8, ++src_tile);
-            blit_tile(x + 8, y + 8, ++src_tile);
+            _gfx_text_blit_tile(x, y, src_tile);
+            _gfx_text_blit_tile(x + 8, y, ++src_tile);
+            _gfx_text_blit_tile(x, y + 8, ++src_tile);
+            _gfx_text_blit_tile(x + 8, y + 8, ++src_tile);
         }
         else
         {
