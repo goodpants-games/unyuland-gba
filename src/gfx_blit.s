@@ -22,7 +22,7 @@ _gfx_text_blit_tile:
 
     @ before doing anything, copy source bitmap to stack.
     @ then adjust tile*. because iwram = Fast. Fast = Good.
-    @ original tile* may live in EWRAM or ROM, so...
+    @ original tile* may live in ROM, so...
     ldmia r2, {r3-r10}
     push {r3-r10}
     mov r2, sp
@@ -58,17 +58,16 @@ _gfx_text_blit_tile:
     @ registers used for block transfer:
     @ {r8, r9, r10, r11}
 
-    beq .no_shf @ branch if zero
+    beq .Lno_shf @ branch if zero
     @ otherwise, run branch that handles shifts
 
-.yes_shf:
     @ r0 = 32 - shf
     rsb r0, r5, #32
 
     @ if odd, run one iteration of
     @ the loop to make it even...
     tst r3, #1
-    beq .yes_shf_loop
+    beq .Lyes_shf_loop
 
     @ u32 src = *(src_row++)
     @ *row |= src << shf
@@ -93,28 +92,31 @@ _gfx_text_blit_tile:
 
     sub r6, #1
 
-.yes_shf_loop:
+.Lyes_shf_loop:
+    @ load two rows from tile #1
+    ldmia r4, {r8-r9}
+
+    @ load two rows from tile #2
+    add ip, r4, #32
+    ldmia ip, {r10-r11}
+
     @ load two source rouces into r7 and ip
     ldmia r2!, {r7, ip}
 
     @ *row |= src << shf;
     @ store in r8
-    ldr r8, [r4]
     orr r8, r8, r7, lsl r5
 
     @ *(row + 8) |= src >> (32 - shf);
     @ store in r10
-    ldr r10, [r4, #32]
     orr r10, r10, r7, lsr r0
 
     @ *(row++) |= src << shf
     @ store in r9
-    ldr r9, [r4, #4]
     orr r9, r9, ip, lsl r5
     
     @ *(row + 8) |= src >> (32 - shf);
     @ store in r11
-    ldr r11, [r4, #36]
     orr r11, r11, ip, lsr r0
 
     @ block-write two rows of the
@@ -130,17 +132,14 @@ _gfx_text_blit_tile:
     addeq r4, #ROW_STRIDE  @ add if zero
 
     subs r6, #2
-    bne .yes_shf_loop @ branch if not zero
+    bne .Lyes_shf_loop @ branch if not zero
+    b .Lblit_tile_return
 
-    add sp, #32 @ pop copy of source bitmap
-    pop {r4-r11}
-    bx lr
-
-.no_shf:
+.Lno_shf:
     @ if odd, run one iteration of
     @ the loop to make it even...
     tst r3, #1
-    beq .no_shf_loop
+    beq .Lno_shf_loop$
 
     @ u32 src = *(src_row++)
     @ *(row++) |= src
@@ -158,7 +157,7 @@ _gfx_text_blit_tile:
 
     sub r6, #1
 
-.no_shf_loop:
+.Lno_shf_loop$:
     @ transfer two rows at a time.
     @ could theoretically do four, but i'm too lazy to handle the logic to make
     @ sure that non-alignment to four doesn't break anything.
@@ -184,8 +183,9 @@ _gfx_text_blit_tile:
     addeq r4, #ROW_STRIDE  @ add if zero
 
     subs r6, #2
-    bne .no_shf_loop @ branch if not zero
+    bne .Lno_shf_loop$ @ branch if not zero
 
+.Lblit_tile_return:
     add sp, #32 @ pop copy of source bitmap
     pop {r4-r11}
     bx lr
@@ -203,9 +203,9 @@ _gfx_text_blit_tile:
 gfx_text_bmap_fill:
     @ check for no-op
     cmp r2, #0 @ param cols
-    beq .return
+    beq .Lbmap_fill_return
     cmp r3, #0 @ param rows
-    beq .return
+    beq .Lbmap_fill_return
 
     mov ip, sp @ save current sp for param reads
     push {r4-r11}
@@ -238,7 +238,7 @@ gfx_text_bmap_fill:
     @ ip: pointer to gfx_text_bmp_dirty_rows
     ldr ip, =gfx_text_bmp_dirty_rows
 
-.row_loop:
+.Lrow_loop:
     @ flag row as dirty
     @ (r6: temp)
     mov r6, #1
@@ -247,7 +247,7 @@ gfx_text_bmap_fill:
     @ r5: dec col counter
     mov r5, r2
 
-.col_loop:
+.Lcol_loop:
     @ copy source data to dest tile
     @ 4 uints at a time
     ldmia r4!, {r6-r9}
@@ -258,16 +258,16 @@ gfx_text_bmap_fill:
 
     @ end of col_loop
     subs r5, #1
-    bne .col_loop
+    bne .Lcol_loop
 
     @ end of row_loop
     add r0, r10
     add r11, #1
     mov r1, r0
     subs r3, #1
-    bne .row_loop
+    bne .Lrow_loop
 
     pop {r4-r11}
 
-.return:
+.Lbmap_fill_return:
     bx lr
