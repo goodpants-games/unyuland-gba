@@ -110,16 +110,26 @@ blit_tile:
 
 @ Ok fr this time i Think im better than gcc. Go my block transfer instructions.
 
-.global _gfx_text_bmap_fill
+.global gfx_text_bmap_fill
 
 .section ".iwram", "ax", %progbits
 .arm
 .align 2
-_gfx_text_bmap_fill:
-    push {r4-r10}
+gfx_text_bmap_fill:
+    @ check for no-op
+    cmp r2, #0 @ param cols
+    beq .return
+    cmp r3, #0 @ param rows
+    beq .return
 
+    mov ip, sp @ save current sp for param reads
+    push {r4-r11}
+    
     @ r4 = data param
-    ldr r4, [sp, #(7 * 4)]
+    ldr r4, [ip]
+
+    @ r11 = row ypos
+    mov r11, r1
 
     @ r0 = param oc
     @ r1 = tile ptr (derived from param or)
@@ -130,7 +140,7 @@ _gfx_text_bmap_fill:
     mul r1, r5
     add r1, r0
     lsl r1, #5 @ SIZEOF_TILE (32) as shift
-    ldr r5, =GFX_TEXT_BMP_VRAM
+    ldr r5, =gfx_text_bmp_buf
     add r1, r5
 
     @ r6-r9 used for block transfer
@@ -140,7 +150,15 @@ _gfx_text_bmap_fill:
     @ r0: tile row origin
     mov r0, r1
 
+    @ ip: pointer to gfx_text_bmp_dirty_rows
+    ldr ip, =gfx_text_bmp_dirty_rows
+
 .row_loop:
+    @ flag row as dirty
+    @ (r6: temp)
+    mov r6, #1
+    strb r6, [ip, r11]
+
     @ r5: dec col counter
     mov r5, r2
 
@@ -159,9 +177,12 @@ _gfx_text_bmap_fill:
 
     @ end of row_loop
     add r0, r10
+    add r11, #1
     mov r1, r0
     subs r3, #1
     bne .row_loop
 
-    pop {r4-r10}
+    pop {r4-r11}
+
+.return:
     bx lr

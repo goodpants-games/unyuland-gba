@@ -14,6 +14,10 @@
 #   define GFX_TEXT_BMP_VRAM (MEM_VRAM                                         \
                              + SIZEOF_CHARBLOCK * GFX_TEXT_BMP_BLOCK           \
                              + SIZEOF_TILE * 1)
+
+.extern gfx_text_bmp_buf
+.extern gfx_text_bmp_dirty_rows
+
 #else
 #   define GFX_TEXT_BMP_VRAM (&(tile_mem[GFX_TEXT_BMP_BLOCK][1]))
 
@@ -146,6 +150,7 @@ gfx_bg_s;
 
 extern gfx_bg_s gfx_bg[4];
 extern OBJ_ATTR gfx_oam_buffer[GFX_OBJ_COUNT];
+extern TILE gfx_text_bmp_buf[GFX_TEXT_BMP_SIZE];
 
 extern u16 gfx_palette[16];
 
@@ -160,16 +165,19 @@ INLINE void gfx_unload_map(uint bg_idx)
     gfx_bg[bg_idx].map_height = 0;
 }
 
-bool gfx_defer_vblank(void (*func)(void *userdata), void *userdata);
+void* gfx_alloc_cpybuf(size_t wsize);
+bool gfx_queue_memcpy32(void *dst, const void *src, size_t wcount);
+bool gfx_queue_memset32(void *dst, uint value, size_t wcount);
 
 void gfx_set_palette_mode(gfx_pal_mode_e mode);
 void gfx_reset_palette(void);
 void gfx_set_palette_multiplied(FIXED factor);
 
-bool gfx_text_bmap_fill(uint oc, uint or_, uint cols, uint rows, u32 data[8]);
-bool gfx_text_bmap_print(uint x, uint y, const char *text, text_color_e color);
-bool gfx_text_bmap_dst_clear(uint row, uint row_count);
-bool gfx_text_bmap_dst_assign(uint row, uint row_count, uint src_row, uint pal);
+// gfx_text_bmap_fill written in asm. For funsies.
+void gfx_text_bmap_fill(uint oc, uint or_, uint cols, uint rows, u32 data[8]);
+void gfx_text_bmap_print(uint x, uint y, const char *text, text_color_e color);
+void gfx_text_bmap_dst_clear(uint row, uint row_count);
+void gfx_text_bmap_dst_assign(uint row, uint row_count, uint src_row, uint pal);
 
 static inline void gfx_text_bmap_clear(uint oc, uint or_, uint cols, uint rows)
 {

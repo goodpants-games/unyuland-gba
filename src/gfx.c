@@ -21,7 +21,8 @@
 #pragma region defs
 
 #define TEXT_CHAR_ID(i) ((i) * 4)
-#define DEFER_QUEUE_MAX_SIZE 8
+#define DMA_QUEUE_MAX_SIZE 32
+#define DMA_CPYPOOL_SIZE (4096 / 4)
 #define TEXT_QUEUE_MAX_SIZE 4096
 
 typedef enum text_queue_action
@@ -33,20 +34,6 @@ typedef enum text_queue_action
     TEXT_QUEUE_DST_ASSIGN,
 }
 text_queue_action_e;
-
-typedef struct bg_scroll_data
-{
-    uint old_offset_x;
-    uint old_offset_y;
-    bool screen_dirty;
-} bg_scroll_data_s;
-
-typedef struct vbl_defer
-{
-    void (*func)(void *userdata);
-    void *userdata;
-}
-vbl_defer_s;
 
 OBJ_ATTR gfx_oam_buffer[128];
 static u16 gfx_mul_palette[16];
@@ -264,6 +251,13 @@ void gfx_set_palette_multiplied(FIXED factor)
 //------------------------------------------------------------------------------
 #pragma region map scrolling
 
+typedef struct bg_scroll_data
+{
+    uint old_offset_x;
+    uint old_offset_y;
+    bool screen_dirty;
+} bg_scroll_data_s;
+
 static EWRAM_BSS bg_scroll_data_s bg_scroll_data[4];
 
 static void write_scr_block(const uint map_entry, u32 *const dest)
@@ -440,131 +434,152 @@ void gfx_load_map(uint bg_idx, const map_header_s *map)
 //------------------------------------------------------------------------------
 #pragma region text engine
 
-typedef struct text_cmd_header
+EWRAM_BSS TILE gfx_text_bmp_buf[GFX_TEXT_BMP_SIZE];
+EWRAM_BSS bool gfx_text_bmp_dirty_rows[GFX_TEXT_BMP_ROWS];
+
+ARM_FUNC NO_INLINE
+static void blit_tile(uint x, uint y, const TILE4 *src_tile)
 {
-    u8 action;
-}
-text_cmd_header_s;
+    const uint shf = (x & 7) << 2;
+    uint ry = y & 7;
+    u32 *row = &gfx_text_bmp_buf[(y >> 3) * GFX_TEXT_BMP_COLS + (x >> 3)].data[ry];
+    const u32 *src_row = src_tile->data;
 
-typedef struct text_cmd_blit
-{
-    text_cmd_header_s head;
+    // bool *dirty = text_bmp_dirty_rows + (y >> 3);
+    // *dirty = true;
 
-    uint x, y;
-    const TILE4 *src_tile;
-}
-text_cmd_blit_s;
+    if (shf)
+    {
+        for (int r = 0; r < 8; ++r)
+        {
+            u32 src = *src_row;
+            *row |= src << shf;
+            *(row + 8) |= src >> (32 - shf);
 
-typedef struct text_cmd_blit_colored
-{
-    text_cmd_header_s head;
+            ++row;
+            ++src_row;
+            if (++ry == 8)
+            {
+                row += (GFX_TEXT_BMP_COLS - 1) * 8;
+                // *(++dirty) = true;
+            }
+        }
+    }
+    else
+    {
+        for (int r = 0; r < 8; ++r)
+        {
+            u32 src = *src_row;
+            *row |= src;
 
-    uint x, y;
-    const TILE4 *src_tile;
-    u32 color_bits;
-}
-text_cmd_blit_colored_s;
-
-typedef struct text_cmd_fill
-{
-    text_cmd_header_s head;
-
-    uint oc, or, cols, rows;
-    u32 data[8];
-}
-text_cmd_fill_s;
-
-typedef struct text_cmd_dst_clear
-{
-    text_cmd_header_s head;
-
-    uint row, row_count;
-} text_cmd_dst_clear_s;
-
-typedef struct text_cmd_dst_assign
-{
-    text_cmd_header_s head;
-
-    uint row, row_count, src_row, pal;
-} text_cmd_dst_assign_s;
-
-static u8 *text_queue_write;
-static EWRAM_BSS u8 text_queue[TEXT_QUEUE_MAX_SIZE];
-#define TEXT_QUEUE_END (text_queue + TEXT_QUEUE_MAX_SIZE)
-
-#define TEXT_ENQUEUE_START(p_action, sname)                                    \
-    u8 *e = text_queue_write + sizeof(text_cmd_##sname##_s);                   \
-    if (e > TEXT_QUEUE_END)                                                    \
-    {                                                                          \
-        LOG_WRN("text command queue is full!");                                \
-        return false;                                                          \
-    }                                                                          \
-                                                                               \
-    text_cmd_##sname##_s *alloc = (void *)text_queue_write;                    \
-    text_queue_write = (void *)align((uint)e, alignof(text_cmd_header_s));     \
-    *alloc = (text_cmd_##sname##_s)                                            \
-    {                                                                          \
-        .head.action = p_action,                                               \
-
-#define TEXT_ENQUEUE_END }; return true;
-
-bool gfx_text_bmap_fill(uint oc, uint or_, uint cols, uint rows, u32 data[8])
-{
-    TEXT_ENQUEUE_START(TEXT_QUEUE_FILL, fill)
-        .oc = oc,
-        .or = or_,
-        .cols = cols,
-        .rows = rows,
-        .data[0] = data[0],
-        .data[1] = data[1],
-        .data[2] = data[2],
-        .data[3] = data[3],
-        .data[4] = data[4],
-        .data[5] = data[5],
-        .data[6] = data[6],
-        .data[7] = data[7]
-    TEXT_ENQUEUE_END
+            ++row;
+            ++src_row;
+            if (++ry == 8)
+            {
+                row += (GFX_TEXT_BMP_COLS - 1) * 8;
+                // *(++dirty) = true;
+            }
+        }
+    }
 }
 
-static bool blit_tile(uint x, uint y, const TILE *src_tile)
-{
-    TEXT_ENQUEUE_START(TEXT_QUEUE_BLIT, blit)
-        .x = x,
-        .y = y,
-        .src_tile = src_tile
-    TEXT_ENQUEUE_END
-}
-
-static bool blit_tile_colored(uint x, uint y, const TILE *src_tile,
+ARM_FUNC NO_INLINE
+static void blit_tile_colored(uint x, uint y, const TILE4 *src_tile,
                               u32 color_bits)
 {
-    TEXT_ENQUEUE_START(TEXT_QUEUE_BLIT_COLORED, blit_colored)
-        .x = x,
-        .y = y,
-        .src_tile = src_tile,
-        .color_bits = color_bits
-    TEXT_ENQUEUE_END
+    const uint shf = (x & 7) << 2;
+    uint ry = y & 7;
+    u32 *row = &gfx_text_bmp_buf[(y >> 3) * GFX_TEXT_BMP_COLS + (x >> 3)].data[ry];
+    const u32 *src_row = src_tile->data;
+
+    // bool *dirty = text_bmp_dirty_rows + (y >> 3);
+    // *dirty = true;
+    
+    if (shf)
+    {
+        for (int r = 0; r < 8; ++r)
+        {
+            u32 src = *src_row;
+            u32 blit = src << shf;
+            *row = (*row & ~blit) | (blit & color_bits);
+
+            row += 8;
+            blit = src >> (32 - shf);
+            *row = (*row & ~blit) | (blit & color_bits);
+
+            row -= 7;
+            ++src_row;
+            if (++ry == 8)
+            {
+                row += (GFX_TEXT_BMP_COLS - 1) * 8;
+                // *(++dirty) = true;
+            }
+        }
+    }
+    else
+    {
+        for (int r = 0; r < 8; ++r)
+        {
+            u32 src = *src_row;
+            *row = (*row & ~src) | (src & color_bits);
+
+            ++row;
+            ++src_row;
+            if (++ry == 8)
+            {
+                row += (GFX_TEXT_BMP_COLS - 1) * 8;
+                // *(++dirty) = true;
+            }
+        }
+    }
+    
+    // for (int r = 0; r < 8; ++r)
+    // {
+    //     u32 src_row = src_tile->data[r];
+    //     u32 *row = get_pixel_row(dx, dy);
+    //     uint shf = (dx & 7) << 2;
+    //     u32 blit = src_row << shf;
+    //     *row = (*row & ~blit) | (blit & color_bits);
+
+    //     if (shf) // shf > 0
+    //     {
+    //         row = get_pixel_row(dx + 8, dy);
+    //         shf = 32 - shf;
+    //         blit = src_row >> shf;
+    //         *row = (*row & ~blit) | (blit & color_bits);
+    //     }
+
+    //     ++dy;
+    // }
 }
 
-bool gfx_text_bmap_dst_clear(uint row, uint row_count)
+ARM_FUNC NO_INLINE
+void gfx_text_bmap_dst_clear(uint row, uint row_count)
 {
-    TEXT_ENQUEUE_START(TEXT_QUEUE_DST_CLEAR, dst_clear)
-        .row = row,
-        .row_count = row_count
-    TEXT_ENQUEUE_END
+    uint i = row * 32;
+    for (uint y = row; y < row + row_count; ++y)
+    {
+        for (uint x = 0; x < 30; ++x)
+            se_mem[GFX_BG0_INDEX][i++] = 0;
+        i += 2;
+    }
 }
 
-bool gfx_text_bmap_dst_assign(uint row, uint row_count, uint src_row, uint pal)
+ARM_FUNC NO_INLINE
+void gfx_text_bmap_dst_assign(uint row, uint row_count, uint src_row,   
+                                      uint pal)
 {
-    TEXT_ENQUEUE_START(TEXT_QUEUE_DST_ASSIGN, dst_assign)
-        .row = row,
-        .row_count = row_count,
-        .src_row = src_row,
-        .pal = pal,
-    TEXT_ENQUEUE_END
+    uint i = src_row * GFX_TEXT_BMP_COLS + 1;
+    uint j = row * 32;
+    for (uint y = row; y < row + row_count; ++y)
+    {
+        for (uint x = 0; x < 30; ++x)
+            se_mem[GFX_BG0_INDEX][j++] = SE_PALBANK(pal) | SE_ID(i++);
+        j += 2;
+    }
 }
 
-bool gfx_text_bmap_print(uint x, uint y, const char *text,
+void gfx_text_bmap_print(uint x, uint y, const char *text,
                          text_color_e text_color)
 {
     const TILE *const text_data = (const TILE *)font_gfxTiles;
@@ -577,9 +592,10 @@ bool gfx_text_bmap_print(uint x, uint y, const char *text,
         color_bits = 0x22222222;
     else if (text_color == TEXT_COLOR_BLACK)
         color_bits = 0x11111111;
-
-    #define ERRCHK(res) \
-        if (!(res)) goto err;
+    
+    gfx_text_bmp_dirty_rows[y / 8] = true;
+    gfx_text_bmp_dirty_rows[y / 8 + 1] = true;
+    gfx_text_bmp_dirty_rows[(y + 15) / 8] = true;
 
     for (; *text != '\0'; ++text)
     {
@@ -656,239 +672,132 @@ bool gfx_text_bmap_print(uint x, uint y, const char *text,
 
         if (is_white)
         {
-            ERRCHK(blit_tile(x, y, src_tile));
-            ERRCHK(blit_tile(x + 8, y, ++src_tile));
-            ERRCHK(blit_tile(x, y + 8, ++src_tile));
-            ERRCHK(blit_tile(x + 8, y + 8, ++src_tile));
+            blit_tile(x, y, src_tile);
+            blit_tile(x + 8, y, ++src_tile);
+            blit_tile(x, y + 8, ++src_tile);
+            blit_tile(x + 8, y + 8, ++src_tile);
         }
         else
         {
-            ERRCHK(blit_tile_colored(x, y, src_tile, color_bits));
-            ERRCHK(blit_tile_colored(x + 8, y, ++src_tile, color_bits));
-            ERRCHK(blit_tile_colored(x, y + 8, ++src_tile, color_bits));
-            ERRCHK(blit_tile_colored(x + 8, y + 8, ++src_tile, color_bits));
+            blit_tile_colored(x, y, src_tile, color_bits);
+            blit_tile_colored(x + 8, y, ++src_tile, color_bits);
+            blit_tile_colored(x, y + 8, ++src_tile, color_bits);
+            blit_tile_colored(x + 8, y + 8, ++src_tile, color_bits);
         }
 
         next_char:;
         x += 12;
     }
-
-    return true;
-    err:
-        return false;
-}
-
-ARM_FUNC NO_INLINE
-static void _gfx_blit_tile(uint x, uint y, const TILE4 *src_tile)
-{
-    const uint shf = (x & 7) << 2;
-    uint ry = y & 7;
-    u32 *row = &GFX_TEXT_BMP_VRAM[(y >> 3) * GFX_TEXT_BMP_COLS + (x >> 3)].data[ry];
-    const u32 *src_row = src_tile->data;
-
-    // bool *dirty = text_bmp_dirty_rows + (y >> 3);
-    // *dirty = true;
-
-    if (shf)
-    {
-        for (int r = 0; r < 8; ++r)
-        {
-            u32 src = *src_row;
-            *row |= src << shf;
-            *(row + 8) |= src >> (32 - shf);
-
-            ++row;
-            ++src_row;
-            if (++ry == 8)
-            {
-                row += (GFX_TEXT_BMP_COLS - 1) * 8;
-                // *(++dirty) = true;
-            }
-        }
-    }
-    else
-    {
-        for (int r = 0; r < 8; ++r)
-        {
-            u32 src = *src_row;
-            *row |= src;
-
-            ++row;
-            ++src_row;
-            if (++ry == 8)
-            {
-                row += (GFX_TEXT_BMP_COLS - 1) * 8;
-                // *(++dirty) = true;
-            }
-        }
-    }
-}
-
-ARM_FUNC NO_INLINE
-static void _gfx_blit_tile_colored(uint x, uint y, const TILE4 *src_tile,
-                                   u32 color_bits)
-{
-    const uint shf = (x & 7) << 2;
-    uint ry = y & 7;
-    u32 *row = &GFX_TEXT_BMP_VRAM[(y >> 3) * GFX_TEXT_BMP_COLS + (x >> 3)].data[ry];
-    const u32 *src_row = src_tile->data;
-
-    // bool *dirty = text_bmp_dirty_rows + (y >> 3);
-    // *dirty = true;
-    
-    if (shf)
-    {
-        for (int r = 0; r < 8; ++r)
-        {
-            u32 src = *src_row;
-            u32 blit = src << shf;
-            *row = (*row & ~blit) | (blit & color_bits);
-
-            row += 8;
-            blit = src >> (32 - shf);
-            *row = (*row & ~blit) | (blit & color_bits);
-
-            row -= 7;
-            ++src_row;
-            if (++ry == 8)
-            {
-                row += (GFX_TEXT_BMP_COLS - 1) * 8;
-                // *(++dirty) = true;
-            }
-        }
-    }
-    else
-    {
-        for (int r = 0; r < 8; ++r)
-        {
-            u32 src = *src_row;
-            *row = (*row & ~src) | (src & color_bits);
-
-            ++row;
-            ++src_row;
-            if (++ry == 8)
-            {
-                row += (GFX_TEXT_BMP_COLS - 1) * 8;
-                // *(++dirty) = true;
-            }
-        }
-    }
-    
-    // for (int r = 0; r < 8; ++r)
-    // {
-    //     u32 src_row = src_tile->data[r];
-    //     u32 *row = get_pixel_row(dx, dy);
-    //     uint shf = (dx & 7) << 2;
-    //     u32 blit = src_row << shf;
-    //     *row = (*row & ~blit) | (blit & color_bits);
-
-    //     if (shf) // shf > 0
-    //     {
-    //         row = get_pixel_row(dx + 8, dy);
-    //         shf = 32 - shf;
-    //         blit = src_row >> shf;
-    //         *row = (*row & ~blit) | (blit & color_bits);
-    //     }
-
-    //     ++dy;
-    // }
-}
-
-// written in asm. For funsies.
-ARM_FUNC
-void _gfx_text_bmap_fill(uint oc, uint or_, uint cols, uint rows, u32 data[8]);
-
-ARM_FUNC NO_INLINE
-static void _gfx_text_bmap_dst_clear(uint row, uint row_count)
-{
-    uint i = row * 32;
-    for (uint y = row; y < row + row_count; ++y)
-    {
-        for (uint x = 0; x < 30; ++x)
-            se_mem[GFX_BG0_INDEX][i++] = 0;
-        i += 2;
-    }
-}
-
-ARM_FUNC NO_INLINE
-static void _gfx_text_bmap_dst_assign(uint row, uint row_count, uint src_row,   
-                                      uint pal)
-{
-    uint i = src_row * GFX_TEXT_BMP_COLS + 1;
-    uint j = row * 32;
-    for (uint y = row; y < row + row_count; ++y)
-    {
-        for (uint x = 0; x < 30; ++x)
-            se_mem[GFX_BG0_INDEX][j++] = SE_PALBANK(pal) | SE_ID(i++);
-        j += 2;
-    }
-}
-
-// IWRAM_CODE ARM_FUNC NO_INLINE
-static void flush_text_cmds(void)
-{
-    for (u8 *ptr = text_queue; ptr < text_queue_write;)
-    {
-        text_cmd_header_s *header = (text_cmd_header_s *)ptr;
-        switch (header->action)
-        {
-        case TEXT_QUEUE_BLIT:
-        {
-            text_cmd_blit_s *data = (void *)header;
-            _gfx_blit_tile(data->x, data->y, data->src_tile);
-            ptr += sizeof(*data);
-            break;
-        }
-        
-        case TEXT_QUEUE_BLIT_COLORED:
-        {
-            text_cmd_blit_colored_s *data = (void *)header;
-            _gfx_blit_tile_colored(data->x, data->y,
-                                   data->src_tile,
-                                   data->color_bits);
-            ptr += sizeof(*data);
-            break;
-        }
-        
-        case TEXT_QUEUE_FILL:
-        {
-            text_cmd_fill_s *data = (void *)header;
-            _gfx_text_bmap_fill(data->oc, data->or, data->cols, data->rows,
-                                data->data);
-            ptr += sizeof(*data);
-            break;
-        }
-
-        case TEXT_QUEUE_DST_ASSIGN:
-        {
-            text_cmd_dst_assign_s *data = (void *)header;
-            _gfx_text_bmap_dst_assign(data->row, data->row_count, data->src_row,
-                                      data->pal);
-            ptr += sizeof(*data);
-            break;
-        }
-        
-        case TEXT_QUEUE_DST_CLEAR:
-        {
-            text_cmd_dst_clear_s *data = (void *)header;
-            _gfx_text_bmap_dst_clear(data->row, data->row_count);
-            ptr += sizeof(*data);
-            break;
-        }
-        
-        default:
-            LOG_ERR("unknown text command %u", header->action);
-            goto exit_text_queue_flush;
-        }
-
-        ptr = (u8 *)align((uint)ptr, alignof(text_cmd_header_s));
-    }
-
-exit_text_queue_flush:
-    text_queue_write = text_queue;
 }
 
 #pragma endregion
+
+
+
+
+
+
+
+//------------------------------------------------------------------------------
+// dma
+//------------------------------------------------------------------------------
+#pragma region dma
+
+typedef enum dma_req_t
+{
+    GFX_DMA_MEMCPY32,
+    GFX_DMA_MEMSET32
+}
+dma_req_t_e;
+
+typedef struct gfx_dma_req
+{
+    u8 type;
+    void *dst;
+    union
+    {
+        const void *src;
+        uintptr_t value;
+    };
+    size_t wcount;
+}
+gfx_dma_req_s;
+
+static uint dma_queue_size = 0;
+static EWRAM_BSS gfx_dma_req_s dma_queue[DMA_QUEUE_MAX_SIZE];
+static u32 *dma_cpypool_write;
+static EWRAM_BSS u32 dma_cpypool[DMA_CPYPOOL_SIZE];
+
+#define CHECK_DMA_QUEUE()  \
+    if (dma_queue_size == DMA_QUEUE_MAX_SIZE)  \
+    {  \
+        LOG_ERR("DMA queue is full!");  \
+        return false;  \
+    }
+
+bool gfx_queue_memcpy32(void *dst, const void *src, size_t wcount)
+{
+    CHECK_DMA_QUEUE();
+
+    dma_queue[dma_queue_size++] = (gfx_dma_req_s)
+    {
+        .type = GFX_DMA_MEMCPY32,
+        .dst = dst,
+        .src = src,
+        .wcount = wcount
+    };
+
+    return true;
+}
+
+bool gfx_queue_memset32(void *dst, uint value, size_t wcount)
+{
+    CHECK_DMA_QUEUE();
+
+    dma_queue[dma_queue_size++] = (gfx_dma_req_s)
+    {
+        .type = GFX_DMA_MEMSET32,
+        .dst = dst,
+        .value = value,
+        .wcount = wcount
+    };
+
+    return true;
+}
+
+static void flush_dma_queue(void)
+{
+    for (uint i = 0; i < dma_queue_size; ++i)
+    {
+        gfx_dma_req_s *req = dma_queue + i;
+
+        if (req->type == GFX_DMA_MEMCPY32)
+            dma3_cpy(req->dst, req->src, req->wcount * 4);
+        else if (req->type == GFX_DMA_MEMSET32)
+            dma3_fill(req->dst, req->value, req->wcount * 4);
+        else
+            LOG_ERR("unknown gfx copy type %u", req->type);
+    }
+    dma_queue_size = 0;
+    dma_cpypool_write = dma_cpypool;
+}
+
+void* gfx_alloc_cpybuf(size_t wsize)
+{
+    u32 *e = dma_cpypool_write + wsize;
+    if (e > dma_cpypool + DMA_CPYPOOL_SIZE)
+    {
+        LOG_ERR("gfx dma copy pool full!");
+        return NULL;
+    }
+
+    u32 *alloc = dma_cpypool_write;
+    dma_cpypool_write += wsize;
+
+    return (void *)alloc;
+}
+
+#pragma endregion dma
 
 
 
@@ -903,12 +812,9 @@ exit_text_queue_flush:
 //------------------------------------------------------------------------------
 #pragma region main
 
-static uint defer_queue_size = 0;
-static EWRAM_BSS vbl_defer_s defer_queue[DEFER_QUEUE_MAX_SIZE];
-
 void gfx_init(void)
 {
-    text_queue_write = text_queue;
+    dma_cpypool_write = dma_cpypool;
     memcpy16(gfx_palette, gfx_palette_normal, 16);
     oam_init(gfx_oam_buffer, 128);
     gfx_reset_palette();
@@ -947,20 +853,6 @@ void gfx_init(void)
     // REG_BG3CNT = BG_SBB(GFX_BG2_INDEX) | BG_4BPP | BG_PRIO(2);
 }
 
-bool gfx_defer_vblank(void (*func)(void *userdata), void *userdata)
-{
-    if (defer_queue_size == DEFER_QUEUE_MAX_SIZE)
-        return false;
-
-    defer_queue[defer_queue_size++] = (vbl_defer_s)
-    {
-        .func = func,
-        .userdata = userdata
-    };
-
-    return true;
-}
-
 void gfx_new_frame(void)
 {
     if (++rainbow_shift_time_accum == 4)
@@ -975,11 +867,33 @@ void gfx_new_frame(void)
 
     oam_copy(oam_mem, gfx_oam_buffer, 128);
 
-    for (uint i = 0; i < defer_queue_size; ++i)
-        defer_queue[i].func(defer_queue[i].userdata);
-    defer_queue_size = 0;
+    flush_dma_queue();
 
-    flush_text_cmds();
+    uint text_dma_copies = 0;
+
+    for (uint r0 = 0; r0 < GFX_TEXT_BMP_ROWS;)
+    {
+        if (!gfx_text_bmp_dirty_rows[r0])
+        {
+            ++r0;
+            continue;
+        }
+        
+        uint r1 = r0 + 1;
+        while (r1 < GFX_TEXT_BMP_ROWS && gfx_text_bmp_dirty_rows[r1])
+            ++r1;
+
+        const uint ofs = r0 * GFX_TEXT_BMP_COLS;
+        const uint sz = ((r1 - r0) * GFX_TEXT_BMP_COLS) * sizeof(TILE);
+        dma3_cpy(GFX_TEXT_BMP_VRAM + ofs, gfx_text_bmp_buf + ofs, sz);
+        ++text_dma_copies;
+        r0 = r1;
+    }
+
+    if (text_dma_copies > 0)
+        LOG_DBG("text dma copies: %u", text_dma_copies);
+
+    memset(gfx_text_bmp_dirty_rows, 0, sizeof(gfx_text_bmp_dirty_rows));
 
     REG_BG0HOFS = gfx_bg[0].offset_x;
     REG_BG0VOFS = gfx_bg[0].offset_y;

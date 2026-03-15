@@ -6,4 +6,8 @@
   code for the original unyuland.
 - why does (seemingly psg channel 2) mute sometimes?
   (or maybe it's just the same sound id is unable to be retriggered?)
-- text print command queue. then it gets flushed on next vsync.
+  it's literallyl probably because i need to fix the code that checks if
+  the enemy is close to cam bounds before playing the sound.
+  oh wait. but the spring sound broke too i think. hm. prob not then.
+- sync control text bitmap _dst_assign and _dst_clear functions.
+- clean up code "modularization" - refer to restructured gfx.c
