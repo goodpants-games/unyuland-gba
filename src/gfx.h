@@ -165,9 +165,9 @@ INLINE void gfx_unload_map(uint bg_idx)
     gfx_bg[bg_idx].map_height = 0;
 }
 
-void* gfx_alloc_cpybuf(size_t wsize);
-bool gfx_queue_memcpy32(void *dst, const void *src, size_t wcount);
-bool gfx_queue_memset32(void *dst, uint value, size_t wcount);
+void* gfx_alloc_cpybuf(size_t size);
+bool gfx_queue_memcpy(void *dst, const void *src, size_t size);
+bool gfx_queue_memset(void *dst, u8 value, size_t size);
 
 void gfx_set_palette_mode(gfx_pal_mode_e mode);
 void gfx_reset_palette(void);

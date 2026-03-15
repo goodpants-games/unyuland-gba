@@ -250,9 +250,6 @@ static void scene_load(uintptr_t data)
     gfx_bg[1].char_block = 0;
     gfx_bg[1].enabled = true;
 
-    u32 bmap[8] = { 0, 0, 0, 0, 0, 0, 0 };
-    gfx_text_bmap_fill(0, 0, GFX_TEXT_BMP_COLS, GFX_TEXT_BMP_ROWS, bmap);
-
     game_paused = false;
     last_player_ammo = UINT_MAX;
     last_rorbs = UINT_MAX;
@@ -271,12 +268,12 @@ static void scene_load(uintptr_t data)
     mmStart(MOD_TESTMOD, MM_PLAY_LOOP);
     mmSetModuleVolume((int)(1024 * 0.3));
 
-    gfx_queue_memset32(&tile_mem[0][0], 0,
-                       (GFX_CHAR_GAME_TILESET + 2) * sizeof(TILE));
-    gfx_queue_memcpy32(&tile_mem[0][0] + GFX_CHAR_GAME_TILESET + 2,
-                       tileset_gfxTiles, tileset_gfxTilesLen / sizeof(u32));
-    gfx_queue_memcpy32(tile_mem_obj[0][0].data, game_sprdb_gfxTiles,
-                       game_sprdb_gfxTilesLen / sizeof(u32));
+    gfx_queue_memset(&tile_mem[0][0], 0,
+                     (GFX_CHAR_GAME_TILESET + 2) * sizeof(TILE) * 4);
+    gfx_queue_memcpy(&tile_mem[0][0] + GFX_CHAR_GAME_TILESET + 2,
+                     tileset_gfxTiles, tileset_gfxTilesLen);
+    gfx_queue_memcpy(tile_mem_obj[0][0].data, game_sprdb_gfxTiles,
+                     game_sprdb_gfxTilesLen);
 }
 
 static void scene_unload(void)

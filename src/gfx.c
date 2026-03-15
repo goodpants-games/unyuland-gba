@@ -188,7 +188,7 @@ void gfx_set_palette_multiplied(FIXED factor)
 
     for (int i = 1; i < 16; ++i)
     {
-        int color = gfx_palette[i];
+        int color = gfx_palette_normal[i];
         FIXED r = (2 * FIX_ONE) * (color & 0x1F);
         FIXED g = (2 * FIX_ONE) * ((color >> 5) & 0x1F);
         FIXED b = (2 * FIX_ONE) * ((color >> 10) & 0x1F);
@@ -201,7 +201,7 @@ void gfx_set_palette_multiplied(FIXED factor)
 
         for (int j = 0; j < 16; ++j)
         {
-            int ocolor = gfx_palette[j];
+            int ocolor = gfx_palette_normal[j];
             FIXED or = (2 * FIX_ONE) * (ocolor & 0x1F);
             FIXED og = (2 * FIX_ONE) * ((ocolor >> 5) & 0x1F);
             FIXED ob = (2 * FIX_ONE) * ((ocolor >> 10) & 0x1F);
@@ -559,13 +559,8 @@ static void blit_tile_colored(uint x, uint y, const TILE4 *src_tile,
 ARM_FUNC NO_INLINE
 void gfx_text_bmap_dst_clear(uint row, uint row_count)
 {
-    uint i = row * 32;
-    for (uint y = row; y < row + row_count; ++y)
-    {
-        for (uint x = 0; x < 30; ++x)
-            se_mem[GFX_BG0_INDEX][i++] = 0;
-        i += 2;
-    }
+    gfx_queue_memset(&se_mem[GFX_BG0_INDEX][row * 32], 0,
+                     sizeof(SCR_ENTRY) * row_count * 32);
 }
 
 ARM_FUNC NO_INLINE
@@ -573,13 +568,20 @@ void gfx_text_bmap_dst_assign(uint row, uint row_count, uint src_row,
                                       uint pal)
 {
     uint i = src_row * GFX_TEXT_BMP_COLS + 1;
-    uint j = row * 32;
-    for (uint y = row; y < row + row_count; ++y)
+    
+    const size_t sz = sizeof(SCR_ENTRY) * 32 * row_count;
+    SCR_ENTRY *alloc = gfx_alloc_cpybuf(sz);
+    if (!alloc) return;
+
+    uint j = 0;
+    for (uint y = 0; y < row_count; ++y)
     {
         for (uint x = 0; x < 30; ++x)
-            se_mem[GFX_BG0_INDEX][j++] = SE_PALBANK(pal) | SE_ID(i++);
+            alloc[j++] = SE_PALBANK(pal) | SE_ID(i++);
         j += 2;
     }
+
+    gfx_queue_memcpy(&se_mem[GFX_BG0_INDEX][row * 32], alloc, sz);
 }
 
 /*
@@ -786,9 +788,9 @@ typedef struct gfx_dma_req
     union
     {
         const void *src;
-        uintptr_t value;
+        uint value;
     };
-    size_t wcount;
+    size_t count;
 }
 gfx_dma_req_s;
 
@@ -804,7 +806,7 @@ static EWRAM_BSS u32 dma_cpypool[DMA_CPYPOOL_SIZE];
         return false;  \
     }
 
-bool gfx_queue_memcpy32(void *dst, const void *src, size_t wcount)
+bool gfx_queue_memcpy(void *dst, const void *src, size_t size)
 {
     CHECK_DMA_QUEUE();
 
@@ -813,13 +815,13 @@ bool gfx_queue_memcpy32(void *dst, const void *src, size_t wcount)
         .type = GFX_DMA_MEMCPY32,
         .dst = dst,
         .src = src,
-        .wcount = wcount
+        .count = size
     };
 
     return true;
 }
 
-bool gfx_queue_memset32(void *dst, uint value, size_t wcount)
+bool gfx_queue_memset(void *dst, u8 value, size_t size)
 {
     CHECK_DMA_QUEUE();
 
@@ -827,8 +829,8 @@ bool gfx_queue_memset32(void *dst, uint value, size_t wcount)
     {
         .type = GFX_DMA_MEMSET32,
         .dst = dst,
-        .value = value,
-        .wcount = wcount
+        .value = (uint) value,
+        .count = size
     };
 
     return true;
@@ -841,18 +843,45 @@ static void flush_dma_queue(void)
         gfx_dma_req_s *req = dma_queue + i;
 
         if (req->type == GFX_DMA_MEMCPY32)
-            dma3_cpy(req->dst, req->src, req->wcount * 4);
+        {
+            dma3_cpy(req->dst, req->src, req->count);
+            if (req->count & 3) // if not word-aligned, copy remainder
+            {
+                size_t s = req->count & ~3;
+                u8 *const dst = req->dst;
+                const u8 *const src = req->src;
+
+                dst[s] = src[s]; ++s;
+                dst[s] = src[s]; ++s;
+                dst[s] = src[s];
+            }
+        }
         else if (req->type == GFX_DMA_MEMSET32)
-            dma3_fill(req->dst, req->value, req->wcount * 4);
+        {
+            dma3_fill(req->dst, req->value, req->count);
+            if (req->count & 3) // if not word-aligned, fill remainder
+            {
+                size_t s = req->count & ~3;
+                u8 *const dst = req->dst;
+                
+                dst[s++] = req->value;
+                dst[s++] = req->value;
+                dst[s]   = req->value;
+            }
+        }
         else
+        {
             LOG_ERR("unknown gfx copy type %u", req->type);
+        }
     }
     dma_queue_size = 0;
     dma_cpypool_write = dma_cpypool;
 }
 
-void* gfx_alloc_cpybuf(size_t wsize)
+void* gfx_alloc_cpybuf(size_t size)
 {
+    size_t wsize = CEIL_DIV(size, 4);
+
     u32 *e = dma_cpypool_write + wsize;
     if (e > dma_cpypool + DMA_CPYPOOL_SIZE)
     {

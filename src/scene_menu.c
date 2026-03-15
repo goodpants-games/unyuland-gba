@@ -176,16 +176,16 @@ static void scene_load(uintptr_t data)
     menu_show(&state.menu);
     gfx_text_bmap_dst_assign(SCREEN_HEIGHT_T / 2, GFX_TEXT_BMP_ROWS, 0, 2);
 
-    gfx_queue_memset32(se_mem[GFX_BG1_INDEX], 0, 1024 / 2);
-    gfx_queue_memcpy32(&tile_mem[0][0].data, game_logo_gfxTiles,
-                       game_logo_gfxTilesLen / 4);
+    gfx_queue_memset(se_mem[GFX_BG1_INDEX], 0, 1024 * 2);
+    gfx_queue_memcpy(&tile_mem[0][0].data, game_logo_gfxTiles,
+                     game_logo_gfxTilesLen);
     
     const SCR_ENTRY *src = (const SCR_ENTRY *)game_logo_gfxMap;
     uint oy = 2;
     uint ox = 4;
     for (uint y = oy; y < oy + 9; ++y)
     {
-        const size_t alloc_size = CEIL_DIV(sizeof(SCR_ENTRY) * 22, 4);
+        const size_t alloc_size = sizeof(SCR_ENTRY) * 22;
 
         SCR_ENTRY *row = gfx_alloc_cpybuf(alloc_size);
         if (!row) DBG_CRASH();
@@ -193,7 +193,7 @@ static void scene_load(uintptr_t data)
         for (uint i = 0; i < 22; ++i)
             row[i] = *(src++);
 
-        gfx_queue_memcpy32(&se_mat[GFX_BG1_INDEX][y][ox], row, alloc_size);
+        gfx_queue_memcpy(&se_mat[GFX_BG1_INDEX][y][ox], row, alloc_size);
         // for (uint x = ox; x < ox + 22; ++x)
         // {
         //     se_mat[GFX_BG1_INDEX][y][x] = *(src++);
