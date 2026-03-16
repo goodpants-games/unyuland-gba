@@ -8,8 +8,14 @@
 @ instructinons...
 
 @ okay i'm pretty sure there's a bug because i think i'm supposed to draw the
-@ last row single when it starts odd. but for some reason nothing seems awry.
-@ so. i guess i shouldn't fix it?
+@ last row single when it starts odd. it would decrement the loop counter by 2
+@ when it's at 1, creating an overflow and thus (essentially) an infinite loop.
+@ but for some reason nothing seems awry. so. i guess i shouldn't fix it?
+@
+@ oh right. it's because graphic pixels are always aligned to a 2x2 pixel grid.
+@ so it's always even. thus that branch never gets called. hm. i guess i should
+@ fix it anyway. and also rearrange the code so that the path to even-aligned
+@ writes are branchless. although most of the time is spent accessing EWRAM...
 .global _gfx_text_blit_tile
 .section ".iwram", "ax", %progbits
 .arm
@@ -58,41 +64,18 @@ _gfx_text_blit_tile:
     @ registers used for block transfer:
     @ {r8, r9, r10, r11}
 
-    beq .Lno_shf @ branch if zero
+    beq .Lno_shf @ branch if no shifts are necessary
     @ otherwise, run branch that handles shifts
 
     @ r0 = 32 - shf
     rsb r0, r5, #32
 
     @ if odd, run one iteration of
-    @ the loop to make it even...
+    @ the loop to make ry even...
     tst r3, #1
-    beq .Lyes_shf_loop
+    bne .Lyes_shf_odd
 
-    @ u32 src = *(src_row++)
-    @ *row |= src << shf
-    @ *(row + 8) |= src >> (32 - shf)
-    @ r7: src
-    @ ip: *row
-    ldr r7, [r2], #4
-    ldr ip, [r4]
-    orr ip, ip, r7, lsl r5
-    str ip, [r4]
-    ldr ip, [r4, #32]
-    orr ip, ip, r7, lsr r0
-    str ip, [r4, #32]
-
-    @ ++row
-    add r4, #4
-
-    @ if (++ry == 8)
-    @   row += (GFX_TEXT_BMP_COLS - 1) * 8;
-    subs r3, #1
-    addeq r4, #ROW_STRIDE  @ add if zero
-
-    sub r6, #1
-
-.Lyes_shf_loop:
+.Lyes_shf_even:
     @ load two rows from tile #1
     ldmia r4, {r8-r9}
 
@@ -131,33 +114,50 @@ _gfx_text_blit_tile:
     subs r3, #2
     addeq r4, #ROW_STRIDE  @ add if zero
 
+    @ if this is the last row, and blit started odd, then do a single row blit.
+    @ the function should exit afterwards.
+    cmp r6, #1
+    beq .Lyes_shf_odd
+
     subs r6, #2
-    bne .Lyes_shf_loop @ branch if not zero
+    bne .Lyes_shf_even @ branch if not zero
     b .Lblit_tile_return
 
-.Lno_shf:
-    @ if odd, run one iteration of
-    @ the loop to make it even...
-    tst r3, #1
-    beq .Lno_shf_loop$
-
+.Lyes_shf_odd:
     @ u32 src = *(src_row++)
-    @ *(row++) |= src
+    @ *row |= src << shf
+    @ *(row + 8) |= src >> (32 - shf)
     @ r7: src
     @ ip: *row
     ldr r7, [r2], #4
     ldr ip, [r4]
-    orr ip, ip, r7
-    str ip, [r4], #4 @ row++
+    orr ip, ip, r7, lsl r5
+    str ip, [r4]
+    ldr ip, [r4, #32]
+    orr ip, ip, r7, lsr r0
+    str ip, [r4, #32]
+
+    @ ++row
+    add r4, #4
 
     @ if (++ry == 8)
     @   row += (GFX_TEXT_BMP_COLS - 1) * 8;
     subs r3, #1
     addeq r4, #ROW_STRIDE  @ add if zero
 
-    sub r6, #1
+    subs r6, #1
+    @ exit once loop ends. otherwise, begin dual-blit processing.
+    beq .Lblit_tile_return
+    sub r6, #2
+    b .Lyes_shf_even
 
-.Lno_shf_loop$:
+.Lno_shf:
+    @ if odd, run one iteration of
+    @ the loop to make ry even...
+    tst r3, #1
+    bne .Lno_shf_odd
+
+.Lno_shf_even:
     @ transfer two rows at a time.
     @ could theoretically do four, but i'm too lazy to handle the logic to make
     @ sure that non-alignment to four doesn't break anything.
@@ -182,8 +182,35 @@ _gfx_text_blit_tile:
     subs r3, #2
     addeq r4, #ROW_STRIDE  @ add if zero
 
+    @ if this is the last row, and blit started odd, then do a single row blit.
+    @ the function should exit afterwards.
+    cmp r6, #1
+    beq .Lno_shf_odd
+
     subs r6, #2
-    bne .Lno_shf_loop$ @ branch if not zero
+    bne .Lno_shf_even @ branch if not zero
+    b .Lblit_tile_return
+
+.Lno_shf_odd:
+    @ u32 src = *(src_row++)
+    @ *(row++) |= src
+    @ r7: src
+    @ ip: *row
+    ldr r7, [r2], #4
+    ldr ip, [r4]
+    orr ip, ip, r7
+    str ip, [r4], #4 @ row++
+
+    @ if (++ry == 8)
+    @   row += (GFX_TEXT_BMP_COLS - 1) * 8;
+    subs r3, #1
+    addeq r4, #ROW_STRIDE  @ add if zero
+
+    subs r6, #1
+    @ exit once loop ends. otherwise, begin dual-blit processing.
+    subne r6, #2
+    bne .Lno_shf_even
+    @ beq .Lblit_tile_return
 
 .Lblit_tile_return:
     add sp, #32 @ pop copy of source bitmap
