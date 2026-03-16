@@ -25,6 +25,9 @@ static const char *const main_menu_options[] =
 static const char *const page_menu_options[] =
     {"BACK"};
 
+static const char *const objective_menu_options[] =
+    {"OK"};
+
 static const char *options_options[] =
     {"LCD Color: Off", "Back"};
 
@@ -40,6 +43,9 @@ struct
     menu_s menu;
     menu_s page_menu;
     int mode;
+
+    // if on objective page, sent from intro
+    bool objective_page;
 }
 static state EWRAM_BSS;
 
@@ -71,14 +77,29 @@ static void render_page(const char *header, const char *lines[],
                             TEXT_COLOR_WHITE);
     }
 
-    state.page_menu = (menu_s)
+    if (state.objective_page)
     {
-        .selection_count = 1,
-        .selection_labels = page_menu_options,
+        state.page_menu = (menu_s)
+        {
+            .selection_count = 1,
+            .selection_labels = objective_menu_options,
 
-        .origin_x = TEXT_CENTER_X_OFS("BACK", 8),
-        .origin_y = yp
-    };
+            .origin_x = TEXT_CENTER_X_OFS("OK", 8),
+            .origin_y = yp,
+            .no_back = true
+        };
+    }
+    else
+    {
+        state.page_menu = (menu_s)
+        {
+            .selection_count = 1,
+            .selection_labels = page_menu_options,
+
+            .origin_x = TEXT_CENTER_X_OFS("BACK", 8),
+            .origin_y = yp
+        };
+    }
 
     menu_show(&state.page_menu);
     state.mode = MENU_MODE_PAGE;
@@ -155,51 +176,66 @@ static void options_menu_update(void)
 
 static void scene_load(uintptr_t data)
 {
+    const bool objective_page = data;
+
     gfx_ctl.bg[1].bpp = GFX_BG_4BPP;
     gfx_ctl.bg[1].char_block = 0;
     gfx_ctl.bg[1].enabled = true;
 
-    mmStart(MOD_SAC08, MM_PLAY_LOOP);
-    mmSetModuleVolume((int)(1024 * 0.3));
+    state.objective_page = objective_page;
 
-    state.mode = MENU_MODE_MAIN;
-    state.menu = (menu_s)
+    if (!objective_page)
     {
-        .selection_count = ARRLEN(main_menu_options),
-        .selection_labels = main_menu_options,
+        state.mode = MENU_MODE_MAIN;
+        state.menu = (menu_s)
+        {
+            .selection_count = ARRLEN(main_menu_options),
+            .selection_labels = main_menu_options,
 
-        .origin_x = (SCREEN_WIDTH - (7 * 12 + 8)) / 2,
-        .origin_y = MENU_CENTER_Y(ARRLEN(main_menu_options)),
-        .no_back = true,
-    };
+            .origin_x = (SCREEN_WIDTH - (7 * 12 + 8)) / 2,
+            .origin_y = MENU_CENTER_Y(ARRLEN(main_menu_options)),
+            .no_back = true,
+        };
 
-    menu_show(&state.menu);
-    gfx_text_bmap_dst_assign(SCREEN_HEIGHT_T / 2, GFX_TEXT_BMP_ROWS, 0, 2);
+        menu_show(&state.menu);
+        gfx_text_bmap_dst_assign(SCREEN_HEIGHT_T / 2, GFX_TEXT_BMP_ROWS, 0, 2);
 
-    gfx_queue_memset(se_mem[GFX_BG1_INDEX], 0, 1024 * 2);
-    gfx_queue_memcpy(&tile_mem[0][0].data, game_logo_gfxTiles,
-                     game_logo_gfxTilesLen);
-    
-    const SCR_ENTRY *src = (const SCR_ENTRY *)game_logo_gfxMap;
-    uint oy = 2;
-    uint ox = 4;
-    for (uint y = oy; y < oy + 9; ++y)
-    {
-        const size_t alloc_size = sizeof(SCR_ENTRY) * 22;
+        gfx_queue_memset(se_mem[GFX_BG1_INDEX], 0, 1024 * 2);
+        gfx_queue_memcpy(&tile_mem[0][0].data, game_logo_gfxTiles,
+                        game_logo_gfxTilesLen);
+        
+        const SCR_ENTRY *src = (const SCR_ENTRY *)game_logo_gfxMap;
+        uint oy = 2;
+        uint ox = 4;
+        for (uint y = oy; y < oy + 9; ++y)
+        {
+            const size_t alloc_size = sizeof(SCR_ENTRY) * 22;
 
-        SCR_ENTRY *row = gfx_alloc_cpybuf(alloc_size);
-        if (!row) DBG_CRASH();
+            SCR_ENTRY *row = gfx_alloc_cpybuf(alloc_size);
+            if (!row) DBG_CRASH();
 
-        for (uint i = 0; i < 22; ++i)
-            row[i] = *(src++);
+            for (uint i = 0; i < 22; ++i)
+                row[i] = *(src++);
 
-        gfx_queue_memcpy(&se_mat[GFX_BG1_INDEX][y][ox], row, alloc_size);
-        // for (uint x = ox; x < ox + 22; ++x)
-        // {
-        //     se_mat[GFX_BG1_INDEX][y][x] = *(src++);
-        // }
+            gfx_queue_memcpy(&se_mat[GFX_BG1_INDEX][y][ox], row, alloc_size);
+            // for (uint x = ox; x < ox + 22; ++x)
+            // {
+            //     se_mat[GFX_BG1_INDEX][y][x] = *(src++);
+            // }
+        }
+
+        mmStart(MOD_SAC08, MM_PLAY_LOOP);
+        mmSetModuleVolume((int)(1024 * 0.3));
     }
+    else
+    {
+        static const char *lines[] = {
+            "Find four red fire",
+            "orbs."
+        };
 
+        render_page("Objective", lines, ARRLEN(lines));
+    }
     // gfx_defer_vblank(scene_load_vram, NULL);
 }
 
@@ -269,18 +305,33 @@ static void scene_frame(void)
     else if (state.mode == MENU_MODE_PAGE)
     {
         int res;
-        switch (menu_update(&state.page_menu, &res))
-        {
-        case MENU_STATUS_SELECT:
-        case MENU_STATUS_BACK:
-            state.mode = MENU_MODE_MAIN;
-            gfx_ctl.bg[1].enabled = true;
-            gfx_text_bmap_clear(0, 0, GFX_TEXT_BMP_COLS, GFX_TEXT_BMP_ROWS);
-            gfx_text_bmap_dst_clear(SCREEN_HEIGHT_T / 4, GFX_TEXT_BMP_ROWS);
-            gfx_text_bmap_dst_assign(SCREEN_HEIGHT_T / 2, GFX_TEXT_BMP_ROWS, 0, 2);
-            menu_show(&state.menu);
+        menu_status_e stat = menu_update(&state.page_menu, &res);
 
-        default: break;
+        if (state.objective_page)
+        {
+            switch (stat)
+            {
+            case MENU_STATUS_SELECT:
+                scenemgr_change(&scene_desc_game, 0);
+
+            default: break;
+            }
+        }
+        else
+        {
+            switch (stat)
+            {
+            case MENU_STATUS_SELECT:
+            case MENU_STATUS_BACK:
+                state.mode = MENU_MODE_MAIN;
+                gfx_ctl.bg[1].enabled = true;
+                gfx_text_bmap_clear(0, 0, GFX_TEXT_BMP_COLS, GFX_TEXT_BMP_ROWS);
+                gfx_text_bmap_dst_clear(SCREEN_HEIGHT_T / 4, GFX_TEXT_BMP_ROWS);
+                gfx_text_bmap_dst_assign(SCREEN_HEIGHT_T / 2, GFX_TEXT_BMP_ROWS, 0, 2);
+                menu_show(&state.menu);
+
+            default: break;
+            }
         }
     }
 

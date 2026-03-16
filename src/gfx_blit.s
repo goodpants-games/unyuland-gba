@@ -29,6 +29,8 @@ _gfx_text_blit_tile:
     @ before doing anything, copy source bitmap to stack.
     @ then adjust tile*. because iwram = Fast. Fast = Good.
     @ original tile* may live in ROM, so...
+    @ TODO: actuall ythis might be pointless since i think it reads each source
+    @ row only once.
     ldmia r2, {r3-r10}
     push {r3-r10}
     mov r2, sp

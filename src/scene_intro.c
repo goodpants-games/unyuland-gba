@@ -10,6 +10,7 @@
 #include "scenes.h"
 
 #define TEXT_ROW_COUNT 9
+#define IMG_FADE_STAGE_LEN 15
 
 struct scene_state
 {
@@ -21,39 +22,11 @@ struct scene_state
     u8 line;
     u8 scroll_ticks;
     u8 page_idx;
+    bool ff;
+
+    u8 img_fade_stage;
+    u8 img_fade_ticks;
 } static state EWRAM_BSS;
-
-static bool display_page(void)
-{
-    if (*state.chat_ptr == 0) return true;
-
-    char line_buf[18];
-    char *line_buf_write = line_buf;
-    uint text_y = 4;
-
-    for (; *state.chat_ptr != '\f'; ++state.chat_ptr)
-    {
-        char ch = *state.chat_ptr;
-        if (ch == '\n')
-        {
-            *(line_buf_write++) = 0;
-            gfx_text_bmap_print(8, text_y, line_buf, TEXT_COLOR_WHITE);
-            text_y += 12;
-
-            line_buf_write = line_buf;
-        }
-        else
-        {
-            *(line_buf_write++) = ch;
-        }
-    }
-
-    *line_buf_write = 0;
-    gfx_text_bmap_print(8, text_y, line_buf, TEXT_COLOR_WHITE);
-
-    ++state.chat_ptr;
-    return false;
-}
 
 static void update_image(void)
 {
@@ -127,79 +100,130 @@ static void scene_unload(void)
     gfx_text_bmap_dst_clear(0, SCREEN_HEIGHT_T);
 }
 
+static void text_tick(void)
+{
+    if (state.scroll_ticks)
+    {
+        if (state.scroll_ticks & 1)
+            gfx_ctl.bg[0].offset_y += 2;
+
+        --state.scroll_ticks;
+    }
+    else if (state.wait_timer-- == 0)
+    {
+        char cur_ch = *(state.chat_ptr++);
+        if (cur_ch == '\f')
+        {
+            state.page_done = true;
+        }
+        else if (cur_ch == '\n')
+        {
+            state.char_xpos = 0;
+            state.char_ypos += 12;
+            ++state.line;
+
+            char fill_str[18];
+            memset(fill_str, '\x7F', 17);
+            fill_str[17] = 0;
+
+            gfx_text_bmap_print(0, state.char_ypos, fill_str, TEXT_COLOR_BLACK);
+            if (state.line >= 4)
+                state.scroll_ticks = 12;
+        }
+        else
+        {
+            char str[2];
+            str[0] = cur_ch;
+            str[1] = 0;
+
+            gfx_text_bmap_print(state.char_xpos, state.char_ypos,
+                                str, TEXT_COLOR_WHITE);
+            state.char_xpos += 12;
+        }
+        
+        state.wait_timer = 1;
+    }
+}
+
+static void next_page(void)
+{
+    gfx_text_bmap_clear(0, 0, GFX_TEXT_BMP_COLS, TEXT_ROW_COUNT);
+    ++state.page_idx;
+    state.char_xpos = 0;
+    state.char_ypos = 0;
+    state.page_done = false;
+    state.wait_timer = 0;
+    state.line = 0;
+    state.ff = false;
+    gfx_ctl.bg[0].offset_y = -4;
+
+    update_image();
+}
+
 static void scene_frame(void)
 {
-    if (!state.page_done)
+    bool btn_hit = key_hit(KEY_A | KEY_B);
+
+    if (state.img_fade_stage)
     {
-        if (state.scroll_ticks)
+        FIXED fade_t = fxdiv(int2fx(state.img_fade_ticks),
+                             int2fx(IMG_FADE_STAGE_LEN));
+
+        switch (state.img_fade_stage)
         {
-            if (state.scroll_ticks & 1)
-                gfx_ctl.bg[0].offset_y += 2;
-
-            --state.scroll_ticks;
-        }
-        else if (state.wait_timer-- == 0)
-        {
-            char cur_ch = *(state.chat_ptr++);
-            if (cur_ch == '\f')
+        case 1:
+            gfx_set_palette_multiplied(FIX_ONE - fade_t);
+            if (++state.img_fade_ticks == IMG_FADE_STAGE_LEN)
             {
-                state.page_done = true;
+                state.img_fade_stage = 2;
+                state.img_fade_ticks = 0;
+                next_page();
             }
-            else if (cur_ch == '\n')
+            break;
+
+        case 2:
+            gfx_set_palette_multiplied(fade_t);
+            if (++state.img_fade_ticks == IMG_FADE_STAGE_LEN)
             {
-                state.char_xpos = 0;
-                state.char_ypos += 12;
-                ++state.line;
-
-                char fill_str[18];
-                memset(fill_str, '\x7F', 17);
-                fill_str[17] = 0;
-
-                gfx_text_bmap_print(0, state.char_ypos, fill_str, TEXT_COLOR_BLACK);
-                if (state.line >= 4)
-                {
-                    state.scroll_ticks = 12;
-                }
+                state.img_fade_stage = 0;
+                state.img_fade_ticks = 0;
             }
-            else
-            {
-                char str[2];
-                str[0] = cur_ch;
-                str[1] = 0;
-
-                gfx_text_bmap_print(state.char_xpos, state.char_ypos,
-                                    str, TEXT_COLOR_WHITE);
-                state.char_xpos += 12;
-            }
-            
-            state.wait_timer = 1;
+            break;
         }
     }
-    else if (key_hit(KEY_A | KEY_B))
+    else if (!state.page_done)
     {
-        if (*state.chat_ptr == 0)
+        if (btn_hit)
+            while (!state.page_done) text_tick();
+        else
+            text_tick();
+        // if (btn_hit)
+        //     while (!state.page_done) text_tick(true);
+        // else
+        //     text_tick(false);
+    }
+    else if (btn_hit)
+    {
+        if (*state.chat_ptr == 0) goto intro_end;
+
+        if (state.page_idx == 2 || state.page_idx == 5)
         {
-            scenemgr_change(&scene_desc_game, 0);
-            return;
+            state.img_fade_stage = 1;
+            state.img_fade_ticks = 0;
         }
-
-        gfx_text_bmap_clear(0, 0, GFX_TEXT_BMP_COLS, TEXT_ROW_COUNT);
-        ++state.page_idx;
-        state.char_xpos = 0;
-        state.char_ypos = 0;
-        state.page_done = false;
-        state.wait_timer = 0;
-        state.line = 0;
-        gfx_ctl.bg[0].offset_y = -4;
-
-        update_image();
+        else
+        {
+            next_page();
+        }
     }
 
-    if (key_hit(KEY_START))
-    {
-        scenemgr_change(&scene_desc_game, 0);
-        return;
-    }
+    if (key_hit(KEY_START | KEY_SELECT)) goto intro_end;
+
+    return;
+
+intro_end:
+    // this is stupid as hell but it's easy
+    scenemgr_change(&scene_desc_menu, 1);
 }
 
 const scene_desc_s scene_desc_intro = {
