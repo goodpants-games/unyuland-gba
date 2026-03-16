@@ -1,7 +1,3 @@
-- dialogue lines will be on bottom, covering up the HUD, rather than on top.
-  (maybe?)
-    - GBAtek notes that the first 8 scanlines are effectively invisible on
-      a real GBA, since they are covered by a shadow.
 - maybemake substep processing local rather than global, like how it is in the
   code for the original unyuland.
 - why does (seemingly psg channel 2) mute sometimes?
@@ -16,3 +12,6 @@
 - combine shaders agb001 and gba-color to create Ultimate Display Emulation.
   not related to the project but just a note to self. also maybe make an
   algebraic inverse of the gba-color "function" to make color correction better.
+- fix tall room, also tall room backgrounds
+- create map system wait does that require me to allow dynamically created
+  scrollmaps FUck.
