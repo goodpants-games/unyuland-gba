@@ -246,9 +246,9 @@ static void update_hud(void)
 
 static void scene_load(uintptr_t data)
 {
-    gfx_bg[1].bpp = GFX_BG_8BPP;
-    gfx_bg[1].char_block = 0;
-    gfx_bg[1].enabled = true;
+    gfx_ctl.bg[1].bpp = GFX_BG_8BPP;
+    gfx_ctl.bg[1].char_block = 0;
+    gfx_ctl.bg[1].enabled = true;
 
     game_paused = false;
     last_player_ammo = UINT_MAX;
@@ -258,8 +258,8 @@ static void scene_load(uintptr_t data)
 
     const map_header_s *map = world_rooms[0];
     gfx_load_map(1, map);
-    gfx_bg[1].offset_x = 0;
-    gfx_bg[1].offset_y = 0;
+    gfx_ctl.bg[1].offset_x = 0;
+    gfx_ctl.bg[1].offset_y = 0;
     game_init();
 
     game_load_room(map);
@@ -280,8 +280,8 @@ static void scene_unload(void)
 {
     mmStop();
     gfx_unload_map(1);
-    gfx_bg[1].offset_x = 0;
-    gfx_bg[1].offset_y = 0;
+    gfx_ctl.bg[1].offset_x = 0;
+    gfx_ctl.bg[1].offset_y = 0;
     gfx_text_bmap_dst_clear(0, SCREEN_HEIGHT_T);
     gfx_text_bmap_clear(0, 0, GFX_TEXT_BMP_COLS, GFX_TEXT_BMP_ROWS);
     gfx_reset_palette();

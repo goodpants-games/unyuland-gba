@@ -13,6 +13,7 @@ scene_desc_s;
 
 extern const scene_desc_s scene_desc_menu;
 extern const scene_desc_s scene_desc_game;
+extern const scene_desc_s scene_desc_intro;
 
 extern const scene_desc_s *scenemgr_current;
 

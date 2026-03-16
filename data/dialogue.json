@@ -204,5 +204,20 @@
             "Just quickly go under them, shoot upwards, move out of the way, and repeat until they're down!",
             "I hope this infor"
         ]
+    },
+    {
+        "id": "intro",
+        "cols": 17,
+        "rows": 6,
+        "pages": [
+            "The winters of this world are extraordinarily cold.",
+            "During the winter months, Unyus migrate to live within the caverns of The Big Mountain.",
+            "But that alone is not sufficient for survival.",
+            "Fire Orbs accumulate inside the caverns during the summer.",
+            "These mysterious, elusive objects provide a long-lasting and versatile source of heat.",
+            "In order for Unyus to survive the winters, they must explore the caverns to find them.",
+            "But this is no easy task. Other, more dangerous creatures live in these caverns.",
+            "And, unfortunately, Unyus taste yummy. Muahaha..."
+        ]
     }
 ]

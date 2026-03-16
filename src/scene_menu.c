@@ -54,7 +54,7 @@ static int text_center_x(const char *str)
 static void render_page(const char *header, const char *lines[],
                         uint line_count)
 {
-    gfx_bg[1].enabled = false;
+    gfx_ctl.bg[1].enabled = false;
 
     gfx_text_bmap_clear(0, 0, GFX_TEXT_BMP_COLS, GFX_TEXT_BMP_ROWS);
     gfx_text_bmap_dst_clear(SCREEN_HEIGHT_T / 2, GFX_TEXT_BMP_ROWS);
@@ -147,7 +147,7 @@ static void options_menu_update(void)
     return;
 
     exit:
-        gfx_bg[1].enabled = true;
+        gfx_ctl.bg[1].enabled = true;
         state.mode = MENU_MODE_MAIN;
         gfx_text_bmap_clear(0, 0, GFX_TEXT_BMP_COLS, GFX_TEXT_BMP_ROWS);
         menu_show(&state.menu);
@@ -155,9 +155,9 @@ static void options_menu_update(void)
 
 static void scene_load(uintptr_t data)
 {
-    gfx_bg[1].bpp = GFX_BG_4BPP;
-    gfx_bg[1].char_block = 0;
-    gfx_bg[1].enabled = true;
+    gfx_ctl.bg[1].bpp = GFX_BG_4BPP;
+    gfx_ctl.bg[1].char_block = 0;
+    gfx_ctl.bg[1].enabled = true;
 
     mmStart(MOD_SAC08, MM_PLAY_LOOP);
     mmSetModuleVolume((int)(1024 * 0.3));
@@ -274,7 +274,7 @@ static void scene_frame(void)
         case MENU_STATUS_SELECT:
         case MENU_STATUS_BACK:
             state.mode = MENU_MODE_MAIN;
-            gfx_bg[1].enabled = true;
+            gfx_ctl.bg[1].enabled = true;
             gfx_text_bmap_clear(0, 0, GFX_TEXT_BMP_COLS, GFX_TEXT_BMP_ROWS);
             gfx_text_bmap_dst_clear(SCREEN_HEIGHT_T / 4, GFX_TEXT_BMP_ROWS);
             gfx_text_bmap_dst_assign(SCREEN_HEIGHT_T / 2, GFX_TEXT_BMP_ROWS, 0, 2);
@@ -285,7 +285,7 @@ static void scene_frame(void)
     }
 
     if (start)
-        scenemgr_change(&scene_desc_game, 0);
+        scenemgr_change(&scene_desc_intro, 0);
 }
 
 const scene_desc_s scene_desc_menu = {

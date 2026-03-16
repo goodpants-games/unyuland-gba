@@ -614,9 +614,9 @@ void game_update(void)
 
     const FIXED x_min = int2fx(SCREEN_WIDTH / 4);
     const FIXED y_min = int2fx(SCREEN_HEIGHT / 4);
-    const FIXED x_max = int2fx(gfx_bg[GAME_BG_IDX].map_width * 8
+    const FIXED x_max = int2fx(gfx_ctl.bg[GAME_BG_IDX].map_width * 8
                                - SCREEN_WIDTH / 4);
-    const FIXED y_max = int2fx(gfx_bg[GAME_BG_IDX].map_height * 8
+    const FIXED y_max = int2fx(gfx_ctl.bg[GAME_BG_IDX].map_height * 8
                                - SCREEN_HEIGHT / 4);
 
     if (g_game.cam_x < x_min) g_game.cam_x = x_min;
@@ -800,8 +800,8 @@ void game_render(void)
     const int cam_x = fx2int(g_game.cam_x);
     const int cam_y = fx2int(g_game.cam_y);
 
-    gfx_bg[GAME_BG_IDX].offset_x = cam_x * 2 - SCREEN_WIDTH / 2;
-    gfx_bg[GAME_BG_IDX].offset_y = cam_y * 2 - SCREEN_HEIGHT / 2;
+    gfx_ctl.bg[GAME_BG_IDX].offset_x = cam_x * 2 - SCREEN_WIDTH / 2;
+    gfx_ctl.bg[GAME_BG_IDX].offset_y = cam_y * 2 - SCREEN_HEIGHT / 2;
 
     gfx_sprdb_s sprdb =
         gfx_get_sprdb((const gfx_root_header_s *)game_sprdb_bin);
@@ -1138,9 +1138,9 @@ static bool room_transition_phase1_update(entity_s *player)
 
     const FIXED x_min = int2fx(SCREEN_WIDTH / 4);
     const FIXED y_min = int2fx(SCREEN_HEIGHT / 4);
-    const FIXED x_max = int2fx(gfx_bg[GAME_BG_IDX].map_width * 8
+    const FIXED x_max = int2fx(gfx_ctl.bg[GAME_BG_IDX].map_width * 8
                                - SCREEN_WIDTH / 4);
-    const FIXED y_max = int2fx(gfx_bg[GAME_BG_IDX].map_height * 8
+    const FIXED y_max = int2fx(gfx_ctl.bg[GAME_BG_IDX].map_height * 8
                                - SCREEN_HEIGHT / 4);
 
     if (g_game.cam_x < x_min) g_game.cam_x = x_min;

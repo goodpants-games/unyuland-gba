@@ -134,8 +134,10 @@ gfx_draw_sprite_state_s;
 
 typedef struct gfx_bg
 {
-    u8 bpp;
     bool enabled;
+    bool enable_win_in[2];
+    bool enable_win_out;
+    u8 bpp;
     u8 priority;
     u8 char_block;
 
@@ -148,7 +150,40 @@ typedef struct gfx_bg
 }
 gfx_bg_s;
 
-extern gfx_bg_s gfx_bg[4];
+typedef struct gfx_win
+{
+    bool enabled;
+
+    union
+    {
+        struct
+        {
+            u8 x1; // right
+            u8 x0; // left
+        };
+        u16 h;
+    };
+
+    union
+    {
+        struct 
+        {
+            u8 y1; // bottom
+            u8 y0; // top
+        };
+        u16 v;
+    };
+}
+gfx_win_s;
+
+typedef struct gfx_display_control
+{
+    gfx_win_s win[2];
+    gfx_bg_s bg[4];
+}
+gfx_display_control_s;
+
+extern gfx_display_control_s gfx_ctl;
 extern OBJ_ATTR gfx_oam_buffer[GFX_OBJ_COUNT];
 extern TILE gfx_text_bmp_buf[GFX_TEXT_BMP_SIZE];
 
@@ -160,9 +195,9 @@ void gfx_load_map(uint bg_idx, const map_header_s *map);
 void gfx_mark_scroll_dirty(uint bg_idx);
 INLINE void gfx_unload_map(uint bg_idx)
 {
-    gfx_bg[bg_idx].map = NULL;
-    gfx_bg[bg_idx].map_width = 0;
-    gfx_bg[bg_idx].map_height = 0;
+    gfx_ctl.bg[bg_idx].map = NULL;
+    gfx_ctl.bg[bg_idx].map_width = 0;
+    gfx_ctl.bg[bg_idx].map_height = 0;
 }
 
 void* gfx_alloc_cpybuf(size_t size);

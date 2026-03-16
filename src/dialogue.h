@@ -33,4 +33,6 @@ static inline const char* dlg_get_chat_data(int idx)
     return (const char *)(base + header_root[idx].offset);
 }
 
+const char *dlg_get_chat_by_name(const char *name);
+
 #endif

@@ -88,18 +88,7 @@ static const char* parse_sign_text(const entity_load_s *load_data)
     if (!get_property_string(load_data, "text", &id))
         return NULL;
 
-    char test_str[17];
-    strncpy(test_str, id, 16);
-
-    for (int i = 0; i < dlg_get_root()->chat_count; ++i)
-    {
-        const dlg_chat_header_s *header = dlg_get_chat_headers() + i;
-        if (memcmp(header->id, test_str, 16)) continue;
-
-        return dlg_get_chat_data(i);
-    }
-
-    return NULL;
+    return dlg_get_chat_by_name(id);
 }
 
 static void load_orb(entity_s *ent, const entity_load_s *load_data, bool blue)

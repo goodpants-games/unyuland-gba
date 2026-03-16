@@ -6,8 +6,8 @@ import sys
 import struct
 from typing import BinaryIO
 
-MAX_COLS = 20
-MAX_ROWS = 6
+DEFAULT_MAX_COLS = 20
+DEFAULT_MAX_ROWS = 6
 
 """
 struct dlg_root
@@ -66,12 +66,22 @@ def process(in_json: dict, out_path: str):
         chat_data = bytearray()
         pages = chat['pages']
 
+        max_cols = DEFAULT_MAX_COLS
+        max_rows = DEFAULT_MAX_ROWS
+
+        if 'cols' in chat:
+            max_cols = int(chat['cols'])
+        
+        if 'rows' in chat:
+            max_rows = int(chat['rows'])
+
         for page_index in range(0, len(pages)):
             text = pages[page_index]
 
-            lines = wrap_text(text, MAX_COLS)
-            if len(lines) > MAX_ROWS:
-                eprint(f"error: page {(page_index + 1)} of {(chat['id'])}, with a line count of {(len(lines))}, exceeds the max length of {MAX_ROWS} lines")
+            lines = wrap_text(text, max_cols)
+            if len(lines) > max_rows:
+                overflowing_word = lines[max_rows].split()[0]
+                eprint(f"error: page {(page_index + 1)} of {(chat['id'])}, with a line count of {(len(lines))}, exceeds the max length of {max_rows} lines at word '{overflowing_word}'")
                 success = False
             
             for line in lines:

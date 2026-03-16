@@ -34,10 +34,10 @@ typedef enum text_queue_action
 }
 text_queue_action_e;
 
+gfx_display_control_s gfx_ctl;
 OBJ_ATTR gfx_oam_buffer[128];
 static u16 gfx_mul_palette[16];
 
-EWRAM_BSS gfx_bg_s gfx_bg[4];
 
 #pragma endregion
 
@@ -303,7 +303,7 @@ static void update_map_scroll(uint bg_idx)
         GFX_BG0_INDEX, GFX_BG1_INDEX, GFX_BG2_INDEX, GFX_BG3_INDEX
     };
 
-    gfx_bg_s *bg = gfx_bg + bg_idx;
+    gfx_bg_s *bg = gfx_ctl.bg + bg_idx;
     bg_scroll_data_s *scroll_data = bg_scroll_data + bg_idx;
 
     if (bg->map)
@@ -409,7 +409,7 @@ void gfx_mark_scroll_dirty(uint bg_idx)
 
 void gfx_load_map(uint bg_idx, const map_header_s *map)
 {
-    gfx_bg_s *bg = gfx_bg + bg_idx;
+    gfx_bg_s *bg = gfx_ctl.bg + bg_idx;
     bg_scroll_data_s *sdata = bg_scroll_data + bg_idx;
 
     bg->map = map;
@@ -919,7 +919,7 @@ void gfx_init(void)
 
     for (uint i = 0; i < 4; ++i)
     {
-        gfx_bg[i] = (gfx_bg_s)
+        gfx_ctl.bg[i] = (gfx_bg_s)
         {
             .bpp = GFX_BG_4BPP,
             .enabled = false,
@@ -928,12 +928,12 @@ void gfx_init(void)
         bg_scroll_data[i] = (bg_scroll_data_s){0};
     };
 
-    gfx_bg[0].enabled = true;
-    gfx_bg[0].char_block = GFX_TEXT_BMP_BLOCK;
-    gfx_bg[0].priority = 0;
-    gfx_bg[1].priority = 1;
-    gfx_bg[2].priority = 2;
-    gfx_bg[3].priority = 2;
+    gfx_ctl.bg[0].enabled = true;
+    gfx_ctl.bg[0].char_block = GFX_TEXT_BMP_BLOCK;
+    gfx_ctl.bg[0].priority = 0;
+    gfx_ctl.bg[1].priority = 1;
+    gfx_ctl.bg[2].priority = 2;
+    gfx_ctl.bg[3].priority = 2;
 
     // REG_DISPCNT = DCNT_OBJ_1D;
 
@@ -993,14 +993,14 @@ void gfx_new_frame(void)
 
     memset(gfx_text_bmp_dirty_rows, 0, sizeof(gfx_text_bmp_dirty_rows));
 
-    REG_BG0HOFS = gfx_bg[0].offset_x;
-    REG_BG0VOFS = gfx_bg[0].offset_y;
-    REG_BG1HOFS = gfx_bg[1].offset_x;
-    REG_BG1VOFS = gfx_bg[1].offset_y;
-    REG_BG2HOFS = gfx_bg[2].offset_x;
-    REG_BG2VOFS = gfx_bg[2].offset_y;
-    REG_BG3HOFS = gfx_bg[3].offset_x;
-    REG_BG3VOFS = gfx_bg[3].offset_y;
+    REG_BG0HOFS = gfx_ctl.bg[0].offset_x;
+    REG_BG0VOFS = gfx_ctl.bg[0].offset_y;
+    REG_BG1HOFS = gfx_ctl.bg[1].offset_x;
+    REG_BG1VOFS = gfx_ctl.bg[1].offset_y;
+    REG_BG2HOFS = gfx_ctl.bg[2].offset_x;
+    REG_BG2VOFS = gfx_ctl.bg[2].offset_y;
+    REG_BG3HOFS = gfx_ctl.bg[3].offset_x;
+    REG_BG3VOFS = gfx_ctl.bg[3].offset_y;
     
     u32 reg_dispcnt = DCNT_OBJ | DCNT_OBJ_1D;
     u16 bg_cnt[4] = { 0, 0, 0, 0 };
@@ -1012,7 +1012,7 @@ void gfx_new_frame(void)
 
     for (uint i = 0; i < 4; ++i)
     {
-        gfx_bg_s *config = gfx_bg + i;
+        gfx_bg_s *config = gfx_ctl.bg + i;
         if (config->enabled)
             reg_dispcnt |= DCNT_BG0 << i;
 
@@ -1024,6 +1024,34 @@ void gfx_new_frame(void)
         else
             *cnt |= BG_4BPP;
     }
+
+    if (gfx_ctl.win[0].enabled)
+    {
+        reg_dispcnt |= DCNT_WIN0;
+        REG_WIN0H = gfx_ctl.win[0].h;
+        REG_WIN0V = gfx_ctl.win[0].v;
+    }
+
+    if (gfx_ctl.win[1].enabled)
+    {
+        reg_dispcnt |= DCNT_WIN1;
+        REG_WIN1H = gfx_ctl.win[1].h;
+        REG_WIN1V = gfx_ctl.win[1].v;
+    }
+
+    REG_WININ =   (gfx_ctl.bg[0].enable_win_in[0] << 0 )
+                | (gfx_ctl.bg[1].enable_win_in[0] << 1 )
+                | (gfx_ctl.bg[2].enable_win_in[0] << 2 )
+                | (gfx_ctl.bg[3].enable_win_in[0] << 3 )
+                | (gfx_ctl.bg[0].enable_win_in[1] << 8 )
+                | (gfx_ctl.bg[1].enable_win_in[1] << 9 )
+                | (gfx_ctl.bg[2].enable_win_in[1] << 10)
+                | (gfx_ctl.bg[3].enable_win_in[1] << 11);
+
+    REG_WINOUT =   (gfx_ctl.bg[0].enable_win_out << 0)
+                 | (gfx_ctl.bg[1].enable_win_out << 1)
+                 | (gfx_ctl.bg[2].enable_win_out << 2)
+                 | (gfx_ctl.bg[3].enable_win_out << 3);
 
     REG_DISPCNT = reg_dispcnt;
     REG_BG0CNT = bg_cnt[0];
