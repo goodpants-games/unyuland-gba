@@ -64,7 +64,7 @@ _gfx_text_blit_tile:
     @ registers used for block transfer:
     @ {r8, r9, r10, r11}
 
-    beq .Lno_shf @ branch if no shifts are necessary
+    beq 3f @ branch if no shifts are necessary
     @ otherwise, run branch that handles shifts
 
     @ r0 = 32 - shf
@@ -73,9 +73,9 @@ _gfx_text_blit_tile:
     @ if odd, run one iteration of
     @ the loop to make ry even...
     tst r3, #1
-    bne .Lyes_shf_odd
+    bne 2f
 
-.Lyes_shf_even:
+1: @ loop: w/ shift, even
     @ load two rows from tile #1
     ldmia r4, {r8-r9}
 
@@ -117,13 +117,13 @@ _gfx_text_blit_tile:
     @ if this is the last row, and blit started odd, then do a single row blit.
     @ the function should exit afterwards.
     cmp r6, #1
-    beq .Lyes_shf_odd
+    beq 2f
 
     subs r6, #2
-    bne .Lyes_shf_even @ branch if not zero
-    b .Lblit_tile_return
+    bne 1b @ branch if not zero
+    b 0f
 
-.Lyes_shf_odd:
+2: @ loop: w/ shift, odd
     @ u32 src = *(src_row++)
     @ *row |= src << shf
     @ *(row + 8) |= src >> (32 - shf)
@@ -147,17 +147,17 @@ _gfx_text_blit_tile:
 
     subs r6, #1
     @ exit once loop ends. otherwise, begin dual-blit processing.
-    beq .Lblit_tile_return
+    beq 0f
     sub r6, #2
-    b .Lyes_shf_even
+    b 1b
 
-.Lno_shf:
+3: @ start w/out shift
     @ if odd, run one iteration of
     @ the loop to make ry even...
     tst r3, #1
-    bne .Lno_shf_odd
+    bne 2f
 
-.Lno_shf_even:
+1: @ loop: w/out shift, even
     @ transfer two rows at a time.
     @ could theoretically do four, but i'm too lazy to handle the logic to make
     @ sure that non-alignment to four doesn't break anything.
@@ -185,13 +185,13 @@ _gfx_text_blit_tile:
     @ if this is the last row, and blit started odd, then do a single row blit.
     @ the function should exit afterwards.
     cmp r6, #1
-    beq .Lno_shf_odd
+    beq 2f
 
     subs r6, #2
-    bne .Lno_shf_even @ branch if not zero
-    b .Lblit_tile_return
+    bne 1b @ branch if not zero
+    b 0f
 
-.Lno_shf_odd:
+2: @ loop: w/ shift, odd
     @ u32 src = *(src_row++)
     @ *(row++) |= src
     @ r7: src
@@ -209,10 +209,10 @@ _gfx_text_blit_tile:
     subs r6, #1
     @ exit once loop ends. otherwise, begin dual-blit processing.
     subne r6, #2
-    bne .Lno_shf_even
+    bne 1b
     @ beq .Lblit_tile_return
 
-.Lblit_tile_return:
+0: @ return
     add sp, #32 @ pop copy of source bitmap
     pop {r4-r11}
     bx lr
@@ -228,11 +228,11 @@ _gfx_text_blit_tile:
 .arm
 .align 2
 gfx_text_bmap_fill:
-    @ check for no-op
+    @ exit early if no-op
     cmp r2, #0 @ param cols
-    beq .Lbmap_fill_return
+    bxeq lr
     cmp r3, #0 @ param rows
-    beq .Lbmap_fill_return
+    bxeq lr
 
     mov ip, sp @ save current sp for param reads
     push {r4-r11}
@@ -265,7 +265,7 @@ gfx_text_bmap_fill:
     @ ip: pointer to gfx_text_bmp_dirty_rows
     ldr ip, =gfx_text_bmp_dirty_rows
 
-.Lrow_loop:
+1: @ row loop
     @ flag row as dirty
     @ (r6: temp)
     mov r6, #1
@@ -274,7 +274,7 @@ gfx_text_bmap_fill:
     @ r5: dec col counter
     mov r5, r2
 
-.Lcol_loop:
+2: @ col loop
     @ copy source data to dest tile
     @ 4 uints at a time
     ldmia r4!, {r6-r9}
@@ -285,16 +285,15 @@ gfx_text_bmap_fill:
 
     @ end of col_loop
     subs r5, #1
-    bne .Lcol_loop
+    bne 2b
 
     @ end of row_loop
     add r0, r10
     add r11, #1
     mov r1, r0
     subs r3, #1
-    bne .Lrow_loop
+    bne 1b
 
+    @ done
     pop {r4-r11}
-
-.Lbmap_fill_return:
     bx lr
