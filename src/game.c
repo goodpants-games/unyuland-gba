@@ -806,13 +806,13 @@ void game_render(void)
     gfx_sprdb_s sprdb =
         gfx_get_sprdb((const gfx_root_header_s *)game_sprdb_bin);
 
-    OBJ_ATTR *const game_oam = gfx_oam_buffer + 64;
+    OBJ_ATTR *const game_oam = gfx_oam_buffer + GAME_OAM_START;
 
     gfx_draw_sprite_state_s draw_state = (gfx_draw_sprite_state_s)
     {
         .sprdb = &sprdb,
         .dst_obj = game_oam,
-        .dst_obj_count = 64
+        .dst_obj_count = GAME_OAM_COUNT
     };
 
     // draw interactable indicator

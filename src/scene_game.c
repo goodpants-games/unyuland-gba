@@ -17,11 +17,42 @@
 
 #define HUD_ROW_ORIGIN (GFX_TEXT_BMP_ROWS - 2)
 #define HUD_Y_ORIGIN   (HUD_ROW_ORIGIN * 8 + 6)
+#define AUTOMAP_MARGIN_X 4
+#define AUTOMAP_MARGIN_Y 4
+#define AUTOMAP_WIDTH (WORLD_MATRIX_WIDTH + AUTOMAP_MARGIN_X * 2)
+#define AUTOMAP_HEIGHT (WORLD_MATRIX_HEIGHT + AUTOMAP_MARGIN_Y * 2)
 
-EWRAM_BSS static uint last_player_ammo;
-EWRAM_BSS static uint last_rorbs;
-EWRAM_BSS static uint last_borbs;
-EWRAM_BSS static uint blink_timer;
+#define PAUSE_MENU_OPTION_COUNT 4
+static const char *pause_menu_options[PAUSE_MENU_OPTION_COUNT] =
+    {"RESUME", "RESPAWN", "MAP", "QUIT"};
+
+enum
+{
+    SUBSTATE_NORMAL,
+    SUBSTATE_PAUSED,
+    SUBSTATE_MAP,
+};
+
+typedef struct gfx_automap
+{
+    map_header_s header;
+    u16 gfx[AUTOMAP_HEIGHT][AUTOMAP_WIDTH];
+}
+gfx_automap_s;
+
+struct scene_state
+{
+    uint last_player_ammo;
+    uint last_rorbs;
+    uint last_borbs;
+    uint blink_timer;
+    gfx_automap_s automap;
+    FIXED map_sx;
+    FIXED map_sy;
+
+    u8 substate;
+    menu_s pause_menu;
+} static state EWRAM_BSS;
 
 static void int_to_str(int n, char *buf)
 {
@@ -99,20 +130,57 @@ static void setup_game_hud(void)
     update_hud_sprites(0, 0);
 }
 
-#define PAUSE_MENU_OPTION_COUNT 4
-static const char *pause_menu_options[PAUSE_MENU_OPTION_COUNT] =
-    {"RESUME", "RESPAWN", "MAP", "QUIT"};
-
-EWRAM_DATA static bool game_paused = false;
-
-EWRAM_DATA static menu_s pause_menu = (menu_s)
+static void open_map(void)
 {
-    .selection_count = PAUSE_MENU_OPTION_COUNT,
-    .selection_labels = pause_menu_options,
+    gfx_set_palette_multiplied(FIX_ONE);
 
-    .origin_x = 2,
-    .origin_y = 16,
-};
+    state.substate = SUBSTATE_MAP;
+    state.map_sx = 0;
+    state.map_sy = 0;
+    gfx_ctl.bg[1].offset_x = 0;
+    gfx_ctl.bg[1].offset_y = 0;
+    gfx_ctl.bg[1].char_block = 1;
+    gfx_ctl.bg[1].bpp = GFX_BG_4BPP;
+    gfx_load_map(1, &state.automap.header);
+    // TODO: load map tileset
+
+    OBJ_ATTR *attr = gfx_oam_buffer + GAME_OAM_START;
+    for (uint i = 0; i < GAME_OAM_COUNT; ++i, ++attr)
+        obj_hide(attr);
+}
+
+static void unpause_game(void);
+
+static void update_map(void)
+{
+    if (key_hit(KEY_START))
+    {
+        gfx_ctl.bg[1].char_block = 0;
+        gfx_ctl.bg[1].bpp = GFX_BG_8BPP;
+        gfx_load_map(1, g_game.map);
+        game_render();
+        unpause_game();
+        return;
+    }
+
+    if (key_held(KEY_RIGHT))
+        state.map_sx += FIX_ONE;
+
+    if (key_held(KEY_LEFT))
+        state.map_sx -= FIX_ONE;
+
+    if (key_held(KEY_DOWN))
+        state.map_sy += FIX_ONE;
+
+    if (key_held(KEY_UP))
+        state.map_sy -= FIX_ONE;
+
+    state.map_sx = MAX(state.map_sx, 0);
+    state.map_sy = MAX(state.map_sy, 0);
+
+    gfx_ctl.bg[1].offset_x = fx2int(state.map_sx);
+    gfx_ctl.bg[1].offset_y = fx2int(state.map_sy);
+}
 
 static void open_pause_menu(void)
 {
@@ -139,8 +207,8 @@ static void open_pause_menu(void)
     // print text
     gfx_text_bmap_print(4, 0 + 4, "PAUSED", TEXT_COLOR_BLUE);
 
-    pause_menu.selected = 0;
-    menu_show(&pause_menu);
+    state.pause_menu.selected = 0;
+    menu_show(&state.pause_menu);
 }
 
 static void close_pause_menu(void)
@@ -152,7 +220,7 @@ static void close_pause_menu(void)
 
 static void pause_game(void)
 {
-    game_paused = true;
+    state.substate = SUBSTATE_PAUSED;
     open_pause_menu();
     mmSetModuleVolume((int)(1024 * 0.1));
     gfx_set_palette_multiplied(TO_FIXED(0.55));
@@ -160,7 +228,7 @@ static void pause_game(void)
 
 static void unpause_game(void)
 {
-    game_paused = false;
+    state.substate = SUBSTATE_NORMAL;
     close_pause_menu();
     mmSetModuleVolume((int)(1024 * 0.3));
     gfx_set_palette_multiplied(FIX_ONE);
@@ -169,7 +237,7 @@ static void unpause_game(void)
 static void update_pause_menu(void)
 {
     int menu_result;
-    switch (menu_update(&pause_menu, &menu_result))
+    switch (menu_update(&state.pause_menu, &menu_result))
     {
         case MENU_STATUS_SELECT:
             switch (menu_result)
@@ -182,7 +250,7 @@ static void update_pause_menu(void)
                     unpause_game();
                     break;
                 case 2: // map
-                    game_save_state();
+                    open_map();
                     break;
                 case 3: // quit
                     scenemgr_change(&scene_desc_menu, 0);
@@ -202,27 +270,27 @@ static void update_hud(void)
 {
     char buf[8];
 
-    if (g_game.player_ammo != last_player_ammo)
+    if (g_game.player_ammo != state.last_player_ammo)
     {
-        last_player_ammo = g_game.player_ammo;
+        state.last_player_ammo = g_game.player_ammo;
         
         int_to_str(g_game.player_ammo, buf);
         gfx_text_bmap_print(12, HUD_Y_ORIGIN, "\x7F\x7F\x7F", TEXT_COLOR_BLACK);
         gfx_text_bmap_print(12, HUD_Y_ORIGIN, buf, TEXT_COLOR_WHITE);
     }
 
-    if (g_game.collected_rorbs != last_rorbs)
+    if (g_game.collected_rorbs != state.last_rorbs)
     {
-        last_rorbs = g_game.collected_rorbs;
+        state.last_rorbs = g_game.collected_rorbs;
         int_to_str(g_game.collected_rorbs, buf);
 
         gfx_text_bmap_print(240 - 36, HUD_Y_ORIGIN, "\x7F", TEXT_COLOR_BLACK);
         gfx_text_bmap_print(240 - 36, HUD_Y_ORIGIN, buf, TEXT_COLOR_WHITE);
     }
 
-    if (g_game.collected_borbs != last_borbs)
+    if (g_game.collected_borbs != state.last_borbs)
     {
-        last_borbs = g_game.collected_borbs;
+        state.last_borbs = g_game.collected_borbs;
         int_to_str(g_game.collected_borbs, buf);
 
         gfx_text_bmap_print(240 - 12, HUD_Y_ORIGIN, "\x7F", TEXT_COLOR_BLACK);
@@ -233,10 +301,11 @@ static void update_hud(void)
     if (g_game.player_spit_mode == PLAYER_SPIT_MODE_BULLET)
         face_frame = 1;
 
-    if (blink_timer <= 4)
+    if (state.blink_timer <= 4)
         face_frame = 2;
 
-    if (--blink_timer == 0) blink_timer = 150;
+    if (--state.blink_timer == 0)
+        state.blink_timer = 150;
 
     if (g_game.player_is_dead)
         face_frame = 3;
@@ -250,11 +319,34 @@ static void scene_load(uintptr_t data)
     gfx_ctl.bg[1].char_block = 0;
     gfx_ctl.bg[1].enabled = true;
 
-    game_paused = false;
-    last_player_ammo = UINT_MAX;
-    last_rorbs = UINT_MAX;
-    last_borbs = UINT_MAX;
-    blink_timer = 150;
+    state = (struct scene_state)
+    {
+        .last_player_ammo = UINT_MAX,
+        .last_rorbs = UINT_MAX,
+        .last_borbs = UINT_MAX,
+        .blink_timer = 150,
+        .substate = SUBSTATE_NORMAL,
+        .pause_menu = (menu_s)
+        {
+            .selection_count = PAUSE_MENU_OPTION_COUNT,
+            .selection_labels = pause_menu_options,
+
+            .origin_x = 2,
+            .origin_y = 16,
+        },
+    };
+
+    state.automap.header.width = AUTOMAP_WIDTH;
+    state.automap.header.height = AUTOMAP_HEIGHT;
+    state.automap.header.gfx_data_offset = offsetof(gfx_automap_s, gfx);
+
+    for (int y = 0; y < AUTOMAP_HEIGHT; ++y)
+    {
+        for (int x = 0; x < AUTOMAP_WIDTH; ++x)
+        {
+            state.automap.gfx[y][x] = 4;
+        }
+    }
 
     const map_header_s *map = world_rooms[0];
     gfx_load_map(1, map);
@@ -292,27 +384,32 @@ static void scene_frame(void)
 {
     if (key_hit(KEY_START))
     {
-        if (!game_paused)
+        if (state.substate == SUBSTATE_NORMAL)
         {
             pause_game();
         }
-        else
+        else if (state.substate == SUBSTATE_PAUSED)
         {
             unpause_game();
         }
     }
 
-    if (!game_paused)
+    switch (state.substate)
     {
+    case SUBSTATE_NORMAL:
         game_update();
         update_hud();
-    }
-    else
-    {
+        game_render();
+        break;
+    
+    case SUBSTATE_PAUSED:
         update_pause_menu();
-    }
+        break;
 
-    game_render();
+    case SUBSTATE_MAP:
+        update_map();
+        break;
+    }
 }
 
 const scene_desc_s scene_desc_game = {
