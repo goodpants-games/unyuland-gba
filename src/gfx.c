@@ -308,6 +308,11 @@ static void update_map_scroll(uint bg_idx)
 
     if (bg->map)
     {
+        // TODO: add support for 8x8 "GBA" tile format, needed by the automap
+        // viewer.
+        if (bg->map->gfx_format != MAP_GFX_FORMAT_MAPC16)
+            DBG_CRASH();
+
         const u16 *map_data = map_graphics_data(bg->map);
         u32 *se32 = (u32 *)se_mem[gfx_bg_indices[bg_idx]];
 

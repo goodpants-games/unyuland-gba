@@ -2,6 +2,7 @@
 #include <tonc.h>
 #include <game_sprdb.h>
 #include <tileset_gfx.h>
+#include <automap_tiles_gfx.h>
 #include <assert.h>
 #include <maxmod.h>
 #include "math_util.h"
@@ -14,13 +15,10 @@
 #include "menu.h"
 #include "tonc_video.h"
 #include "scenes.h"
+#include "automap.h"
 
 #define HUD_ROW_ORIGIN (GFX_TEXT_BMP_ROWS - 2)
 #define HUD_Y_ORIGIN   (HUD_ROW_ORIGIN * 8 + 6)
-#define AUTOMAP_MARGIN_X 4
-#define AUTOMAP_MARGIN_Y 4
-#define AUTOMAP_WIDTH (WORLD_MATRIX_WIDTH + AUTOMAP_MARGIN_X * 2)
-#define AUTOMAP_HEIGHT (WORLD_MATRIX_HEIGHT + AUTOMAP_MARGIN_Y * 2)
 
 #define PAUSE_MENU_OPTION_COUNT 4
 static const char *pause_menu_options[PAUSE_MENU_OPTION_COUNT] =
@@ -33,20 +31,13 @@ enum
     SUBSTATE_MAP,
 };
 
-typedef struct gfx_automap
-{
-    map_header_s header;
-    u16 gfx[AUTOMAP_HEIGHT][AUTOMAP_WIDTH];
-}
-gfx_automap_s;
-
 struct scene_state
 {
     uint last_player_ammo;
     uint last_rorbs;
     uint last_borbs;
     uint blink_timer;
-    gfx_automap_s automap;
+    automap_s automap;
     FIXED map_sx;
     FIXED map_sy;
 
@@ -141,7 +132,7 @@ static void open_map(void)
     gfx_ctl.bg[1].offset_y = 0;
     gfx_ctl.bg[1].char_block = 1;
     gfx_ctl.bg[1].bpp = GFX_BG_4BPP;
-    gfx_load_map(1, &state.automap.header);
+    gfx_load_map(1, &state.automap.scrmap_header);
     // TODO: load map tileset
 
     OBJ_ATTR *attr = gfx_oam_buffer + GAME_OAM_START;
@@ -336,17 +327,7 @@ static void scene_load(uintptr_t data)
         },
     };
 
-    state.automap.header.width = AUTOMAP_WIDTH;
-    state.automap.header.height = AUTOMAP_HEIGHT;
-    state.automap.header.gfx_data_offset = offsetof(gfx_automap_s, gfx);
-
-    for (int y = 0; y < AUTOMAP_HEIGHT; ++y)
-    {
-        for (int x = 0; x < AUTOMAP_WIDTH; ++x)
-        {
-            state.automap.gfx[y][x] = 4;
-        }
-    }
+    automap_init(&state.automap);
 
     const map_header_s *map = world_rooms[0];
     gfx_load_map(1, map);
@@ -366,6 +347,8 @@ static void scene_load(uintptr_t data)
                      tileset_gfxTiles, tileset_gfxTilesLen);
     gfx_queue_memcpy(tile_mem_obj[0][0].data, game_sprdb_gfxTiles,
                      game_sprdb_gfxTilesLen);
+    gfx_queue_memcpy(&tile_mem[1][0], automap_tiles_gfxTiles,
+                     automap_tiles_gfxTilesLen);
 }
 
 static void scene_unload(void)

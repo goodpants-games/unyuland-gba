@@ -1,0 +1,22 @@
+#ifndef AUTOMAP_H
+#define AUTOMAP_H
+
+#include <world.h>
+
+#define AUTOMAP_MARGIN_X 4
+#define AUTOMAP_MARGIN_Y 4
+#define AUTOMAP_WIDTH (WORLD_MATRIX_WIDTH + AUTOMAP_MARGIN_X * 2)
+#define AUTOMAP_HEIGHT (WORLD_MATRIX_HEIGHT + AUTOMAP_MARGIN_Y * 2)
+#define AUTOMAP_EMPTY 0xFF
+
+typedef struct automap
+{
+    u8 map[AUTOMAP_HEIGHT][AUTOMAP_WIDTH];
+    map_header_s scrmap_header;
+    u16 scrmap[AUTOMAP_HEIGHT][AUTOMAP_WIDTH];
+}
+automap_s;
+
+void automap_init(automap_s *map);
+
+#endif

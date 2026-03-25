@@ -201,8 +201,8 @@ soundbank.bin soundbank.h : $(AUDIOFILES)
 	@echo $(notdir $<)
 	@$(bin2o)
 
-%.map: %.tmx world.json
-	@$(PYTHON) ../tools/mapc.py $< world.json $@
+%.map: %.tmx world.json $(TOPLEVEL)/tools/mapc.py
+	@$(PYTHON) $(TOPLEVEL)/tools/mapc.py $< world.json $@
 
 #---------------------------------------------------------------------------------
 # This rule compiles .sprdb files to a sprdb binary data and image file, using

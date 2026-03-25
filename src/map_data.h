@@ -7,14 +7,18 @@
 #include "mgba.h"
 #include "math_util.h"
 
+#define MAP_GFX_FORMAT_GBA    0 // hardware GBA screen-entry format
+#define MAP_GFX_FORMAT_MAPC16 1 // 16x16 tile screen-entry format used by mapc
+
 typedef struct map_header
 {
     u16 width;
     u16 height;
     u8  px;
     u8  py;
+    u8  gfx_format;
 
-    // 2 byte padding
+    // 1 byte of padding
 
     u32 col_data_offset;
     u32 gfx_data_offset;
