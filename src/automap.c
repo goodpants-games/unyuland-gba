@@ -2,20 +2,49 @@
 
 #include <automap_tiles_gfx.h>
 
-#define TILE_STRIDE 94
+#define TILE_STRIDE 98
+
+static void scrblock_write(uint map_entry, u16 *dest)
+{
+    const u32 *src32 = (const u32 *)(automap_tiles_gfxMap + (map_entry * 2));
+    u32 *dest32 = (u32 *)dest; // should be aligned as dst stride is 2
+
+    *dest32 = *src32;
+    *(dest32 + 16) = *(src32 + TILE_STRIDE);
+}
 
 void automap_init(automap_s *map)
 {
-    uint gfx_scale = AUTOMAP_GFX_SCALE;
-
     map->scrmap_header = (map_header_s)
     {
-        .gfx_format = MAP_GFX_FORMAT_GBA,
-        .width = AUTOMAP_WIDTH * gfx_scale,
-        .height = AUTOMAP_HEIGHT * gfx_scale,
+        .gfx_format = MAP_GFX_FORMAT_CUSTOM16,
+        .width = AUTOMAP_WIDTH,
+        .height = AUTOMAP_HEIGHT,
+        .custom_scrblock_write = scrblock_write,
         .gfx_data_offset = offsetof(automap_s, scrmap)
                            - offsetof(automap_s, scrmap_header)
     };
+
+    for (uint y = 0; y < AUTOMAP_HEIGHT; ++y)
+    {
+        bool yodd = y & 1;
+        for (uint x = 0; x < AUTOMAP_WIDTH; ++x)
+        {
+            bool xodd = x & 1;
+
+            u16 v;
+            if (yodd & xodd)
+                v = 0;
+            else if (yodd)
+                v = 3;
+            else if (xodd)
+                v = 2;
+            else
+                v = 1;
+
+            map->scrmap[y][x] = v;
+        }
+    }
 
     for (uint y = AUTOMAP_MARGIN_Y; y < AUTOMAP_HEIGHT - AUTOMAP_MARGIN_Y; ++y)
     {
@@ -25,12 +54,11 @@ void automap_init(automap_s *map)
             uint src_x = (x - AUTOMAP_MARGIN_X) / 2;
 
             bool has_level = world_matrix[src_y][src_x] != 0;
-            u16 t = has_level ? 6 : 1;
+            if (!has_level) continue;
 
-            map->scrmap[(y * gfx_scale)][(x * gfx_scale)] = t;
-            map->scrmap[(y * gfx_scale)][(x * gfx_scale) + 1] = t;
-            map->scrmap[(y * gfx_scale) + 1][(x * gfx_scale)] = t;
-            map->scrmap[(y * gfx_scale) + 1][(x * gfx_scale) + 1] = t;
+            u16 t = 66;
+
+            map->scrmap[y][x] = t;
         }
     }
 }
