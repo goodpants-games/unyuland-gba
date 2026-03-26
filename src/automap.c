@@ -6,15 +6,31 @@
 
 void automap_init(automap_s *map)
 {
-    map->scrmap_header.width = AUTOMAP_WIDTH;
-    map->scrmap_header.height = AUTOMAP_HEIGHT;
-    map->scrmap_header.gfx_data_offset = offsetof(automap_s, scrmap);
+    uint gfx_scale = AUTOMAP_GFX_SCALE;
 
-    for (int y = 0; y < AUTOMAP_HEIGHT; ++y)
+    map->scrmap_header = (map_header_s)
     {
-        for (int x = 0; x < AUTOMAP_WIDTH; ++x)
+        .gfx_format = MAP_GFX_FORMAT_GBA,
+        .width = AUTOMAP_WIDTH * gfx_scale,
+        .height = AUTOMAP_HEIGHT * gfx_scale,
+        .gfx_data_offset = offsetof(automap_s, scrmap)
+                           - offsetof(automap_s, scrmap_header)
+    };
+
+    for (uint y = AUTOMAP_MARGIN_Y; y < AUTOMAP_HEIGHT - AUTOMAP_MARGIN_Y; ++y)
+    {
+        for (uint x = AUTOMAP_MARGIN_X; x < AUTOMAP_WIDTH - AUTOMAP_MARGIN_X; ++x)
         {
-            map->scrmap[y][x] = 4;
+            uint src_y = (y - AUTOMAP_MARGIN_Y) / 2;
+            uint src_x = (x - AUTOMAP_MARGIN_X) / 2;
+
+            bool has_level = world_matrix[src_y][src_x] != 0;
+            u16 t = has_level ? 6 : 1;
+
+            map->scrmap[(y * gfx_scale)][(x * gfx_scale)] = t;
+            map->scrmap[(y * gfx_scale)][(x * gfx_scale) + 1] = t;
+            map->scrmap[(y * gfx_scale) + 1][(x * gfx_scale)] = t;
+            map->scrmap[(y * gfx_scale) + 1][(x * gfx_scale) + 1] = t;
         }
     }
 }

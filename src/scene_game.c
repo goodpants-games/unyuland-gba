@@ -154,17 +154,19 @@ static void update_map(void)
         return;
     }
 
+    const FIXED scroll_speed = FX(2);
+
     if (key_held(KEY_RIGHT))
-        state.map_sx += FIX_ONE;
+        state.map_sx += scroll_speed;
 
     if (key_held(KEY_LEFT))
-        state.map_sx -= FIX_ONE;
+        state.map_sx -= scroll_speed;
 
     if (key_held(KEY_DOWN))
-        state.map_sy += FIX_ONE;
+        state.map_sy += scroll_speed;
 
     if (key_held(KEY_UP))
-        state.map_sy -= FIX_ONE;
+        state.map_sy -= scroll_speed;
 
     state.map_sx = MAX(state.map_sx, 0);
     state.map_sy = MAX(state.map_sy, 0);
