@@ -15,3 +15,7 @@
 - fix tall room, also tall room backgrounds
 - create map system wait does that require me to allow dynamically created
   scrollmaps FUck.
+- update camera tracking:
+  - stop x scroll when player changed direction while scrolling
+  - y scroll to ground level when player is grounded
+- is mesen psg wave more accurate than mGBA?
