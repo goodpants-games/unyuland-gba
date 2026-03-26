@@ -7,8 +7,11 @@
 #include "mgba.h"
 #include "math_util.h"
 
-#define MAP_GFX_FORMAT_GBA    0 // hardware GBA screen-entry format
-#define MAP_GFX_FORMAT_MAPC16 1 // 16x16 tile screen-entry format used by mapc
+#define MAP_GFX_FORMAT_GBA      0 // hardware GBA screen-entry format
+#define MAP_GFX_FORMAT_MAPC16   1 // 16x16 tile screen-entry format used by mapc
+#define MAP_GFX_FORMAT_CUSTOM16 2 // custom 16x16 tile format
+
+typedef void (*map_write_scrblock_f)(uint map_entry, u16 *dest);
 
 typedef struct map_header
 {
@@ -20,6 +23,7 @@ typedef struct map_header
 
     // 1 byte of padding
 
+    map_write_scrblock_f custom_scrblock_write; // used with custom16
     u32 col_data_offset;
     u32 gfx_data_offset;
     u32 ent_data_offset;

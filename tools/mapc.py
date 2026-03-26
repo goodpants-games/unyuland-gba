@@ -72,8 +72,8 @@ def parse(ifile_path: str, output_file: BinaryIO, tileset: Tileset,
         raise Exception(f"could not find '{room_name}' in world.json")
 
     room_data = world_data['rooms'][room_name]
-    output_file.write(struct.pack('<HHBBBx', map_width, map_height,
-                                  room_data['x'], room_data['y'], 1))
+    output_file.write(struct.pack('<HHBBBxI', map_width, map_height,
+                                  room_data['x'], room_data['y'], 1, 0))
 
     # get collision matrix
     col_data: list[int] = []
@@ -214,7 +214,7 @@ def parse(ifile_path: str, output_file: BinaryIO, tileset: Tileset,
             ent_data += struct.pack('<H', len(odata))
             ent_data += odata
     
-    section_offset = 20
+    section_offset = 24
     output_file.write(struct.pack('<I', section_offset)) # col offset
     section_offset += align(len(col_bytes), 4)
     output_file.write(struct.pack('<I', section_offset)) # gfx offset

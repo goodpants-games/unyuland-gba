@@ -260,7 +260,7 @@ typedef struct bg_scroll_data
 static EWRAM_BSS bg_scroll_data_s bg_scroll_data[4];
 
 static void update_map_scroll_t(uint bg_idx, uint size_shift, uint dst_shift,
-                                void (*write_scr_block)(uint entry, void *dst))
+                                map_write_scrblock_f write_scr_block)
 {
     static const uint gfx_bg_indices[4] = {
         GFX_BG0_INDEX, GFX_BG1_INDEX, GFX_BG2_INDEX, GFX_BG3_INDEX
@@ -361,9 +361,11 @@ static void update_map_scroll_t(uint bg_idx, uint size_shift, uint dst_shift,
     }
 }
 
-static void write_scr_block16(const uint map_entry, void *p_dest)
+static void write_scr_block16(const uint map_entry, u16 *p_dest)
 {
+    // dest should always be 32-bit aligned, since dst stride is 2
     u32 *dest = (u32 *)p_dest;
+
     if (map_entry == 0)
     {
         *dest        = 0;
@@ -400,9 +402,8 @@ static void write_scr_block16(const uint map_entry, void *p_dest)
     *(dest + 16) = lower;;
 }
 
-static void write_scr_block8(const uint map_entry, void *p_dest)
+static void write_scr_block8(const uint map_entry, u16 *dest)
 {
-    u16 *dest = (u16 *)p_dest;
     *dest = (u16) map_entry;
 }
 
@@ -423,6 +424,10 @@ static void update_map_scroll(uint bg_idx)
             update_map_scroll_t(bg_idx, 4, 1, write_scr_block16);
             break;
 
+        case MAP_GFX_FORMAT_CUSTOM16:
+            update_map_scroll_t(bg_idx, 4, 1, bg->map->custom_scrblock_write);
+            break;
+        
         default:
             LOG_ERR("invalid map gfx format %u", bg->map->gfx_format);
             ASM_BREAK();

@@ -13,8 +13,7 @@
   not related to the project but just a note to self. also maybe make an
   algebraic inverse of the gba-color "function" to make color correction better.
 - fix tall room, also tall room backgrounds
-- create map system wait does that require me to allow dynamically created
-  scrollmaps FUck.
+- make projectiles stop on player-created platforms
 - update camera tracking:
   - stop x scroll when player changed direction while scrolling
   - y scroll to ground level when player is grounded
