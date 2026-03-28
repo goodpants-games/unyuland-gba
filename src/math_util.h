@@ -13,6 +13,14 @@
 #define TO_FIXED(n) (FIXED)(FIX_ONE * (n))
 #define FX(n) TO_FIXED(n)
 
+// inclusive clamp (because tonc's is max-exclusive?)
+static inline int iclamp(int v, int min, int max)
+{
+    if (v > max) return max;
+    if (v < min) return min;
+    return v;
+}
+
 static inline int ceil_div(int a, int b)
 {
     return (a + b - 1) / b;
