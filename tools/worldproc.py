@@ -39,7 +39,8 @@ def abort_errors():
 def worldproc(world_path: str, room_list: list[str],
               out_json: typing.TextIO|None = None,
               out_bin: typing.BinaryIO|None = None,
-              out_cp: str|None = None):
+              out_cp: str|None = None,
+              out_automap: str|None = None):
     if len(room_list) >= 255:
         raise RuntimeError('exceeded max room count of 255')
 
@@ -128,6 +129,9 @@ def worldproc(world_path: str, room_list: list[str],
 
     if out_cp:
         generate_c_source(room_list, matrix_w, matrix_h, matrix, out_cp)
+    
+    if out_automap:
+        generate_automap(rooms, matrix_w, matrix_h, out_automap)
 
 
 def generate_c_source(rooms: list[str], mat_w: int, mat_h: int, matrix: bytes,
@@ -181,6 +185,39 @@ const map_header_s *const world_rooms[{room_count}] = {{""")
         
         fc.write("};\n")
 
+
+def generate_automap(rooms: dict[str, RoomData], matrix_w: int, matrix_h: int,
+                     out_path: str):
+    matrix_w *= 2
+    matrix_h *= 2
+
+    print(f"gen automap: {matrix_w}, {matrix_h}")
+
+    matrix: list[int] = []
+    for i in range(0, matrix_w * matrix_h):
+        matrix.append(0xFF)
+    
+    for room in rooms.values():
+        min_x = (room.x // WORLD_GRID_WIDTH) * 2
+        min_y = (room.y // WORLD_GRID_HEIGHT) * 2
+        max_x = ((room.x + room.w) // WORLD_GRID_WIDTH) * 2
+        max_y = ((room.y + room.h) // WORLD_GRID_HEIGHT) * 2
+
+        for y in range(min_y, max_y):
+            for x in range(min_x, max_x):
+                print(x, y)
+                matrix[y * matrix_w + x] = 66
+    
+    out_bytes = bytearray(matrix_w * matrix_h)
+    byte_wp = 0
+    for v in matrix:
+        out_bytes[byte_wp] = v & 0xFF
+        byte_wp += 1
+    
+    with ioutil.open_output(out_path, binary=True) as out_f:
+        out_f.write(out_bytes)
+
+
 def main():
     parser = argparse.ArgumentParser(prog='worldproc')
     parser.add_argument('world', help='input tiled .world file.')
@@ -188,6 +225,7 @@ def main():
     parser.add_argument('--json', metavar='path', help='output json file. pass - to write to stdout.')
     parser.add_argument('--bin', metavar='path', help='output bin file. pass - to write to stdout.')
     parser.add_argument('--c', dest='c', metavar='path', help="output .h file for room list. sibling .c source will be generated as well.")
+    parser.add_argument('--automap', help='output automap bin file. pass - to write to stdout.')
 
     args = parser.parse_args()
 
@@ -202,23 +240,28 @@ def main():
     world_path = path.abspath(args.world)
 
     out_json: typing.TextIO = None
-    out_bin: typing.TextIO = None
+    out_bin: typing.BinaryIO = None
+    out_automap: str = None
     out_cp: str = None
 
     if args.json:
         out_json = ioutil.open_output(args.json)
     
     if args.bin:
-        out_bin = ioutil.open_output(args.bin)
+        out_bin = ioutil.open_output(args.bin, binary=True)
 
     if args.c:
         out_cp = args.c
+
+    if args.automap:
+        out_automap = args.automap
 
     try:
         worldproc(world_path, room_list,
                   out_json=out_json,
                   out_bin=out_bin,
-                  out_cp=out_cp)
+                  out_cp=out_cp,
+                  out_automap=out_automap)
     finally:
         if out_json:
             out_json.close()

@@ -1,6 +1,8 @@
 #include "automap.h"
+#include "world.h"
 
 #include <automap_tiles_gfx.h>
+#include <automap_bin.h>
 
 #define TILE_STRIDE 98
 
@@ -46,19 +48,35 @@ void automap_init(automap_s *map)
         }
     }
 
-    for (uint y = AUTOMAP_MARGIN_Y; y < AUTOMAP_HEIGHT - AUTOMAP_MARGIN_Y; ++y)
+    const u8 *am_data = (const u8 *)automap_bin;
+    const uint data_row_stride = WORLD_MATRIX_WIDTH;
+
+    uint dst_y = AUTOMAP_MARGIN_Y;
+    for (uint y = 0; y < AUTOMAP_HEIGHT - AUTOMAP_MARGIN_Y * 2; ++y, ++dst_y)
     {
-        for (uint x = AUTOMAP_MARGIN_X; x < AUTOMAP_WIDTH - AUTOMAP_MARGIN_X; ++x)
+        uint dst_x = AUTOMAP_MARGIN_X;
+        for (uint x = 0; x < AUTOMAP_WIDTH - AUTOMAP_MARGIN_X * 2; ++x, ++dst_x)
         {
-            uint src_y = (y - AUTOMAP_MARGIN_Y) / 2;
-            uint src_x = (x - AUTOMAP_MARGIN_X) / 2;
+            u8 v = am_data[y * data_row_stride + x];
+            if (v == 0xFF) continue;
 
-            bool has_level = world_matrix[src_y][src_x] != 0;
-            if (!has_level) continue;
-
-            u16 t = 66;
-
-            map->scrmap[y][x] = t;
+            map->scrmap[dst_y][dst_x ] = v;
         }
     }
+
+    // for (uint y = AUTOMAP_MARGIN_Y; y < AUTOMAP_HEIGHT - AUTOMAP_MARGIN_Y; ++y)
+    // {
+    //     for (uint x = AUTOMAP_MARGIN_X; x < AUTOMAP_WIDTH - AUTOMAP_MARGIN_X; ++x)
+    //     {
+    //         uint src_y = (y - AUTOMAP_MARGIN_Y) / 2;
+    //         uint src_x = (x - AUTOMAP_MARGIN_X) / 2;
+
+    //         bool has_level = world_matrix[src_y][src_x] != 0;
+    //         if (!has_level) continue;
+
+    //         u16 t = 66;
+
+    //         map->scrmap[y][x] = t;
+    //     }
+    // }
 }

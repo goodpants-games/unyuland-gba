@@ -128,7 +128,7 @@ export OFILES_SPRITES := $(addsuffix _sprdb.bin.o,$(SPRFILES:.sprdb=))\
                          $(addsuffix _sprdb_gfx.s,$(SPRFILES:.sprdb=))
 
 export OFILES_INTERMEDIATE := sinelut.bin.o dlg.bin.o pitchlut.bin.o\
-                              wave_tri.bin.o wave_noise.bin.o
+                              wave_tri.bin.o wave_noise.bin.o automap.bin.o
 
 export OFILES := $(OFILES_BIN) $(OFILES_GRAPHICS) $(OFILES_INTERMEDIATE)\
                  $(OFILES_MAPS) $(OFILES_SPRITES) $(OFILES_SOURCES)
@@ -227,23 +227,16 @@ soundbank.bin soundbank.h : $(AUDIOFILES)
 #---------------------------------------------------------------------------------
 # This rule compiles the positions of each room in the world matrix, as well
 # as the room order. This data is then read by mapc.
+# Also creates a pointer list to each map file, as well as the world matrix.
 #---------------------------------------------------------------------------------
-world.json: $(MAPFILES)
-#---------------------------------------------------------------------------------
-	@$(PYTHON) $(TOPLEVEL)/tools/worldproc.py \
-	           $(TOPLEVEL)/data/maps/unyuland.world \
-	           $(TOPLEVEL)/data/room_list.txt \
-	           --json world.json
-
-#---------------------------------------------------------------------------------
-# This rule creates a pointer list to each map file and the world matrix.
-#---------------------------------------------------------------------------------
-world.c world.h: $(MAPFILES)
+world.json world.c world.h automap.bin: $(MAPFILES)
 #---------------------------------------------------------------------------------
 	@$(PYTHON) $(TOPLEVEL)/tools/worldproc.py \
 	           $(TOPLEVEL)/data/maps/unyuland.world \
 	           $(TOPLEVEL)/data/room_list.txt \
-			   --c world.c
+	           --json world.json \
+			   --c world.c \
+			   --automap automap.bin
 
 #---------------------------------------------------------------------------------
 # This rule creates the sine look-up table.
