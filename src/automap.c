@@ -4,7 +4,7 @@
 #include <automap_tiles_gfx.h>
 #include <automap_bin.h>
 
-#define TILE_STRIDE 98
+#define TILE_STRIDE 99
 
 static void scrblock_write(uint map_entry, u16 *dest)
 {
@@ -49,7 +49,7 @@ void automap_init(automap_s *map)
     }
 
     const u8 *am_data = (const u8 *)automap_bin;
-    const uint data_row_stride = WORLD_MATRIX_WIDTH;
+    const uint data_row_stride = WORLD_MATRIX_WIDTH * 2;
 
     uint dst_y = AUTOMAP_MARGIN_Y;
     for (uint y = 0; y < AUTOMAP_HEIGHT - AUTOMAP_MARGIN_Y * 2; ++y, ++dst_y)
@@ -60,23 +60,7 @@ void automap_init(automap_s *map)
             u8 v = am_data[y * data_row_stride + x];
             if (v == 0xFF) continue;
 
-            map->scrmap[dst_y][dst_x ] = v;
+            map->scrmap[dst_y][dst_x] = v;
         }
     }
-
-    // for (uint y = AUTOMAP_MARGIN_Y; y < AUTOMAP_HEIGHT - AUTOMAP_MARGIN_Y; ++y)
-    // {
-    //     for (uint x = AUTOMAP_MARGIN_X; x < AUTOMAP_WIDTH - AUTOMAP_MARGIN_X; ++x)
-    //     {
-    //         uint src_y = (y - AUTOMAP_MARGIN_Y) / 2;
-    //         uint src_x = (x - AUTOMAP_MARGIN_X) / 2;
-
-    //         bool has_level = world_matrix[src_y][src_x] != 0;
-    //         if (!has_level) continue;
-
-    //         u16 t = 66;
-
-    //         map->scrmap[y][x] = t;
-    //     }
-    // }
 }

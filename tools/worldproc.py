@@ -7,8 +7,22 @@ import typing
 import struct
 import ioutil
 
-WORLD_GRID_WIDTH = 15 * 8
-WORLD_GRID_HEIGHT = 11 * 8
+ROOM_SCREEN_WIDTH = 15
+ROOM_SCREEN_HEIGHT = 11
+WORLD_GRID_WIDTH = ROOM_SCREEN_WIDTH * 8
+WORLD_GRID_HEIGHT = ROOM_SCREEN_HEIGHT * 8
+MAP_SCREEN_SUBDIV = 2
+MAP_SCREEN_MARGIN_X = 2
+MAP_SCREEN_MARGIN_Y = 2
+
+ADJBIT_R  = 0x1
+ADJBIT_U  = 0x2
+ADJBIT_L  = 0x4
+ADJBIT_D  = 0x8
+ADJBIT_TR = 0x10
+ADJBIT_TL = 0x20
+ADJBIT_BL = 0x40
+ADJBIT_BR = 0x80
 
 g_errors: list[Exception] = []
 
@@ -24,6 +38,30 @@ class RoomData:
         self.y = y
         self.w = w
         self.h = h
+
+class Array2D:
+    def __init__(self: typing.Self, w: int, h: int, data: list):
+        self.data = data
+        self.w = w
+        self.h = h
+    
+    def create(w: int, h: int, init):
+        return Array2D(w, h, [init] * (w * h))
+    
+    def is_in_bounds(self: typing.Self, x: int, y: int) -> bool:
+        return x >= 0 and y >= 0 and x < self.w and y < self.h
+    
+    def get(self: typing.Self, x: int, y: int, default=None):
+        if not self.is_in_bounds(x, y): return default
+        return self.data[y * self.w + x]
+    
+    def set(self: typing.Self, x: int, y: int, v):
+        if not self.is_in_bounds(x, y): return None
+        self.data[y * self.w + x] = v
+
+
+def int_ceil_div(x: int, y: int) -> int:
+    return (x + y - 1) // y
 
 
 def abort_errors():
@@ -130,8 +168,8 @@ def worldproc(world_path: str, room_list: list[str],
     if out_cp:
         generate_c_source(room_list, rooms, matrix_w, matrix_h, matrix, out_cp)
     
-    # if out_automap:
-    #     generate_automap(rooms, matrix_w, matrix_h, world_path, out_automap)
+    if out_automap:
+        generate_automap(rooms, matrix_w, matrix_h, world_path, out_automap)
 
 
 def generate_c_source(rooms: list[str], room_data: dict[str, RoomData],
@@ -200,27 +238,71 @@ const world_room_s world_rooms[WORLD_ROOM_COUNT] = {{""")
         fc.write("};\n")
 
 
-def generate_automap(rooms: dict[str, RoomData], matrix_w: int, matrix_h: int,
-                     out_path: str):
-    matrix_w *= 2
-    matrix_h *= 2
+def calc_adjacency(mat: Array2D, x: int, y: int):
+    adj = 0
 
-    print(f"gen automap: {matrix_w}, {matrix_h}")
+    if not mat.get(x+1, y  , False): adj |= ADJBIT_R
+    if not mat.get(x  , y-1, False): adj |= ADJBIT_U
+    if not mat.get(x-1, y  , False): adj |= ADJBIT_L
+    if not mat.get(x  , y+1, False): adj |= ADJBIT_D
+
+    if not mat.get(x+1, y-1, False): adj |= ADJBIT_TR
+    if not mat.get(x-1, y-1, False): adj |= ADJBIT_TL
+    if not mat.get(x-1, y+1, False): adj |= ADJBIT_BL
+    if not mat.get(x+1, y+1, False): adj |= ADJBIT_BR
+
+    # change meaning of corner flags. it should only mean inner corners, not
+    # outer corners
+    if (adj & (ADJBIT_R | ADJBIT_D)) != 0:
+        adj &= ~ADJBIT_BR
+    
+    if (adj & (ADJBIT_R | ADJBIT_U)) != 0:
+        adj &= ~ADJBIT_TR
+    
+    if (adj & (ADJBIT_L | ADJBIT_U)) != 0:
+        adj &= ~ADJBIT_TL
+    
+    if (adj & (ADJBIT_L | ADJBIT_D)) != 0:
+        adj &= ~ADJBIT_BL
+
+    return adj
+
+
+def generate_automap(rooms: dict[str, RoomData], matrix_w: int, matrix_h: int,
+                     world_path: str, out_path: str):
+    matrix_w *= MAP_SCREEN_SUBDIV
+    matrix_h *= MAP_SCREEN_SUBDIV
+
+    tex_lookup: list[int] = [4]
+    i = 5
+    for flags in range(1, 0x100):
+        if (  (flags & ADJBIT_R)!=0 and (flags & (ADJBIT_BR | ADJBIT_TR))!=0
+           or (flags & ADJBIT_U)!=0 and (flags & (ADJBIT_TR | ADJBIT_TL))!=0
+           or (flags & ADJBIT_L)!=0 and (flags & (ADJBIT_TL | ADJBIT_BL))!=0
+           or (flags & ADJBIT_D)!=0 and (flags & (ADJBIT_BL | ADJBIT_BR))!=0):
+            tex_lookup.append(0)
+            continue
+
+        tex_lookup.append(i)
+        i += 1
 
     matrix: list[int] = []
     for i in range(0, matrix_w * matrix_h):
         matrix.append(0xFF)
     
     for room in rooms.values():
-        min_x = (room.x // WORLD_GRID_WIDTH) * 2
-        min_y = (room.y // WORLD_GRID_HEIGHT) * 2
-        max_x = ((room.x + room.w) // WORLD_GRID_WIDTH) * 2
-        max_y = ((room.y + room.h) // WORLD_GRID_HEIGHT) * 2
+        omatrix = calc_room_automap_occupancy(room.name)
 
-        for y in range(min_y, max_y):
-            for x in range(min_x, max_x):
-                print(x, y)
-                matrix[y * matrix_w + x] = 66
+        start_x = room.x // WORLD_GRID_WIDTH * MAP_SCREEN_SUBDIV
+        start_y = room.y // WORLD_GRID_HEIGHT * MAP_SCREEN_SUBDIV
+
+        for ly in range(0, room.h // WORLD_GRID_HEIGHT * MAP_SCREEN_SUBDIV):
+            gy = start_y + ly
+            for lx in range(0, room.w // WORLD_GRID_WIDTH * MAP_SCREEN_SUBDIV):
+                gx = start_x + lx
+                if omatrix.get(lx, ly):
+                    adj = calc_adjacency(omatrix, lx, ly)
+                    matrix[gy * matrix_w + gx] = tex_lookup[adj]
     
     out_bytes = bytearray(matrix_w * matrix_h)
     byte_wp = 0
@@ -230,6 +312,62 @@ def generate_automap(rooms: dict[str, RoomData], matrix_w: int, matrix_h: int,
     
     with ioutil.open_output(out_path, binary=True) as out_f:
         out_f.write(out_bytes)
+
+
+def calc_room_automap_occupancy(room_path: str) -> Array2D:
+    cell_w = WORLD_GRID_WIDTH / MAP_SCREEN_SUBDIV / 8.0
+    cell_h = WORLD_GRID_HEIGHT / MAP_SCREEN_SUBDIV / 8.0
+
+    with open(room_path + '.map', 'rb') as map_file:
+        map_data = map_file.read()
+    
+    (room_width, room_height, _, _, col_data_offset, _, _) = \
+        struct.unpack('<HHBxxxIIII', map_data[0:24])
+    
+    col_data = bytearray(int_ceil_div(room_width * room_height, 4) * 4)
+    j = 0
+    for i in range(0, int_ceil_div(room_width * room_height, 4)):
+        byte = map_data[col_data_offset + i]
+        col_data[j  ] = byte & 0x3
+        col_data[j+1] = (byte >> 2) & 0x3
+        col_data[j+2] = (byte >> 4) & 0x3
+        col_data[j+3] = (byte >> 6) & 0x3
+        j += 4
+    
+    room_swidth = int_ceil_div(room_width, ROOM_SCREEN_WIDTH)
+    room_sheight = int_ceil_div(room_height, ROOM_SCREEN_HEIGHT)
+    
+    owidth = room_swidth * MAP_SCREEN_SUBDIV
+    oheight = room_sheight * MAP_SCREEN_SUBDIV
+    occupancy: list[bool] = [False] * (owidth * oheight)
+
+    i = 0
+    for r in range(0, room_sheight * MAP_SCREEN_SUBDIV):
+        start_y = int(r * cell_h) + MAP_SCREEN_MARGIN_Y
+        end_y = int(start_y + cell_h) - MAP_SCREEN_MARGIN_Y
+
+        for c in range(0, room_swidth * MAP_SCREEN_SUBDIV):
+            start_x = int(c * cell_w) + MAP_SCREEN_MARGIN_X
+            end_x = int(start_x + cell_w) - MAP_SCREEN_MARGIN_X
+
+            # assert(room.screens[i] ~= nil)
+
+            scr_available = False
+            for y in range(start_y, end_y + 1):
+                assert (y >= 0 and y < room_height)
+                for x in range(start_x, end_x + 1):
+                    assert (x >= 0 and x < room_width)
+                    if col_data[y * room_width + x] != 1:
+                        scr_available = True
+                        break
+                else:
+                    continue
+                break
+
+            occupancy[i] = scr_available
+            i += 1
+    
+    return Array2D(owidth, oheight, occupancy)
 
 
 def main():

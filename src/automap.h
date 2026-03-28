@@ -10,8 +10,6 @@
 
 typedef struct automap
 {
-    u8 map[AUTOMAP_HEIGHT][AUTOMAP_WIDTH];
-
     map_header_s scrmap_header;
     u16 scrmap[AUTOMAP_HEIGHT][AUTOMAP_WIDTH];
 }

@@ -231,7 +231,7 @@ soundbank.bin soundbank.h : $(AUDIOFILES)
 # as the room order. This data is then read by mapc.
 # Also creates a pointer list to each map file, as well as the world matrix.
 #---------------------------------------------------------------------------------
-world.json world.c world.h automap.bin: $(TMXFILES)
+world.json world.c world.h automap.bin: $(TMXFILES) $(TOPLEVEL)/tools/worldproc.py
 #---------------------------------------------------------------------------------
 	@$(PYTHON) $(TOPLEVEL)/tools/worldproc.py \
 	           $(TOPLEVEL)/data/maps/unyuland.world \
