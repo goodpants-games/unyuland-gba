@@ -98,6 +98,7 @@ static void update_hud_sprites(uint face_frame, uint mode_frame)
         .dst_obj = &gfx_oam_buffer[0],
         .dst_obj_count = 16,
         .a1 = ATTR2_PRIO(0),
+        .a2 = ATTR2_PALBANK(GFX_OBJPAL_MUL),
     };
 
     const int ypos = SCREEN_HEIGHT - 10;
@@ -112,10 +113,10 @@ static void update_hud_sprites(uint face_frame, uint mode_frame)
 static void setup_game_hud(void)
 {
     // set up pause menu display
-    gfx_text_bmap_dst_assign(0, 9, 0, 2);
+    gfx_text_bmap_dst_assign(0, 9, 0, GFX_TEXTPAL_NORMAL);
 
     // set up HUD display
-    gfx_text_bmap_dst_assign(18, 2, HUD_ROW_ORIGIN, 3);
+    gfx_text_bmap_dst_assign(18, 2, HUD_ROW_ORIGIN, GFX_TEXTPAL_MUL);
 
     clear_game_hud();
     update_hud_sprites(0, 0);

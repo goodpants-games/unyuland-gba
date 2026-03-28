@@ -18,6 +18,8 @@
 
 #define GAME_BG_IDX 1
 
+#define RAINBOW_PALETTE_LENGTH (sizeof(rainbow_pal) / sizeof(*rainbow_pal))
+
 typedef enum render_obj_t
 {
     RENDER_OBJ_SPRITE,
@@ -64,6 +66,24 @@ static int last_obj_index = 0;
 
 EWRAM_BSS char game_dialogue_buffer[DIALOGUE_BUFFER_SIZE];
 
+static const int rainbow_pal[] = {
+    GFX_PAL_RED, GFX_PAL_ORANGE, GFX_PAL_YELLOW, GFX_PAL_GREEN,
+    GFX_PAL_BLUE, GFX_PAL_PINK
+};
+
+static int rainbow_shift = 0;
+static int rainbow_shift_time_accum = 0;
+
+static void update_rainbow_palette(void)
+{
+    int j = rainbow_shift;
+    for (int i = 0; i < 16; ++i)
+    {
+        gfx_ctl.obj_userpal[1][i] = rainbow_pal[j];
+        if (++j == RAINBOW_PALETTE_LENGTH) j = 0;
+    }
+}
+
 static bool game_transition_update(entity_s *player);
 
 // this is called by both entity_alloc and game_restore_state
@@ -94,7 +114,8 @@ entity_s* entity_alloc(void)
             .mass = 2,
             .actor.face_dir = 1,
             .col.group = COLGROUP_DEFAULT,
-            .col.mask = COLGROUP_ALL
+            .col.mask = COLGROUP_ALL,
+            .sprite.palette = GFX_OBJPAL_MUL
         };
 
         on_entity_alloc(ent);
@@ -401,6 +422,14 @@ static void update_animation()
     uint timer = g_game.active_interactable_timer;
     g_game.interactable_indicator_offset =
         sine_lut(timer * 4 + timer / 4) + TO_FIXED(0.5);
+    
+    // rainbow palette
+    if (++rainbow_shift_time_accum == 4)
+    {
+        rainbow_shift_time_accum = 0;
+        if (++rainbow_shift == RAINBOW_PALETTE_LENGTH) rainbow_shift = 0;
+        update_rainbow_palette();
+    }
 }
 
 void dialogue_show_page(void)
@@ -826,7 +855,7 @@ void game_render(void)
         // draw arrow
         draw_state.a0 = 0;
         draw_state.a1 = 0;
-        draw_state.a2 = ATTR2_PALBANK(1) | ATTR2_PRIO(1);
+        draw_state.a2 = ATTR2_PALBANK(GFX_OBJPAL_USER1) | ATTR2_PRIO(1);
 
         FIXED pos_x = ent->pos.x + int2fx(ent->col.w) / 2;
         FIXED pos_y = ent->pos.y - int2fx(5) + dy;
@@ -843,7 +872,7 @@ void game_render(void)
         // draw interact button
         draw_state.a0 = 0;
         draw_state.a1 = 0;
-        draw_state.a2 = ATTR2_PALBANK(0) | ATTR2_PRIO(1);
+        draw_state.a2 = ATTR2_PALBANK(GFX_OBJPAL_MUL) | ATTR2_PRIO(1);
 
         pos_y -= int2fx(6);
         draw_x = fx2int(pos_x) - 4;

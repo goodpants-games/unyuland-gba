@@ -64,7 +64,8 @@ static void render_page(const char *header, const char *lines[],
 
     gfx_text_bmap_clear(0, 0, GFX_TEXT_BMP_COLS, GFX_TEXT_BMP_ROWS);
     gfx_text_bmap_dst_clear(SCREEN_HEIGHT_T / 2, GFX_TEXT_BMP_ROWS);
-    gfx_text_bmap_dst_assign(SCREEN_HEIGHT_T / 4, GFX_TEXT_BMP_ROWS, 0, 2);
+    gfx_text_bmap_dst_assign(SCREEN_HEIGHT_T / 4, GFX_TEXT_BMP_ROWS, 0,
+                             GFX_TEXTPAL_NORMAL);
 
     int yp = MENU_CENTER_Y(line_count + 1);
     gfx_text_bmap_print(text_center_x(header), yp,
@@ -198,7 +199,8 @@ static void scene_load(uintptr_t data)
         };
 
         menu_show(&state.menu);
-        gfx_text_bmap_dst_assign(SCREEN_HEIGHT_T / 2, GFX_TEXT_BMP_ROWS, 0, 2);
+        gfx_text_bmap_dst_assign(SCREEN_HEIGHT_T / 2, GFX_TEXT_BMP_ROWS, 0,
+                                 GFX_TEXTPAL_NORMAL);
 
         gfx_queue_memset(se_mem[GFX_BG1_INDEX], 0, 1024 * 2);
         gfx_queue_memcpy(&tile_mem[0][0].data, game_logo_gfxTiles,
@@ -327,7 +329,8 @@ static void scene_frame(void)
                 gfx_ctl.bg[1].enabled = true;
                 gfx_text_bmap_clear(0, 0, GFX_TEXT_BMP_COLS, GFX_TEXT_BMP_ROWS);
                 gfx_text_bmap_dst_clear(SCREEN_HEIGHT_T / 4, GFX_TEXT_BMP_ROWS);
-                gfx_text_bmap_dst_assign(SCREEN_HEIGHT_T / 2, GFX_TEXT_BMP_ROWS, 0, 2);
+                gfx_text_bmap_dst_assign(SCREEN_HEIGHT_T / 2, GFX_TEXT_BMP_ROWS,
+                                         0, GFX_TEXTPAL_NORMAL);
                 menu_show(&state.menu);
 
             default: break;

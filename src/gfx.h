@@ -37,6 +37,18 @@
 
 #define GFX_CHAR_GAME_TILESET 0
 
+#define GFX_BGPAL_MUL         0
+#define GFX_BGPAL_NORMAL      1
+#define GFX_TEXTPAL_NORMAL    2
+#define GFX_TEXTPAL_MUL       3
+#define GFX_BGPAL_USER0       4
+#define GFX_BGPAL_USER1       5
+
+#define GFX_OBJPAL_NORMAL     0
+#define GFX_OBJPAL_MUL        1
+#define GFX_OBJPAL_USER0      2
+#define GFX_OBJPAL_USER1      3
+
 typedef enum text_color
 {
     TEXT_COLOR_WHITE,
@@ -180,6 +192,9 @@ typedef struct gfx_display_control
 {
     gfx_win_s win[2];
     gfx_bg_s bg[4];
+
+    u8 bg_userpal[2][16];
+    u8 obj_userpal[2][16];
 }
 gfx_display_control_s;
 

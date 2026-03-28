@@ -56,15 +56,6 @@ static u16 gfx_mul_palette[16];
 
 EWRAM_BSS u16 gfx_palette[16];
 
-#define RAINBOW_PALETTE_LENGTH (sizeof(rainbow_pal) / sizeof(*rainbow_pal))
-static const int rainbow_pal[] = {
-    GFX_PAL_RED, GFX_PAL_ORANGE, GFX_PAL_YELLOW, GFX_PAL_GREEN,
-    GFX_PAL_BLUE, GFX_PAL_PINK
-};
-
-static int rainbow_shift = 0;
-static int rainbow_shift_time_accum = 0;
-
 static const u16 gfx_palette_normal[16] = {
     0x0000,
     0x28a4,
@@ -103,16 +94,6 @@ static const u16 gfx_palette_corrected[16] = {
     0x477f
 };
 
-static void update_rainbow_palette(void)
-{
-    int j = rainbow_shift;
-    for (int i = 0; i < 16; ++i)
-    {
-        pal_obj_bank[1][i] = gfx_mul_palette[rainbow_pal[j]];
-        if (++j == RAINBOW_PALETTE_LENGTH) j = 0;
-    }
-}
-
 void gfx_set_palette_mode(gfx_pal_mode_e mode)
 {
     switch (mode)
@@ -142,6 +123,8 @@ void gfx_reset_palette(void)
     //             use idx 16 to refer to black.
     // pal bank 2: 1-black, 2-yellow, 3-light blue, 15-white. used for text.
     // pal bank 3: same as pal bank 2, but may be darkened for room transition.
+    // pal bank 4: bg user pal 0
+    // pal bank 5: bg user pal 1
     for (int i = 0; i < 16; ++i)
         pal_bg_bank[0][i] = gfx_palette[i];
 
@@ -160,17 +143,30 @@ void gfx_reset_palette(void)
     pal_bg_bank[3][3]  = gfx_palette[GFX_PAL_BLUE];
     pal_bg_bank[3][15] = gfx_palette[GFX_PAL_WHITE];
 
-    // pal bank 0: regular palette, may be darkened for room transition
-    // pal bank 1: dynamically changing rainbow palette
-    // pal bank 2: regular palette, but never darkened
+    for (uint i = 0; i < 16; ++i)
+    {
+        pal_bg_bank[GFX_BGPAL_USER0][i] =
+            gfx_palette[gfx_ctl.bg_userpal[0][i]];
+        pal_bg_bank[GFX_BGPAL_USER1][i] =
+            gfx_palette[gfx_ctl.bg_userpal[1][i]];
+    }
+
+    // pal bank 0: regular palette
+    // pal bank 1: regular palette, dynamically multiplied
+    // pal bank 2: obj user pal 0
+    // pal bank 3: obj user pal 1 (multiplied)
     for (int i = 0; i < 16; ++i)
-        pal_obj_bank[0][i] = gfx_palette[i];
+    {
+        pal_obj_bank[GFX_OBJPAL_NORMAL][i] = gfx_palette[i];
+        pal_obj_bank[GFX_OBJPAL_MUL][i] = gfx_palette[i];
 
-    for (int i = 0; i < 16; ++i)
-        pal_obj_bank[2][i] = gfx_palette[i];
+        pal_obj_bank[GFX_OBJPAL_USER0][i] =
+            gfx_palette[gfx_ctl.obj_userpal[0][i]];
+        pal_obj_bank[GFX_OBJPAL_USER1][i] =
+            gfx_palette[gfx_ctl.obj_userpal[1][i]];
+    }
 
-    update_rainbow_palette();
-
+    // make all transparent colors display as purple in emulator debug views...
     for (int i = 2; i < 16; ++i)
         pal_bg_bank[i][0] = RGB8(255, 0, 255);
 
@@ -222,17 +218,19 @@ void gfx_set_palette_multiplied(FIXED factor)
     }
 
     for (int i = 1; i < 16; ++i)
-        pal_bg_bank[0][i] = gfx_mul_palette[i];
+        pal_bg_bank[GFX_BGPAL_MUL][i] = gfx_mul_palette[i];
 
-    pal_bg_bank[3][1]  = gfx_mul_palette[0];
-    pal_bg_bank[3][2]  = gfx_mul_palette[GFX_PAL_YELLOW];
-    pal_bg_bank[3][3]  = gfx_mul_palette[GFX_PAL_BLUE];
-    pal_bg_bank[3][15] = gfx_mul_palette[GFX_PAL_WHITE];
+    pal_bg_bank[GFX_TEXTPAL_MUL][1]  = gfx_mul_palette[0];
+    pal_bg_bank[GFX_TEXTPAL_MUL][2]  = gfx_mul_palette[GFX_PAL_YELLOW];
+    pal_bg_bank[GFX_TEXTPAL_MUL][3]  = gfx_mul_palette[GFX_PAL_BLUE];
+    pal_bg_bank[GFX_TEXTPAL_MUL][15] = gfx_mul_palette[GFX_PAL_WHITE];
 
     for (int i = 1; i < 16; ++i)
-        pal_obj_bank[0][i] = gfx_mul_palette[i];
-
-    update_rainbow_palette();
+    {
+        pal_obj_bank[GFX_OBJPAL_MUL][i] = gfx_mul_palette[i];
+        pal_obj_bank[GFX_OBJPAL_USER1][i] =
+            gfx_mul_palette[gfx_ctl.obj_userpal[1][i]];
+    }
 }
 
 #pragma endregion
@@ -259,6 +257,7 @@ typedef struct bg_scroll_data
 
 static EWRAM_BSS bg_scroll_data_s bg_scroll_data[4];
 
+IWRAM_CODE
 static void update_map_scroll_t(uint bg_idx, uint size_shift, uint dst_shift,
                                 map_write_scrblock_f write_scr_block)
 {
@@ -990,11 +989,12 @@ void gfx_init(void)
 
 void gfx_new_frame(void)
 {
-    if (++rainbow_shift_time_accum == 4)
+    for (int i = 0; i < 16; ++i)
     {
-        rainbow_shift_time_accum = 0;
-        if (++rainbow_shift == RAINBOW_PALETTE_LENGTH) rainbow_shift = 0;
-        update_rainbow_palette();
+        pal_obj_bank[GFX_OBJPAL_USER0][i] =
+            gfx_palette[gfx_ctl.obj_userpal[0][i]];
+        pal_obj_bank[GFX_OBJPAL_USER1][i] =
+            gfx_mul_palette[gfx_ctl.obj_userpal[1][i]];
     }
 
     for (uint i = 0; i < 4; ++i)

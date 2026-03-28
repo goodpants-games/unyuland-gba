@@ -6,6 +6,7 @@
 #include "math_util.h"
 #include "sound.h"
 #include "printf.h"
+#include "gfx.h"
 
 #define DEFAULT_DAMP TO_FIXED(0.88)
 
@@ -162,7 +163,7 @@ void entity_player_init(entity_s *self)
 
     cursor->flags |= ENTITY_FLAG_KEEP_ON_ROOM_CHANGE;
     cursor->sprite.graphic_id = SPRID_GAME_PLATFORM_OUTLINE;
-    cursor->sprite.palette = 1;
+    cursor->sprite.palette = GFX_OBJPAL_USER1;
     cursor->sprite.ox = -1;
     cursor->sprite.zidx = -9;
 
@@ -503,7 +504,8 @@ static void behavior_player_update(entity_s *self)
                 (player_simulate_droplet(type, dir, x, y, &cursor->pos.x,
                                          &cursor->pos.y));
 
-            cursor->sprite.palette = valid_placement ? 1 : 0;
+            cursor->sprite.palette = valid_placement ? GFX_OBJPAL_USER1
+                                                     : GFX_OBJPAL_MUL;
         }
 
         cursor->sprite.flags |= SPRITE_FLAG_HIDDEN;

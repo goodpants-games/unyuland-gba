@@ -76,7 +76,7 @@ static void scene_load(uintptr_t init_data)
 
     gfx_queue_memset(&se_mem[GFX_BG1_INDEX][0], 0, sizeof(SCREENBLOCK));
 
-    gfx_text_bmap_dst_assign(13, TEXT_ROW_COUNT, 0, 2);
+    gfx_text_bmap_dst_assign(13, TEXT_ROW_COUNT, 0, GFX_TEXTPAL_NORMAL);
 
     const char *chat = dlg_get_chat_by_name("intro");
     if (!chat)
