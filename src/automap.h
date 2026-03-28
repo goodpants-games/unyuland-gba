@@ -15,8 +15,12 @@
 
 typedef struct automap
 {
+    bool is_open;
+
     int player_x;
     int player_y;
+    int view_bg_idx;
+    FIXED sx, sy;
 
     map_header_s scrmap_header;
     u16 scrmap[AUTOMAP_HEIGHT][AUTOMAP_WIDTH];
@@ -24,7 +28,10 @@ typedef struct automap
 automap_s;
 
 void automap_init(automap_s *map);
-void automap_visit(automap_s *map, const world_room_s *room, int local_x,
-                   int local_y);
+void automap_open_view(automap_s *map, int bg_idx);
+void automap_close_view(automap_s *map);
+void automap_set_pos(automap_s *map, const world_room_s *room, int local_x,
+                     int local_y);
+void automap_update_view(automap_s *map);
 
 #endif

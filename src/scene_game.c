@@ -126,14 +126,8 @@ static void open_map(void)
     gfx_set_palette_multiplied(FIX_ONE);
 
     state.substate = SUBSTATE_MAP;
+    automap_open_view(&state.automap, 1);
 
-    state.map_sx = int2fx(state.automap.player_x - SCREEN_WIDTH / 4);
-    state.map_sy = int2fx(state.automap.player_y - SCREEN_HEIGHT / 4);
-    state.map_sx = iclamp(state.map_sx, 0, int2fx(AUTOMAP_WIDTH * 8 - SCREEN_WIDTH / 2));
-    state.map_sy = iclamp(state.map_sy, 0, int2fx(AUTOMAP_HEIGHT * 8 - SCREEN_HEIGHT / 2));
-
-    gfx_ctl.bg[1].offset_x = fx2int(state.map_sx) * 2;
-    gfx_ctl.bg[1].offset_y = fx2int(state.map_sy) * 2;
     gfx_ctl.bg[1].char_block = 1;
     gfx_ctl.bg[1].bpp = GFX_BG_4BPP;
     gfx_load_map(1, &state.automap.scrmap_header);
@@ -150,6 +144,8 @@ static void update_map(void)
 {
     if (key_hit(KEY_START))
     {
+        automap_close_view(&state.automap);
+
         gfx_ctl.bg[1].char_block = 0;
         gfx_ctl.bg[1].bpp = GFX_BG_8BPP;
         gfx_load_map(1, g_game.room->map);
@@ -158,25 +154,7 @@ static void update_map(void)
         return;
     }
 
-    const FIXED scroll_speed = FX(1);
-
-    if (key_held(KEY_RIGHT))
-        state.map_sx += scroll_speed;
-
-    if (key_held(KEY_LEFT))
-        state.map_sx -= scroll_speed;
-
-    if (key_held(KEY_DOWN))
-        state.map_sy += scroll_speed;
-
-    if (key_held(KEY_UP))
-        state.map_sy -= scroll_speed;
-
-    state.map_sx = iclamp(state.map_sx, 0, int2fx(AUTOMAP_WIDTH * 8 - SCREEN_WIDTH / 2));
-    state.map_sy = iclamp(state.map_sy, 0, int2fx(AUTOMAP_HEIGHT * 8 - SCREEN_HEIGHT / 2));
-
-    gfx_ctl.bg[1].offset_x = fx2int(state.map_sx) * 2;
-    gfx_ctl.bg[1].offset_y = fx2int(state.map_sy) * 2;
+    automap_update_view(&state.automap);
 }
 
 static void open_pause_menu(void)
@@ -392,7 +370,7 @@ static void scene_frame(void)
         const entity_s *player = &g_game.entities[0];
         int px = fx2int(player->pos.x);
         int py = fx2int(player->pos.y);
-        automap_visit(&state.automap, g_game.room, px, py);
+        automap_set_pos(&state.automap, g_game.room, px, py);
 
         update_hud();
         game_render();

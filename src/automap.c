@@ -1,5 +1,5 @@
-#include <string.h>
 #include <tonc_video.h>
+#include <tonc_input.h>
 
 #include <automap_tiles_gfx.h>
 #include <automap_bin.h>
@@ -7,6 +7,7 @@
 #include "automap.h"
 #include "world.h"
 #include "log.h"
+#include "gfx.h"
 
 #define TILE_STRIDE 99
 
@@ -69,8 +70,34 @@ void automap_init(automap_s *map)
     // }
 }
 
-void automap_visit(automap_s *map, const world_room_s *room, int local_x,
-                   int local_y)
+static inline void automap_clamp_spos(automap_s *map)
+{
+    map->sx = iclamp(map->sx, 0, int2fx(AUTOMAP_WIDTH * 8 - SCREEN_WIDTH / 2));
+    map->sy = iclamp(map->sy, 0, int2fx(AUTOMAP_HEIGHT * 8 - SCREEN_HEIGHT / 2));
+}
+
+void automap_open_view(automap_s *map, int bg_idx)
+{
+    gfx_bg_s *view_bg = &gfx_ctl.bg[bg_idx];
+    map->view_bg_idx = bg_idx;
+
+    map->sx = int2fx(map->player_x - SCREEN_WIDTH / 4);
+    map->sy = int2fx(map->player_y - SCREEN_HEIGHT / 4);
+    automap_clamp_spos(map);
+
+    view_bg->offset_x = fx2int(map->sx) * 2;
+    view_bg->offset_y = fx2int(map->sy) * 2;
+
+    map->is_open = true;
+}
+
+void automap_close_view(automap_s *map)
+{
+    map->is_open = false;
+}
+
+void automap_set_pos(automap_s *map, const world_room_s *room, int local_x,
+                     int local_y)
 {
     const int view_we = SCREEN_WIDTH / 3;
     const int view_he = SCREEN_HEIGHT / 3;
@@ -123,4 +150,28 @@ void automap_visit(automap_s *map, const world_room_s *room, int local_x,
             map->scrmap[dst_y][dst_x] = v;
         }
     }
+}
+
+void automap_update_view(automap_s *map)
+{
+    gfx_bg_s *view_bg = &gfx_ctl.bg[map->view_bg_idx];
+
+    const FIXED scroll_speed = FX(1);
+
+    if (key_held(KEY_RIGHT))
+        map->sx += scroll_speed;
+
+    if (key_held(KEY_LEFT))
+        map->sx -= scroll_speed;
+
+    if (key_held(KEY_DOWN))
+        map->sy += scroll_speed;
+
+    if (key_held(KEY_UP))
+        map->sy -= scroll_speed;
+
+    automap_clamp_spos(map);
+
+    view_bg->offset_x = fx2int(map->sx) * 2;
+    view_bg->offset_y = fx2int(map->sy) * 2;
 }
