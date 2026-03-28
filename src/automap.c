@@ -1,3 +1,4 @@
+#include <string.h>
 #include <tonc_video.h>
 #include <tonc_input.h>
 
@@ -9,7 +10,8 @@
 #include "log.h"
 #include "gfx.h"
 
-#define TILE_STRIDE 99
+#define TILE_STRIDE 100
+#define HIGHLIGHT_TILE_OFFSET 48
 
 static void scrblock_write(uint map_entry, u16 *dest)
 {
@@ -22,6 +24,8 @@ static void scrblock_write(uint map_entry, u16 *dest)
 
 void automap_init(automap_s *map)
 {
+    memset(map->visited, 0, sizeof(map->visited));
+
     map->scrmap_header = (map_header_s)
     {
         .gfx_format = MAP_GFX_FORMAT_CUSTOM16,
@@ -78,8 +82,10 @@ static inline void automap_clamp_spos(automap_s *map)
 
 void automap_open_view(automap_s *map, int bg_idx)
 {
-    gfx_bg_s *view_bg = &gfx_ctl.bg[bg_idx];
-    map->view_bg_idx = bg_idx;
+    gfx_bg_s *view_bg = &gfx_ctl.bg[bg_idx & 0xFF];
+    map->view_bg_idx = (u8) bg_idx;
+
+    map->frame = 0;
 
     map->sx = int2fx(map->player_x - SCREEN_WIDTH / 4);
     map->sy = int2fx(map->player_y - SCREEN_HEIGHT / 4);
@@ -88,12 +94,49 @@ void automap_open_view(automap_s *map, int bg_idx)
     view_bg->offset_x = fx2int(map->sx) * 2;
     view_bg->offset_y = fx2int(map->sy) * 2;
 
+    gfx_ctl.bg_userpal[0][1] = GFX_PAL_DARK_BLUE;
+    gfx_ctl.bg_userpal[0][2] = GFX_PAL_DARK_BLUE;
+    gfx_ctl.bg_userpal[0][3] = GFX_PAL_RED;
+    gfx_ctl.bg_userpal[0][4] = GFX_PAL_WHITE;
+
     map->is_open = true;
 }
 
 void automap_close_view(automap_s *map)
 {
     map->is_open = false;
+}
+
+static void update_room_tiles(automap_s *map, const world_room_s *room,
+                              int offset)
+{
+    const int w = (((int) room->map->width) * 8 * AUTOMAP_SCALE) / MAP_SCREEN_WIDTH;
+    const int h = (((int) room->map->height) * 8 * AUTOMAP_SCALE) / MAP_SCREEN_HEIGHT;
+    
+    int l = ((int) room->x) * AUTOMAP_SCALE;
+    int t = ((int) room->y) * AUTOMAP_SCALE;
+    int r = l + w;
+    int b = t + h;
+
+    LOG_DBG("room bounds: (%i, %i), (%i, %i)", l,t, r,b);
+
+    const u8 *am_data = (const u8 *)automap_bin;
+    const uint data_row_stride = WORLD_MATRIX_WIDTH * 2;
+
+    for (int y = t; y < b; ++y)
+    {
+        int dst_y = y + AUTOMAP_MARGIN_Y;
+        for (int x = l; x < r; ++x)
+        {
+            if (!map->visited[y][x]) continue;
+            
+            u8 v = am_data[y * data_row_stride + x];
+            if (v == 0xFF) continue;
+
+            int dst_x = x + AUTOMAP_MARGIN_X;
+            map->scrmap[dst_y][dst_x] = v + offset;
+        }
+    }
 }
 
 void automap_set_pos(automap_s *map, const world_room_s *room, int local_x,
@@ -115,8 +158,6 @@ void automap_set_pos(automap_s *map, const world_room_s *room, int local_x,
         ((room_y * MAP_SCREEN_HEIGHT + local_y)) * 16 / MAP_SCREEN_HEIGHT
         + AUTOMAP_MARGIN_Y * 8;
 
-    LOG_DBG("playerpos (%i, %i)", map->player_x, map->player_y);
-
     int view_l = iclamp(local_x - view_we, 0, room_w);
     int view_r = iclamp(local_x + view_we, 0, room_w);
     int view_u = iclamp(local_y - view_he, 0, room_h);
@@ -137,6 +178,21 @@ void automap_set_pos(automap_s *map, const world_room_s *room, int local_x,
     const u8 *am_data = (const u8 *)automap_bin;
     const uint data_row_stride = WORLD_MATRIX_WIDTH * 2;
 
+    // if room changed, update all tiles of old room to normal, and all tiles
+    // in the new room to highlighted.
+    const world_room_s *old_room = map->cur_room;
+    if (old_room != room)
+    {
+        if (old_room)
+        {
+            LOG_DBG("room change");
+            update_room_tiles(map, old_room, 0);
+            update_room_tiles(map, room,     HIGHLIGHT_TILE_OFFSET);
+        }
+
+        map->cur_room = room;
+    }
+
     for (int y = map_u; y < map_d; ++y)
     {
         int dst_y = y + AUTOMAP_MARGIN_Y;
@@ -147,7 +203,8 @@ void automap_set_pos(automap_s *map, const world_room_s *room, int local_x,
             u8 v = am_data[y * data_row_stride + x];
             if (v == 0xFF) continue;
 
-            map->scrmap[dst_y][dst_x] = v;
+            map->scrmap[dst_y][dst_x] = v + HIGHLIGHT_TILE_OFFSET;
+            map->visited[y][x] = true;
         }
     }
 }
@@ -174,4 +231,12 @@ void automap_update_view(automap_s *map)
 
     view_bg->offset_x = fx2int(map->sx) * 2;
     view_bg->offset_y = fx2int(map->sy) * 2;
+
+    gfx_ctl.bg_userpal[0][1] = (map->frame & 1)
+                               ? GFX_PAL_DARK_BLUE : GFX_PAL_BLACK;
+    gfx_ctl.bg_userpal[0][3] = (map->frame < 30)
+                               ? GFX_PAL_RED : GFX_PAL_DARK_BLUE;
+
+    if (++map->frame == 60)
+        map->frame = 0;
 }

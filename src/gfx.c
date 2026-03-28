@@ -77,7 +77,7 @@ static const u16 gfx_palette_normal[16] = {
 
 static const u16 gfx_palette_corrected[16] = {
     0x0000,
-    0x4000,
+    0x3807,
     0x4014,
     0x0340,
     0x001a,
@@ -88,7 +88,7 @@ static const u16 gfx_palette_corrected[16] = {
     0x02df,
     0x03ff,
     0x03e0,
-    0x7e60, // 0x7e20?
+    0x7e20,
     0x6412,
     0x641f,
     0x477f
@@ -148,7 +148,7 @@ void gfx_reset_palette(void)
         pal_bg_bank[GFX_BGPAL_USER0][i] =
             gfx_palette[gfx_ctl.bg_userpal[0][i]];
         pal_bg_bank[GFX_BGPAL_USER1][i] =
-            gfx_palette[gfx_ctl.bg_userpal[1][i]];
+            gfx_mul_palette[gfx_ctl.bg_userpal[1][i]];
     }
 
     // pal bank 0: regular palette
@@ -158,7 +158,7 @@ void gfx_reset_palette(void)
     for (int i = 0; i < 16; ++i)
     {
         pal_obj_bank[GFX_OBJPAL_NORMAL][i] = gfx_palette[i];
-        pal_obj_bank[GFX_OBJPAL_MUL][i] = gfx_palette[i];
+        pal_obj_bank[GFX_OBJPAL_MUL][i] = gfx_mul_palette[i];
 
         pal_obj_bank[GFX_OBJPAL_USER0][i] =
             gfx_palette[gfx_ctl.obj_userpal[0][i]];
@@ -991,6 +991,11 @@ void gfx_new_frame(void)
 {
     for (int i = 0; i < 16; ++i)
     {
+        pal_bg_bank[GFX_BGPAL_USER0][i] =
+            gfx_palette[gfx_ctl.bg_userpal[0][i]];
+        pal_bg_bank[GFX_BGPAL_USER1][i] =
+            gfx_mul_palette[gfx_ctl.bg_userpal[1][i]];
+
         pal_obj_bank[GFX_OBJPAL_USER0][i] =
             gfx_palette[gfx_ctl.obj_userpal[0][i]];
         pal_obj_bank[GFX_OBJPAL_USER1][i] =

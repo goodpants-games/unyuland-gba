@@ -16,14 +16,17 @@
 typedef struct automap
 {
     bool is_open;
+    u8 frame;
+    u8 view_bg_idx;
 
     int player_x;
     int player_y;
-    int view_bg_idx;
     FIXED sx, sy;
+    const world_room_s *cur_room;
 
     map_header_s scrmap_header;
     u16 scrmap[AUTOMAP_HEIGHT][AUTOMAP_WIDTH];
+    bool visited[AUTOMAP_INNER_HEIGHT][AUTOMAP_INNER_WIDTH];
 }
 automap_s;
 
