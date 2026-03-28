@@ -644,9 +644,11 @@ void game_update(void)
                            accum |= *((ptr)++) << 24, \
                            accum)
 
-void game_load_room(const map_header_s *map)
+void game_load_room(const world_room_s *room)
 {
-    g_game.map = map;
+    const map_header_s *map = room->map;
+
+    g_game.room = room;
     g_game.room_collision = game_room_collision;
     g_game.room_width = (int) map->width;
     g_game.room_height = (int) map->height;
@@ -943,7 +945,7 @@ void game_render(void)
     last_obj_index = obj_index;
 }
 
-static void change_room(const map_header_s *new_room)
+static void change_room(const world_room_s *new_room)
 {
     // if an orb was collected, commit the change
     if (g_game.did_collect_orb)
@@ -953,7 +955,7 @@ static void change_room(const map_header_s *new_room)
             LOG_ERR("collected orb count list is full!");
             return;
         }
-        g_game.collected_orbs[g_game.collected_orbs_count++] = g_game.map;
+        g_game.collected_orbs[g_game.collected_orbs_count++] = g_game.room;
         g_game.did_collect_orb = false;
 
         g_game.committed_collected_rorbs = g_game.collected_rorbs;
@@ -981,7 +983,7 @@ static void change_room(const map_header_s *new_room)
     }
 
     game_load_room(new_room);
-    gfx_load_map(GAME_BG_IDX, new_room);
+    gfx_load_map(GAME_BG_IDX, new_room->map);
 }
 
 static void room_transition_inactive_update(entity_s *player)
@@ -999,9 +1001,9 @@ static void room_transition_inactive_update(entity_s *player)
 
     if (cx > roomw)
     {
-        matx = (int) g_game.map->px +
-               g_game.map->width / WORLD_MATRIX_GRID_WIDTH;
-        maty = (int) g_game.map->py +
+        matx = (int) g_game.room->x +
+               g_game.room->map->width / WORLD_MATRIX_GRID_WIDTH;
+        maty = (int) g_game.room->y +
                fx2int(cy) / (WORLD_MATRIX_GRID_HEIGHT * WORLD_TILE_SIZE);
 
         dir = DIR4_RIGHT;
@@ -1010,8 +1012,8 @@ static void room_transition_inactive_update(entity_s *player)
     }
     else if (cx < 0)
     {
-        matx = (int) g_game.map->px - 1;
-        maty = (int) g_game.map->py +
+        matx = (int) g_game.room->x - 1;
+        maty = (int) g_game.room->y +
                fx2int(cy) / (WORLD_MATRIX_GRID_HEIGHT * WORLD_TILE_SIZE);
 
         dir = DIR4_LEFT;
@@ -1020,10 +1022,10 @@ static void room_transition_inactive_update(entity_s *player)
     }
     else if (cy > roomh)
     {
-        matx = (int) g_game.map->px +
+        matx = (int) g_game.room->x +
                fx2int(cx) / (WORLD_MATRIX_GRID_WIDTH * WORLD_TILE_SIZE);
-        maty = (int) g_game.map->py +
-               g_game.map->height / WORLD_MATRIX_GRID_HEIGHT;
+        maty = (int) g_game.room->y +
+               g_game.room->map->height / WORLD_MATRIX_GRID_HEIGHT;
         
         dir = DIR4_DOWN;
         player_mx = 0;
@@ -1031,9 +1033,9 @@ static void room_transition_inactive_update(entity_s *player)
     }
     else if (cy < 0)
     {
-        matx = (int) g_game.map->px +
+        matx = (int) g_game.room->x +
                fx2int(cx) / (WORLD_MATRIX_GRID_WIDTH * WORLD_TILE_SIZE);
-        maty = (int) g_game.map->py - 1;
+        maty = (int) g_game.room->y - 1;
         
         dir = DIR4_UP;
         player_mx = 0;
@@ -1041,7 +1043,7 @@ static void room_transition_inactive_update(entity_s *player)
     }
     else return;
 
-    const map_header_s *new_room;
+    const world_room_s *new_room;
 
     uint new_room_idx = (uint) world_matrix[maty][matx];
     if (new_room_idx == 0)
@@ -1051,7 +1053,7 @@ static void room_transition_inactive_update(entity_s *player)
     }
     --new_room_idx;
 
-    new_room = world_rooms[new_room_idx];
+    new_room = &world_rooms[new_room_idx];
 
     g_game.room_trans = (room_trans_state_s)
     {
@@ -1076,8 +1078,8 @@ static bool room_transition_phase1_update(entity_s *player)
         return true;
     }
 
-    const map_header_s *old_room = g_game.map;
-    const map_header_s *new_room = g_game.room_trans.new_room;
+    const world_room_s *old_room = g_game.room;
+    const world_room_s *new_room = g_game.room_trans.new_room;
     change_room(new_room);
 
     FIXED colw = int2fx((int) player->col.w);
@@ -1091,20 +1093,20 @@ static bool room_transition_phase1_update(entity_s *player)
     {
     case DIR4_RIGHT:
         cx = 0;
-        cy += int2fx((old_room->py - new_room->py) * WORLD_MATRIX_GRID_HEIGHT * WORLD_TILE_SIZE);
+        cy += int2fx((old_room->y - new_room->y) * WORLD_MATRIX_GRID_HEIGHT * WORLD_TILE_SIZE);
         player->vel.y = 0;
         player_mx = 1;
         break;
 
     case DIR4_LEFT:
-        cx = int2fx(new_room->width * WORLD_TILE_SIZE);
-        cy += int2fx((old_room->py - new_room->py) * WORLD_MATRIX_GRID_HEIGHT * WORLD_TILE_SIZE);
+        cx = int2fx(new_room->map->width * WORLD_TILE_SIZE);
+        cy += int2fx((old_room->y - new_room->y) * WORLD_MATRIX_GRID_HEIGHT * WORLD_TILE_SIZE);
         player->vel.y = 0;
         player_mx = -1;
         break;
 
     case DIR4_DOWN:
-        cx += int2fx((old_room->px - new_room->px) * WORLD_MATRIX_GRID_WIDTH * WORLD_TILE_SIZE);
+        cx += int2fx((old_room->x - new_room->x) * WORLD_MATRIX_GRID_WIDTH * WORLD_TILE_SIZE);
         cy = 0;
         player->vel.x = 0;
         player->vel.y = TO_FIXED(1);
@@ -1112,8 +1114,8 @@ static bool room_transition_phase1_update(entity_s *player)
         break;
 
     case DIR4_UP:
-        cx += int2fx((old_room->px - new_room->px) * WORLD_MATRIX_GRID_WIDTH * WORLD_TILE_SIZE);
-        cy = int2fx(new_room->height * WORLD_TILE_SIZE);
+        cx += int2fx((old_room->x - new_room->x) * WORLD_MATRIX_GRID_WIDTH * WORLD_TILE_SIZE);
+        cy = int2fx(new_room->map->height * WORLD_TILE_SIZE);
         player->vel.x = 0;
         player->vel.y = TO_FIXED(-2);
         player_mx = player->actor.face_dir;

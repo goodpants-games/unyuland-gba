@@ -17,11 +17,9 @@ typedef struct map_header
 {
     u16 width;
     u16 height;
-    u8  px;
-    u8  py;
     u8  gfx_format;
 
-    // 1 byte of padding
+    // 3 bytes of padding
 
     map_write_scrblock_f custom_scrblock_write; // used with custom16
     u32 col_data_offset;

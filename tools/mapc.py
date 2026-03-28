@@ -45,8 +45,7 @@ def parse_tileset(tmx_path: str):
 
     return output
 
-def parse(ifile_path: str, output_file: BinaryIO, tileset: Tileset,
-          world_data: dict):
+def parse(ifile_path: str, output_file: BinaryIO, tileset: Tileset):
     with open(ifile_path, 'r') as ifile:
         file_contents = ifile.read()
     
@@ -68,12 +67,7 @@ def parse(ifile_path: str, output_file: BinaryIO, tileset: Tileset,
     data = base64.b64decode(data_base64.text.strip())
 
     room_name = path.splitext(path.basename(ifile_path))[0]
-    if not room_name in world_data['rooms']:
-        raise Exception(f"could not find '{room_name}' in world.json")
-
-    room_data = world_data['rooms'][room_name]
-    output_file.write(struct.pack('<HHBBBxI', map_width, map_height,
-                                  room_data['x'], room_data['y'], 1, 0))
+    output_file.write(struct.pack('<HHBxxxI', map_width, map_height, 1, 0))
 
     # get collision matrix
     col_data: list[int] = []
@@ -249,19 +243,15 @@ def parse(ifile_path: str, output_file: BinaryIO, tileset: Tileset,
 def main():
     parser = argparse.ArgumentParser(prog='mapc')
     parser.add_argument('input', help="path to input tmx file.")
-    parser.add_argument('world', help="path to worldproc json output.")
     parser.add_argument('output', help="output bin file. pass - to write to stdout.")
 
     args = parser.parse_args()
 
     out_file = ioutil.open_output(args.output, binary=True)
 
-    with open(args.world, 'r') as wf:
-        world_data = json.load(wf)
-
     s = False
     try:
-        parse(args.input, out_file, parse_tileset(args.input), world_data)
+        parse(args.input, out_file, parse_tileset(args.input))
         s = True
     finally:
         if not s:

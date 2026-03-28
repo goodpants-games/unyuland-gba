@@ -96,7 +96,7 @@ static void load_orb(entity_s *ent, const entity_load_s *load_data, bool blue)
     // don't spawn the orb if the orb in this room was already collected
     for (uint i = 0; i < g_game.collected_orbs_count; ++i)
     {
-        if (g_game.collected_orbs[i] == g_game.map)
+        if (g_game.collected_orbs[i] == g_game.room)
         {
             entity_free(ent);
             return;

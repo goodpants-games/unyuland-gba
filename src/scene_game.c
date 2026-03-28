@@ -148,7 +148,7 @@ static void update_map(void)
     {
         gfx_ctl.bg[1].char_block = 0;
         gfx_ctl.bg[1].bpp = GFX_BG_8BPP;
-        gfx_load_map(1, g_game.map);
+        gfx_load_map(1, g_game.room->map);
         game_render();
         unpause_game();
         return;
@@ -331,13 +331,13 @@ static void scene_load(uintptr_t data)
 
     automap_init(&state.automap);
 
-    const map_header_s *map = world_rooms[0];
-    gfx_load_map(1, map);
+    const world_room_s *room = &world_rooms[0];
+    gfx_load_map(1, room->map);
     gfx_ctl.bg[1].offset_x = 0;
     gfx_ctl.bg[1].offset_y = 0;
     game_init();
 
-    game_load_room(map);
+    game_load_room(room);
     setup_game_hud();
 
     mmStart(MOD_TESTMOD, MM_PLAY_LOOP);

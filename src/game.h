@@ -3,6 +3,7 @@
 
 #include <tonc_types.h>
 #include <game_sprdb.h>
+#include <world.h>
 #include "map_data.h"
 
 #define WORLD_SUBPX_SHIFT 4
@@ -173,7 +174,7 @@ typedef struct room_trans_state
 {
     int phase;
     int ticks;
-    const map_header_s *new_room;
+    const world_room_s *new_room;
     dir4_e dir;
 
     int player_move_x;
@@ -194,7 +195,7 @@ typedef struct game {
     entity_s entities[MAX_ENTITY_COUNT];
     projectile_s projectiles[MAX_PROJECTILE_COUNT];
 
-    const map_header_s *map;
+    const world_room_s *room;
     const u8 *room_collision;
     int room_width;
     int room_height;
@@ -228,7 +229,7 @@ typedef struct game {
 
     u8 collected_orbs_count;
     // list of rooms in which the orb was collected
-    const map_header_s *collected_orbs[MAX_ORB_COUNT];
+    const world_room_s *collected_orbs[MAX_ORB_COUNT];
 } game_s;
 
 typedef enum entity_load_prop_type
@@ -274,7 +275,7 @@ bool projectile_queue_free(projectile_s *proj);
 
 void game_init(void);
 void game_update(void);
-void game_load_room(const map_header_s *map);
+void game_load_room(const world_room_s *room);
 void game_render(void);
 void game_save_state(void);
 void game_restore_state(void);

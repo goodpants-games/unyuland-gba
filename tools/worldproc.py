@@ -128,14 +128,14 @@ def worldproc(world_path: str, room_list: list[str],
         out_bin.write(matrix)
 
     if out_cp:
-        generate_c_source(room_list, matrix_w, matrix_h, matrix, out_cp)
+        generate_c_source(room_list, rooms, matrix_w, matrix_h, matrix, out_cp)
     
-    if out_automap:
-        generate_automap(rooms, matrix_w, matrix_h, out_automap)
+    # if out_automap:
+    #     generate_automap(rooms, matrix_w, matrix_h, world_path, out_automap)
 
 
-def generate_c_source(rooms: list[str], mat_w: int, mat_h: int, matrix: bytes,
-                      fc_path: str):
+def generate_c_source(rooms: list[str], room_data: dict[str, RoomData],
+                      mat_w: int, mat_h: int, matrix: bytes, fc_path: str):
     fh_path = path.splitext(fc_path)[0] + '.h'
 
     with open(fh_path, 'w') as fh:
@@ -143,15 +143,24 @@ def generate_c_source(rooms: list[str], mat_w: int, mat_h: int, matrix: bytes,
 
         fh.write(f"""#ifndef WORLD_H
 #define WORLD_H
+#include <tonc_types.h>
 #include <map_data.h>
 
 #define WORLD_MATRIX_GRID_WIDTH 15
 #define WORLD_MATRIX_GRID_HEIGHT 11
 #define WORLD_MATRIX_WIDTH {mat_w}
 #define WORLD_MATRIX_HEIGHT {mat_h}
+#define WORLD_ROOM_COUNT {room_count}
 
-extern const map_header_s *const world_rooms[{room_count}];
-extern const unsigned char world_matrix[WORLD_MATRIX_HEIGHT][WORLD_MATRIX_WIDTH];
+typedef struct world_room
+{{
+    u8 x, y;
+    const map_header_s *map;
+}}
+world_room_s;
+
+extern const world_room_s world_rooms[WORLD_ROOM_COUNT];
+extern const u8 world_matrix[WORLD_MATRIX_HEIGHT][WORLD_MATRIX_WIDTH];
 
 #endif""")
     
@@ -164,12 +173,17 @@ extern const unsigned char world_matrix[WORLD_MATRIX_HEIGHT][WORLD_MATRIX_WIDTH]
             fc.write("_map.h>\n")
         
         fc.write(f"""
-const map_header_s *const world_rooms[{room_count}] = {{""")
+const world_room_s world_rooms[WORLD_ROOM_COUNT] = {{""")
         
         for name in rooms:
-            fc.write("\n    (const map_header_s *)")
+            data = room_data[name]
+            room_x = data.x // WORLD_GRID_WIDTH
+            room_y = data.y // WORLD_GRID_HEIGHT
+
+            fc.write(f"\n    {{ .x = {room_x}, .y = {room_y}, ")
+            fc.write(".map = (const map_header_s *)")
             fc.write(name)
-            fc.write("_map,")
+            fc.write("_map },")
         
         fc.write("\n};\n\n")
 
