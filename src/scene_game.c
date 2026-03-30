@@ -3,7 +3,6 @@
 #include <game_sprdb.h>
 #include <tileset_gfx.h>
 #include <automap_tiles_gfx.h>
-#include <assert.h>
 #include <maxmod.h>
 #include "math_util.h"
 #include "soundbank.h"
@@ -191,7 +190,20 @@ static void update_map(void)
         return;
     }
 
-    automap_update_view(&state.automap);
+    for (uint i = 0; i < HUD_SPRITE_COUNT; ++i)
+        obj_hide(&gfx_oam_buffer[HUD_SPRITE_BASE + i]);
+
+    gfx_sprdb_s sprdb = gfx_get_sprdb((const gfx_root_header_s *)game_sprdb_bin);
+    gfx_draw_sprite_state_s sprdraw_state = (gfx_draw_sprite_state_s)
+    {
+        .sprdb = &sprdb,
+        .dst_obj = &gfx_oam_buffer[HUD_SPRITE_BASE],
+        .dst_obj_count = HUD_SPRITE_COUNT,
+        .a1 = 0,
+        .a2 = ATTR2_PRIO(1) | ATTR2_PALBANK(GFX_OBJPAL_MUL),
+    };
+
+    automap_update_view(&state.automap, &sprdraw_state);
 }
 
 static void open_pause_menu(void)

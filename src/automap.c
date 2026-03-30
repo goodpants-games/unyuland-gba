@@ -1,17 +1,25 @@
+#include <stdint.h>
 #include <string.h>
 #include <tonc_video.h>
 #include <tonc_input.h>
 
 #include <automap_tiles_gfx.h>
 #include <automap_bin.h>
+#include <game_sprdb.h>
 
 #include "automap.h"
+#include "tonc_math.h"
 #include "world.h"
 #include "log.h"
 #include "gfx.h"
 
 #define TILE_STRIDE 100
 #define HIGHLIGHT_TILE_OFFSET 48
+
+#define ICON_MIN_X 7
+#define ICON_MAX_X ((SCREEN_WIDTH / 2) - 15)
+#define ICON_MIN_Y 7
+#define ICON_MAX_Y ((SCREEN_HEIGHT / 2) - 15 - 5)
 
 static void scrblock_write(uint map_entry, u16 *dest)
 {
@@ -209,7 +217,53 @@ void automap_set_pos(automap_s *map, const world_room_s *room, int local_x,
     }
 }
 
-void automap_update_view(automap_s *map)
+static void draw_sprite(gfx_draw_sprite_state_s *spr_state, uint spridx,
+                        int x, int y)
+{
+    uint flags = 0;
+    int dx = 0;
+    int dy = 0;
+
+    if (x > ICON_MAX_X)
+    {
+        x = ICON_MAX_X;
+        flags |= 1;
+        dx = 1;
+    }
+
+    if (y > ICON_MAX_Y)
+    {
+        y = ICON_MAX_Y;
+        flags |= 2;
+        dy = 1;
+    }
+
+    if (x < ICON_MIN_X)
+    {
+        x = ICON_MIN_X;
+        flags |= 4;
+        dx = -1;
+    }
+
+    if (y < ICON_MIN_Y)
+    {
+        y = ICON_MIN_Y;
+        flags |= 8;
+        dy = -1;
+    }
+
+    static u16 arrow_indices[] =
+        {-1, 0, 3, 7, 2, -1, 6, -1, 1, 4, -1, -1, 5, -1, -1, -1};
+    
+    gfx_draw_sprite(spr_state, SPRID_GAME_MAP_ICONS, spridx, x * 2, y * 2);
+
+    u16 index = arrow_indices[flags];
+    if (index != UINT16_MAX)
+        gfx_draw_sprite(spr_state, SPRID_GAME_MAP_ICONS, 2 + index,
+                        (x + dx * 7) * 2, (y + dy * 7) * 2);
+}
+
+void automap_update_view(automap_s *map, gfx_draw_sprite_state_s *spr_state)
 {
     gfx_bg_s *view_bg = &gfx_ctl.bg[map->view_bg_idx];
 
@@ -229,13 +283,21 @@ void automap_update_view(automap_s *map)
 
     automap_clamp_spos(map);
 
-    view_bg->offset_x = fx2int(map->sx) * 2;
-    view_bg->offset_y = fx2int(map->sy) * 2;
+    int sx = fx2int(map->sx);
+    int sy = fx2int(map->sy);
+
+    view_bg->offset_x = sx * 2;
+    view_bg->offset_y = sy * 2;
 
     gfx_ctl.bg_userpal[0][1] = (map->frame & 1)
                                ? GFX_PAL_DARK_BLUE : GFX_PAL_BLACK;
     gfx_ctl.bg_userpal[0][3] = (map->frame < 30)
                                ? GFX_PAL_RED : GFX_PAL_DARK_BLUE;
+    
+    // draw map sprites
+    draw_sprite(spr_state, 1,
+                map->player_x - 4 - sx, map->player_y - 4 - sy);
+    // draw_sprite(spr_state, 1, map->player_x - 4 - sx, map->player_y - 4);
 
     if (++map->frame == 60)
         map->frame = 0;
