@@ -19,6 +19,9 @@
 
 #define HUD_ROW_ORIGIN (GFX_TEXT_BMP_ROWS - 2)
 #define HUD_Y_ORIGIN   (HUD_ROW_ORIGIN * 8 + 6)
+#define HUD_SPRITE_BASE  0
+#define HUD_SPRITE_COUNT 16
+#define PAUSE_PALETTE_MUL FX(0.55)
 
 #define PAUSE_MENU_OPTION_COUNT 4
 static const char *pause_menu_options[PAUSE_MENU_OPTION_COUNT] =
@@ -95,8 +98,8 @@ static void update_hud_sprites(uint face_frame, uint mode_frame)
     gfx_draw_sprite_state_s state = (gfx_draw_sprite_state_s)
     {
         .sprdb = &sprdb,
-        .dst_obj = &gfx_oam_buffer[0],
-        .dst_obj_count = 16,
+        .dst_obj = &gfx_oam_buffer[HUD_SPRITE_BASE],
+        .dst_obj_count = HUD_SPRITE_COUNT,
         .a1 = ATTR2_PRIO(0),
         .a2 = ATTR2_PALBANK(GFX_OBJPAL_MUL),
     };
@@ -114,13 +117,17 @@ static void setup_game_hud(void)
 {
     // set up pause menu display
     gfx_text_bmap_dst_assign(0, 9, 0, GFX_TEXTPAL_NORMAL);
-
     // set up HUD display
     gfx_text_bmap_dst_assign(18, 2, HUD_ROW_ORIGIN, GFX_TEXTPAL_MUL);
 
     clear_game_hud();
     update_hud_sprites(0, 0);
 }
+
+// TODO: maybe reorganize the code so these forward declarations are not
+// necessary
+static void unpause_game(void);
+static void update_hud(bool force_dirty);
 
 static void open_map(void)
 {
@@ -132,26 +139,55 @@ static void open_map(void)
     gfx_ctl.bg[1].char_block = 1;
     gfx_ctl.bg[1].bpp = GFX_BG_4BPP;
     gfx_load_map(1, &state.automap.scrmap_header);
-    // TODO: load map tileset
 
-    OBJ_ATTR *attr = gfx_oam_buffer + GAME_OAM_START;
-    for (uint i = 0; i < GAME_OAM_COUNT; ++i, ++attr)
-        obj_hide(attr);
+    // clear pause gui
+    gfx_text_bmap_dst_clear(0, 9);
+
+    // change bottom bar to say controls
+    clear_game_hud();
+    gfx_text_bmap_print(0, HUD_Y_ORIGIN, "B: BACK", TEXT_COLOR_WHITE);
+
+    // hide all ui sprites
+    OBJ_ATTR *obj;
+    obj = gfx_oam_buffer + HUD_SPRITE_BASE;
+    for (uint i = HUD_SPRITE_COUNT; i != 0; --i, ++obj)
+        obj_hide(obj);
+
+    // hide all game sprites
+    obj = gfx_oam_buffer + GAME_OAM_START;
+    for (uint i = 0; i < GAME_OAM_COUNT; ++i, ++obj)
+        obj_hide(obj);
 }
 
-static void unpause_game(void);
+static void close_map(void)
+{
+    automap_close_view(&state.automap);
+    gfx_ctl.bg[1].char_block = 0;
+    gfx_ctl.bg[1].bpp = GFX_BG_8BPP;
+    gfx_load_map(1, g_game.room->map);
+
+    // reset pause menu display
+    gfx_text_bmap_dst_assign(0, 9, 0, GFX_TEXTPAL_NORMAL);
+
+    setup_game_hud();
+    update_hud(true);
+    game_render();
+}
 
 static void update_map(void)
 {
     if (key_hit(KEY_START))
     {
-        automap_close_view(&state.automap);
-
-        gfx_ctl.bg[1].char_block = 0;
-        gfx_ctl.bg[1].bpp = GFX_BG_8BPP;
-        gfx_load_map(1, g_game.room->map);
-        game_render();
+        close_map();
         unpause_game();
+        return;
+    }
+
+    if (key_hit(KEY_B))
+    {
+        close_map();
+        state.substate = SUBSTATE_PAUSED;
+        gfx_set_palette_multiplied(PAUSE_PALETTE_MUL);
         return;
     }
 
@@ -199,7 +235,7 @@ static void pause_game(void)
     state.substate = SUBSTATE_PAUSED;
     open_pause_menu();
     mmSetModuleVolume((int)(1024 * 0.1));
-    gfx_set_palette_multiplied(TO_FIXED(0.55));
+    gfx_set_palette_multiplied(PAUSE_PALETTE_MUL);
 }
 
 static void unpause_game(void)
@@ -242,11 +278,11 @@ static void update_pause_menu(void)
     }
 }
 
-static void update_hud(void)
+static void update_hud(bool force_dirty)
 {
     char buf[8];
 
-    if (g_game.player_ammo != state.last_player_ammo)
+    if (force_dirty || g_game.player_ammo != state.last_player_ammo)
     {
         state.last_player_ammo = g_game.player_ammo;
         
@@ -255,7 +291,7 @@ static void update_hud(void)
         gfx_text_bmap_print(12, HUD_Y_ORIGIN, buf, TEXT_COLOR_WHITE);
     }
 
-    if (g_game.collected_rorbs != state.last_rorbs)
+    if (force_dirty || g_game.collected_rorbs != state.last_rorbs)
     {
         state.last_rorbs = g_game.collected_rorbs;
         int_to_str(g_game.collected_rorbs, buf);
@@ -264,7 +300,7 @@ static void update_hud(void)
         gfx_text_bmap_print(240 - 36, HUD_Y_ORIGIN, buf, TEXT_COLOR_WHITE);
     }
 
-    if (g_game.collected_borbs != state.last_borbs)
+    if (force_dirty || g_game.collected_borbs != state.last_borbs)
     {
         state.last_borbs = g_game.collected_borbs;
         int_to_str(g_game.collected_borbs, buf);
@@ -373,7 +409,7 @@ static void scene_frame(void)
         int py = fx2int(player->pos.y);
         automap_set_pos(&state.automap, g_game.room, px, py);
 
-        update_hud();
+        update_hud(false);
         game_render();
         break;
     }
