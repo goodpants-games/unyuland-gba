@@ -22,6 +22,9 @@ typedef struct automap
 
     int player_x;
     int player_y;
+    int home_x;
+    int home_y;
+    
     FIXED sx, sy;
     const world_room_s *cur_room;
 

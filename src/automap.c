@@ -6,10 +6,10 @@
 #include <automap_tiles_gfx.h>
 #include <automap_bin.h>
 #include <game_sprdb.h>
+#include <world.h>
 
 #include "automap.h"
 #include "tonc_math.h"
-#include "world.h"
 #include "log.h"
 #include "gfx.h"
 
@@ -34,6 +34,20 @@ void automap_init(automap_s *map)
 {
     memset(map->visited, 0, sizeof(map->visited));
 
+    // calculate position of home
+    const world_room_s *start_room = &world_rooms[0];
+
+    int home_lx = ((uint)start_room->map->width * 8) / 2;
+    int home_ly = ((uint)start_room->map->height * 8) / 2;
+
+    map->home_x =
+        ((start_room->x * MAP_SCREEN_WIDTH + home_lx)) * 16 / MAP_SCREEN_WIDTH
+        + AUTOMAP_MARGIN_X * 8;
+    map->home_y =
+        ((start_room->y * MAP_SCREEN_HEIGHT + home_ly)) * 16 / MAP_SCREEN_HEIGHT
+        + AUTOMAP_MARGIN_Y * 8;
+
+    // initialize scrollmap data as empty (i.e. grid pattern)
     map->scrmap_header = (map_header_s)
     {
         .gfx_format = MAP_GFX_FORMAT_CUSTOM16,
@@ -64,22 +78,6 @@ void automap_init(automap_s *map)
             map->scrmap[y][x] = v;
         }
     }
-
-    // const u8 *am_data = (const u8 *)automap_bin;
-    // const uint data_row_stride = WORLD_MATRIX_WIDTH * 2;
-
-    // uint dst_y = AUTOMAP_MARGIN_Y;
-    // for (uint y = 0; y < AUTOMAP_HEIGHT - AUTOMAP_MARGIN_Y * 2; ++y, ++dst_y)
-    // {
-    //     uint dst_x = AUTOMAP_MARGIN_X;
-    //     for (uint x = 0; x < AUTOMAP_WIDTH - AUTOMAP_MARGIN_X * 2; ++x, ++dst_x)
-    //     {
-    //         u8 v = am_data[y * data_row_stride + x];
-    //         if (v == 0xFF) continue;
-
-    //         map->scrmap[dst_y][dst_x] = v;
-    //     }
-    // }
 }
 
 static inline void automap_clamp_spos(automap_s *map)
@@ -125,8 +123,6 @@ static void update_room_tiles(automap_s *map, const world_room_s *room,
     int t = ((int) room->y) * AUTOMAP_SCALE;
     int r = l + w;
     int b = t + h;
-
-    LOG_DBG("room bounds: (%i, %i), (%i, %i)", l,t, r,b);
 
     const u8 *am_data = (const u8 *)automap_bin;
     const uint data_row_stride = WORLD_MATRIX_WIDTH * 2;
@@ -218,8 +214,11 @@ void automap_set_pos(automap_s *map, const world_room_s *room, int local_x,
 }
 
 static void draw_sprite(gfx_draw_sprite_state_s *spr_state, uint spridx,
-                        int x, int y)
+                        int cx, int cy)
 {
+    int x = cx - 4;
+    int y = cy - 4;
+
     uint flags = 0;
     int dx = 0;
     int dy = 0;
@@ -289,15 +288,19 @@ void automap_update_view(automap_s *map, gfx_draw_sprite_state_s *spr_state)
     view_bg->offset_x = sx * 2;
     view_bg->offset_y = sy * 2;
 
+    // make bg grid invisible on every other frame, so that it looks 50%
+    // transparent to the eye.
     gfx_ctl.bg_userpal[0][1] = (map->frame & 1)
                                ? GFX_PAL_DARK_BLUE : GFX_PAL_BLACK;
+    // current room blinks red
     gfx_ctl.bg_userpal[0][3] = (map->frame < 30)
                                ? GFX_PAL_RED : GFX_PAL_DARK_BLUE;
     
     // draw map sprites
     draw_sprite(spr_state, 1,
-                map->player_x - 4 - sx, map->player_y - 4 - sy);
-    // draw_sprite(spr_state, 1, map->player_x - 4 - sx, map->player_y - 4);
+                map->player_x - sx, map->player_y - sy);
+    draw_sprite(spr_state, 0,
+                map->home_x - sx, map->home_y - sy);
 
     if (++map->frame == 60)
         map->frame = 0;
