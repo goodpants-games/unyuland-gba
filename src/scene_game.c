@@ -369,6 +369,7 @@ static void scene_load(uintptr_t data)
     game_init();
 
     game_load_room(room);
+    game_reset_player_pos();
     setup_game_hud();
 
     mmStart(MOD_TESTMOD, MM_PLAY_LOOP);

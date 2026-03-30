@@ -199,6 +199,10 @@ typedef struct game {
     const u8 *room_collision;
     int room_width;
     int room_height;
+
+    // player start position within room
+    FIXED room_player_x;
+    FIXED room_player_y;
     
     FIXED cam_x;
     FIXED cam_y;
@@ -276,6 +280,7 @@ bool projectile_queue_free(projectile_s *proj);
 void game_init(void);
 void game_update(void);
 void game_load_room(const world_room_s *room);
+void game_reset_player_pos(void);
 void game_render(void);
 void game_save_state(void);
 void game_restore_state(void);

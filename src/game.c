@@ -774,7 +774,15 @@ void game_load_room(const world_room_s *room)
             .props = props,
         };
 
-        game_load_entity(&load_ent);
+        if (!strcmp(load_ent.name, "player"))
+        {
+            g_game.room_player_x = load_ent.x;
+            g_game.room_player_y = load_ent.y;
+        }
+        else
+        {
+            game_load_entity(&load_ent);
+        }
     }
 }
 
@@ -972,6 +980,13 @@ void game_render(void)
     }
 
     last_obj_index = obj_index;
+}
+
+void game_reset_player_pos(void)
+{
+    entity_s *player = &g_game.entities[0];
+    player->pos.x = g_game.room_player_x;
+    player->pos.y = g_game.room_player_y;
 }
 
 static void change_room(const world_room_s *new_room)
