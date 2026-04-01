@@ -13,20 +13,11 @@
 #define HUD_Y_ORIGIN   (HUD_ROW_ORIGIN * 8 + 6)
 #define ARRLEN(arr) (sizeof(arr) / sizeof(*arr))
 
-#define TEXT_CENTER_X_OFS(str, ofs) \
-    ((SCREEN_WIDTH - ((sizeof(str) - 1) * 12) - (ofs)) / 2)
-#define TEXT_CENTER_X(str, ofs) TEXT_CENTER_X_OFS(str, ofs)
-#define MENU_CENTER_Y(sel_count) \
-    (SCREEN_HEIGHT / 2 - 12 * (sel_count)) / 2
-
 static const char *const main_menu_options[] =
     {"START", "CONTROLS", "OPTIONS", "CREDITS"};
 
 static const char *const page_menu_options[] =
     {"BACK"};
-
-static const char *const objective_menu_options[] =
-    {"OK"};
 
 static const char *options_options[] =
     {"LCD Color: Off", "Back"};
@@ -43,64 +34,25 @@ struct
     menu_s menu;
     menu_s page_menu;
     int mode;
-
-    // if on objective page, sent from intro
-    bool objective_page;
 }
 static state EWRAM_BSS;
 
 static EWRAM_BSS bool option_lcd_color = false;
 
-
-static int text_center_x(const char *str)
-{
-    return (SCREEN_WIDTH - (strlen(str) * 12)) / 2;
-}
-
 static void render_page(const char *header, const char *lines[],
                         uint line_count)
 {
-    gfx_ctl.bg[1].enabled = false;
-
-    gfx_text_bmap_clear(0, 0, GFX_TEXT_BMP_COLS, GFX_TEXT_BMP_ROWS);
-    gfx_text_bmap_dst_clear(SCREEN_HEIGHT_T / 2, GFX_TEXT_BMP_ROWS);
-    gfx_text_bmap_dst_assign(SCREEN_HEIGHT_T / 4, GFX_TEXT_BMP_ROWS, 0,
-                             GFX_TEXTPAL_NORMAL);
-
-    int yp = MENU_CENTER_Y(line_count + 1);
-    gfx_text_bmap_print(text_center_x(header), yp,
-                        header, TEXT_COLOR_BLUE);
-    yp += 12;
-
-    for (uint i = 0; i < line_count; ++i, yp += 12)
+    int yp;
+    menu_render_page(header, lines, line_count, &yp);
+    
+    state.page_menu = (menu_s)
     {
-        gfx_text_bmap_print(text_center_x(lines[i]), yp, lines[i],
-                            TEXT_COLOR_WHITE);
-    }
+        .selection_count = 1,
+        .selection_labels = page_menu_options,
 
-    if (state.objective_page)
-    {
-        state.page_menu = (menu_s)
-        {
-            .selection_count = 1,
-            .selection_labels = objective_menu_options,
-
-            .origin_x = TEXT_CENTER_X_OFS("OK", 8),
-            .origin_y = yp,
-            .no_back = true
-        };
-    }
-    else
-    {
-        state.page_menu = (menu_s)
-        {
-            .selection_count = 1,
-            .selection_labels = page_menu_options,
-
-            .origin_x = TEXT_CENTER_X_OFS("BACK", 8),
-            .origin_y = yp
-        };
-    }
+        .origin_x = TEXT_CENTER_X_OFS("BACK", 8),
+        .origin_y = yp
+    };
 
     menu_show(&state.page_menu);
     state.mode = MENU_MODE_PAGE;
@@ -177,68 +129,51 @@ static void options_menu_update(void)
 
 static void scene_load(uintptr_t data)
 {
-    const bool objective_page = data;
-
     gfx_ctl.bg[1].bpp = GFX_BG_4BPP;
     gfx_ctl.bg[1].char_block = 0;
     gfx_ctl.bg[1].enabled = true;
-
-    state.objective_page = objective_page;
-
-    if (!objective_page)
+    
+    state.mode = MENU_MODE_MAIN;
+    state.menu = (menu_s)
     {
-        state.mode = MENU_MODE_MAIN;
-        state.menu = (menu_s)
-        {
-            .selection_count = ARRLEN(main_menu_options),
-            .selection_labels = main_menu_options,
+        .selection_count = ARRLEN(main_menu_options),
+        .selection_labels = main_menu_options,
 
-            .origin_x = (SCREEN_WIDTH - (7 * 12 + 8)) / 2,
-            .origin_y = MENU_CENTER_Y(ARRLEN(main_menu_options)),
-            .no_back = true,
-        };
+        .origin_x = (SCREEN_WIDTH - (7 * 12 + 8)) / 2,
+        .origin_y = MENU_CENTER_Y(ARRLEN(main_menu_options)),
+        .no_back = true,
+    };
 
-        menu_show(&state.menu);
-        gfx_text_bmap_dst_assign(SCREEN_HEIGHT_T / 2, GFX_TEXT_BMP_ROWS, 0,
-                                 GFX_TEXTPAL_NORMAL);
+    menu_show(&state.menu);
+    gfx_text_bmap_dst_assign(SCREEN_HEIGHT_T / 2, GFX_TEXT_BMP_ROWS, 0,
+                                GFX_TEXTPAL_NORMAL);
 
-        gfx_queue_memset(se_mem[GFX_BG1_INDEX], 0, 1024 * 2);
-        gfx_queue_memcpy(&tile_mem[0][0].data, game_logo_gfxTiles,
-                        game_logo_gfxTilesLen);
-        
-        const SCR_ENTRY *src = (const SCR_ENTRY *)game_logo_gfxMap;
-        uint oy = 2;
-        uint ox = 4;
-        for (uint y = oy; y < oy + 9; ++y)
-        {
-            const size_t alloc_size = sizeof(SCR_ENTRY) * 22;
-
-            SCR_ENTRY *row = gfx_alloc_cpybuf(alloc_size);
-            if (!row) DBG_CRASH();
-
-            for (uint i = 0; i < 22; ++i)
-                row[i] = *(src++);
-
-            gfx_queue_memcpy(&se_mat[GFX_BG1_INDEX][y][ox], row, alloc_size);
-            // for (uint x = ox; x < ox + 22; ++x)
-            // {
-            //     se_mat[GFX_BG1_INDEX][y][x] = *(src++);
-            // }
-        }
-
-        mmStart(MOD_SAC08, MM_PLAY_LOOP);
-        mmSetModuleVolume((int)(1024 * 0.3));
-    }
-    else
+    gfx_queue_memset(se_mem[GFX_BG1_INDEX], 0, 1024 * 2);
+    gfx_queue_memcpy(&tile_mem[0][0].data, game_logo_gfxTiles,
+                    game_logo_gfxTilesLen);
+    
+    const SCR_ENTRY *src = (const SCR_ENTRY *)game_logo_gfxMap;
+    uint oy = 2;
+    uint ox = 4;
+    for (uint y = oy; y < oy + 9; ++y)
     {
-        static const char *lines[] = {
-            "Find four red fire",
-            "orbs."
-        };
+        const size_t alloc_size = sizeof(SCR_ENTRY) * 22;
 
-        render_page("Objective", lines, ARRLEN(lines));
+        SCR_ENTRY *row = gfx_alloc_cpybuf(alloc_size);
+        if (!row) DBG_CRASH();
+
+        for (uint i = 0; i < 22; ++i)
+            row[i] = *(src++);
+
+        gfx_queue_memcpy(&se_mat[GFX_BG1_INDEX][y][ox], row, alloc_size);
+        // for (uint x = ox; x < ox + 22; ++x)
+        // {
+        //     se_mat[GFX_BG1_INDEX][y][x] = *(src++);
+        // }
     }
-    // gfx_defer_vblank(scene_load_vram, NULL);
+
+    mmStart(MOD_SAC08, MM_PLAY_LOOP);
+    mmSetModuleVolume((int)(1024 * 0.3));
 }
 
 static void scene_unload(void)
@@ -308,33 +243,20 @@ static void scene_frame(void)
     {
         int res;
         menu_status_e stat = menu_update(&state.page_menu, &res);
-
-        if (state.objective_page)
+        
+        switch (stat)
         {
-            switch (stat)
-            {
-            case MENU_STATUS_SELECT:
-                scenemgr_change(&scene_desc_game, 0);
+        case MENU_STATUS_SELECT:
+        case MENU_STATUS_BACK:
+            state.mode = MENU_MODE_MAIN;
+            gfx_ctl.bg[1].enabled = true;
+            gfx_text_bmap_clear(0, 0, GFX_TEXT_BMP_COLS, GFX_TEXT_BMP_ROWS);
+            gfx_text_bmap_dst_clear(SCREEN_HEIGHT_T / 4, GFX_TEXT_BMP_ROWS);
+            gfx_text_bmap_dst_assign(SCREEN_HEIGHT_T / 2, GFX_TEXT_BMP_ROWS,
+                                        0, GFX_TEXTPAL_NORMAL);
+            menu_show(&state.menu);
 
-            default: break;
-            }
-        }
-        else
-        {
-            switch (stat)
-            {
-            case MENU_STATUS_SELECT:
-            case MENU_STATUS_BACK:
-                state.mode = MENU_MODE_MAIN;
-                gfx_ctl.bg[1].enabled = true;
-                gfx_text_bmap_clear(0, 0, GFX_TEXT_BMP_COLS, GFX_TEXT_BMP_ROWS);
-                gfx_text_bmap_dst_clear(SCREEN_HEIGHT_T / 4, GFX_TEXT_BMP_ROWS);
-                gfx_text_bmap_dst_assign(SCREEN_HEIGHT_T / 2, GFX_TEXT_BMP_ROWS,
-                                         0, GFX_TEXTPAL_NORMAL);
-                menu_show(&state.menu);
-
-            default: break;
-            }
+        default: break;
         }
     }
 

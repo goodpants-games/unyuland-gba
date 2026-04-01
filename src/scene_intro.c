@@ -7,10 +7,15 @@
 #include <intro3_gfx.h>
 
 #include "gfx.h"
+#include "menu.h"
 #include "scenes.h"
+#include "tonc_memdef.h"
 
 #define TEXT_ROW_COUNT 9
 #define IMG_FADE_STAGE_LEN 15
+#define ARRLEN(arr) (sizeof(arr) / sizeof(*arr))
+
+static const char *menu_options[] = { "START" };
 
 struct scene_state
 {
@@ -26,6 +31,9 @@ struct scene_state
 
     u8 img_fade_stage;
     u8 img_fade_ticks;
+    u8 stage;
+
+    menu_s end_menu;
 } static state EWRAM_BSS;
 
 static void update_image(void)
@@ -160,8 +168,63 @@ static void next_page(void)
     update_image();
 }
 
+static void intro_end(void)
+{
+    gfx_ctl.win[0].enabled = false;
+    gfx_ctl.bg[0].offset_x = 0;
+    gfx_ctl.bg[0].offset_y = 0;
+
+    state.stage = 1;
+
+    static const char *lines[] = {
+        "Find four red fire",
+        "orbs."
+    };
+
+    int yp;
+    menu_render_page("Objective", lines, ARRLEN(lines), &yp);
+
+    state.end_menu = (menu_s)
+    {
+        .selection_labels = menu_options,
+        .selection_count = ARRLEN(menu_options),
+        .origin_x = TEXT_CENTER_X_OFS(" START", 8),
+        .origin_y = yp,
+        .no_back = true
+    };
+
+    menu_show(&state.end_menu);
+}
+
+static void intro_end_update(void)
+{
+    int res;
+    switch (menu_update(&state.end_menu, &res))
+    {
+    case MENU_STATUS_SELECT:
+        goto change_scene;
+        break;
+
+    default: break;
+    }
+
+    if (key_hit(KEY_START))
+        goto change_scene;
+
+    return;
+
+change_scene:
+    scenemgr_change(&scene_desc_game, 0);
+}
+
 static void scene_frame(void)
 {
+    if (state.stage == 1)
+    {
+        intro_end_update();
+        return;
+    }
+
     bool btn_hit = key_hit(KEY_A | KEY_B);
 
     if (state.img_fade_stage)
@@ -221,9 +284,7 @@ static void scene_frame(void)
 
     return;
 
-intro_end:
-    // this is stupid as hell but it's easy
-    scenemgr_change(&scene_desc_menu, 1);
+intro_end: intro_end();
 }
 
 const scene_desc_s scene_desc_intro = {

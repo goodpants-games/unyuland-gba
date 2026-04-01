@@ -141,3 +141,27 @@ int menu_calc_max_width(const char *const items[], uint item_count)
 
     return max_width;
 }
+
+void menu_render_page(const char *header, const char *lines[], uint line_count,
+                      int *o_yp)
+{
+    gfx_ctl.bg[1].enabled = false;
+
+    gfx_text_bmap_clear(0, 0, GFX_TEXT_BMP_COLS, GFX_TEXT_BMP_ROWS);
+    gfx_text_bmap_dst_clear(SCREEN_HEIGHT_T / 2, GFX_TEXT_BMP_ROWS);
+    gfx_text_bmap_dst_assign(SCREEN_HEIGHT_T / 4, GFX_TEXT_BMP_ROWS, 0,
+                             GFX_TEXTPAL_NORMAL);
+
+    int yp = MENU_CENTER_Y(line_count + 1);
+    gfx_text_bmap_print(text_center_x(header), yp,
+                        header, TEXT_COLOR_BLUE);
+    yp += 12;
+
+    for (uint i = 0; i < line_count; ++i, yp += 12)
+    {
+        gfx_text_bmap_print(text_center_x(lines[i]), yp, lines[i],
+                            TEXT_COLOR_WHITE);
+    }
+
+    *o_yp = yp;
+}

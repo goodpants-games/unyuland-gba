@@ -2,7 +2,15 @@
 #define MENU_H
 
 #include <stdbool.h>
+#include <string.h>
 #include <tonc_types.h>
+#include <tonc_video.h>
+
+#define TEXT_CENTER_X_OFS(str, ofs) \
+    ((SCREEN_WIDTH - ((sizeof(str) - 1) * 12) - (ofs)) / 2)
+#define TEXT_CENTER_X(str, ofs) TEXT_CENTER_X_OFS(str, ofs)
+#define MENU_CENTER_Y(sel_count) \
+    (SCREEN_HEIGHT / 2 - 12 * (sel_count)) / 2
 
 typedef enum menu_status
 {
@@ -30,5 +38,12 @@ menu_s;
 int menu_calc_max_width(const char *const items[], uint item_count);
 void menu_show(menu_s *menu);
 menu_status_e menu_update(menu_s *menu, int *result);
+void menu_render_page(const char *header, const char *lines[], uint line_count,
+                      int *o_yp);
+
+static inline int text_center_x(const char *str)
+{
+    return (SCREEN_WIDTH - (strlen(str) * 12)) / 2;
+}
 
 #endif
