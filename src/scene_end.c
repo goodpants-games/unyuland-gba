@@ -20,8 +20,10 @@ static void scene_load(uintptr_t init_data)
     char str1[32];
     char str2[32];
 
-    snprintf(str1, 32, "Red orbs: %u/5", (int) g_game.collected_rorbs);
-    snprintf(str2, 32, "Secret orbs: %u/4", (int) g_game.collected_borbs);
+    snprintf(str1, 32, "Red orbs: %u/%u",
+             (int) g_game.collected_rorbs, GAME_MAX_RORBS);
+    snprintf(str2, 32, "Secret orbs: %u/%u",
+             (int) g_game.collected_borbs, GAME_MAX_BORBS);
 
     const char *lines[] = {
         "You beat the game!",

@@ -68,6 +68,10 @@
 #define ENTITY_ENABLED(ent) ((ent)->flags & ENTITY_FLAG_ENABLED)
 #define IS_PROJ_ACTIVE(proj) ((proj)->flags & PROJ_FLAG_ACTIVE)
 
+#define GAME_REQUIRED_RORBS 4
+#define GAME_MAX_RORBS      5
+#define GAME_MAX_BORBS      4
+
 typedef enum dir4
 {
     DIR4_RIGHT,

@@ -1,9 +1,11 @@
 #include <tonc_math.h>
 #include <tonc_input.h>
 #include <tonc_video.h>
+#include "dialogue.h"
 #include "game.h"
 #include "log.h"
 #include "math_util.h"
+#include "scenes.h"
 #include "sound.h"
 #include "printf.h"
 #include "gfx.h"
@@ -1062,7 +1064,15 @@ static const behavior_def_s behavior_home;
 
 static void home_interact(entity_s *self, entity_s *source)
 {
-    LOG_DBG("home interacted with");
+    if (g_game.collected_rorbs >= GAME_REQUIRED_RORBS)
+    {
+        scenemgr_change(&scene_desc_end, 0);
+    }
+    else
+    {
+        const char *dlg = dlg_get_chat_by_name("home_unfinished");
+        game_start_dialogue(dlg);
+    }
 }
 
 void entity_home_init(entity_s *self, FIXED px, FIXED py)
@@ -1327,9 +1337,9 @@ static void behavior_orb_update(entity_s *self)
 
 static void orb_display_dialogue(bool blue)
 {
-    const uint red_required = 4;
-    const uint red_max = 5;
-    const uint blue_max = 4;
+    const uint red_required = GAME_REQUIRED_RORBS;
+    const uint red_max = GAME_MAX_RORBS;
+    const uint blue_max = GAME_MAX_BORBS;
 
     char *buf_ptr = game_dialogue_buffer;
 
