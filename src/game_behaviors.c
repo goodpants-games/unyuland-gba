@@ -1058,20 +1058,31 @@ const behavior_def_s behavior_spring = {
 // home //
 //////////
 #pragma region home
+static const behavior_def_s behavior_home;
+
+static void home_interact(entity_s *self, entity_s *source)
+{
+    LOG_DBG("home interacted with");
+}
 
 void entity_home_init(entity_s *self, FIXED px, FIXED py)
 {
+    self->flags |= ENTITY_FLAG_COLLIDE;
     self->pos.x = px;
     self->pos.y = py;
     self->col.w = 8;
     self->col.h = 8;
+    self->col.flags |= COL_FLAG_MONITOR_ONLY;
     self->sprite.graphic_id = SPRID_GAME_HOME;
     self->sprite.ox = -4;
     self->sprite.oy = -16;
     self->sprite.zidx = -20;
+    self->behavior = &behavior_home;
 }
 
-const behavior_def_s behavior_home = {0};
+static const behavior_def_s behavior_home = {
+    .interact = home_interact
+};
 
 #pragma endregion home
 
@@ -1286,15 +1297,15 @@ orb_data_s;
 void entity_orb(entity_s *self, FIXED px, FIXED py, bool blue)
 {
     self->flags |= ENTITY_FLAG_COLLIDE;
-    self->pos.x = px + int2fx(1);
+    self->pos.x = px + int2fx(2);
     self->pos.y = py;
-    self->col.w = 6;
-    self->col.h = 6;
+    self->col.w = 4;
+    self->col.h = 4;
     self->col.flags = COL_FLAG_MONITOR_ONLY;
     self->sprite.graphic_id = blue ? SPRID_GAME_FIRE_ORB_BLUE
                                    : SPRID_GAME_FIRE_ORB_RED;
-    self->sprite.ox = -1;
-    self->sprite.oy = -1;
+    self->sprite.ox = -2;
+    self->sprite.oy = -2;
     self->sprite.flags |= SPRITE_FLAG_PLAYING;
     self->behavior = &behavior_orb;
 
