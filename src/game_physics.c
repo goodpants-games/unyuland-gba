@@ -8,6 +8,11 @@
 #include "gba_util.h"
 #include "log.h"
 
+//------------------------------------------------------------------------------
+// declarations
+//------------------------------------------------------------------------------
+#pragma region declarations
+
 // #define PHYS_PROFILE
 
 #ifdef PHYS_PROFILE
@@ -20,12 +25,45 @@
 #define PROFILE_END2(t)
 #endif
 
-// in world units (8 units per tile)
-#define PARTGRID_CEL_W 64
-#define PARTGRID_CEL_H 64
-#define PARTGRID_COLS  8
-#define PARTGRID_ROWS  8
-#define PARTGRID_NODE_POOL_SIZE 128
+#ifdef PHYS_PROFILE
+struct phys_profile
+{
+    u32 detection_ent_t;
+    u32 detection_tile_t;
+    u32 resolution_t;
+    u32 move_t;
+    u32 start_t;
+    u32 projectiles_t;
+} profile;
+
+#define PROFILE_LOG(str, n)  \
+    do  \
+    {  \
+        int v = profile.n * 100;  \
+        LOG_DBG(str ": %i.%02i%%", v / 280896, v % 280896 / 2809);  \
+    } while (false)
+
+#define PROFILE_LOG_CYCLES(str, n)  \
+    do  \
+    {  \
+        LOG_DBG(str ": %i cycles", profile.n);  \
+    } while (false)
+#endif
+
+// static pqueue_entry_s contact_queue[MAX_CONTACT_COUNT];
+
+#pragma endregion declarations
+
+
+
+
+
+
+
+//------------------------------------------------------------------------------
+// entity physics 
+//------------------------------------------------------------------------------
+#pragma region entity physics
 
 #define ENTITY_PAIR_SIZE \
     IALIGN(CEIL_DIV(UPAIR2U(MAX_ENTITY_COUNT - 1, MAX_ENTITY_COUNT - 1), 8), 4)
@@ -83,28 +121,6 @@ typedef struct col_overlap_res {
     FIXED nx, ny, pd;
 } col_overlap_res_s;
 
-typedef struct partgrid_node
-{
-    projectile_s *projectile;
-
-    // if active (i.e. projectile != NULL), this points to the next node
-    // in the partition cell linked list. if inactive, this instead points to
-    // the next unallocated node in the pool.
-    union
-    {
-        struct partgrid_node *next;
-        struct partgrid_node *next_free;
-    };
-} partgrid_node_s;
-
-typedef partgrid_node_s *part_cell_t;
-
-typedef struct proj_part_data
-{
-    part_cell_t *part_cell;
-}
-proj_part_data_s;
-
 static int col_ent_count = 0;
 static entity_coldata_s col_ent_map[MAX_ENTITY_COUNT];
 static entity_coldata_s *col_ents[MAX_ENTITY_COUNT];
@@ -125,37 +141,12 @@ static col_bp_edge_s y_edges[EDGE_LIST_MAX_COUNT];
 static u8 x_contact_pairs[ENTITY_PAIR_SIZE];
 static u8 y_contact_pairs[ENTITY_PAIR_SIZE];
 
-static proj_part_data_s proj_data[MAX_PROJECTILE_COUNT];
-static partgrid_node_s partgrid_node_pool[PARTGRID_NODE_POOL_SIZE];
-static partgrid_node_s *partgrid_node_pool_ffree; // first free
-static part_cell_t partgrid[PARTGRID_ROWS][PARTGRID_COLS];
 
-#ifdef PHYS_PROFILE
-struct phys_profile
-{
-    u32 detection_ent_t;
-    u32 detection_tile_t;
-    u32 resolution_t;
-    u32 move_t;
-    u32 start_t;
-    u32 projectiles_t;
-} profile;
 
-#define PROFILE_LOG(str, n)  \
-    do  \
-    {  \
-        int v = profile.n * 100;  \
-        LOG_DBG(str ": %i.%02i%%", v / 280896, v % 280896 / 2809);  \
-    } while (false)
 
-#define PROFILE_LOG_CYCLES(str, n)  \
-    do  \
-    {  \
-        LOG_DBG(str ": %i cycles", profile.n);  \
-    } while (false)
-#endif
 
-// static pqueue_entry_s contact_queue[MAX_CONTACT_COUNT];
+
+
 
 // (w, h) = half-extents
 static inline col_overlap_res_s rect_collision(FIXED x0, FIXED y0, FIXED hw0,
@@ -190,17 +181,6 @@ static inline col_overlap_res_s rect_collision(FIXED x0, FIXED y0, FIXED hw0,
     ret:
         return res;
 }
-
-void game_physics_move_projs(FIXED vel_mult);
-
-
-
-
-
-
-
-
-
 
 static void col_ent_added(int col_ent_idx)
 {
@@ -899,7 +879,52 @@ static bool physics_substep(FIXED vel_mult)
     return no_movement;
 }
 
+#pragma endregion entity physics
 
+
+
+
+
+
+
+//------------------------------------------------------------------------------
+// projectile physics
+//------------------------------------------------------------------------------
+#pragma region projectile physics
+
+// in world units (8 units per tile)
+#define PARTGRID_CEL_W 64
+#define PARTGRID_CEL_H 64
+#define PARTGRID_COLS  8
+#define PARTGRID_ROWS  8
+#define PARTGRID_NODE_POOL_SIZE 128
+
+typedef struct partgrid_node
+{
+    projectile_s *projectile;
+
+    // if active (i.e. projectile != NULL), this points to the next node
+    // in the partition cell linked list. if inactive, this instead points to
+    // the next unallocated node in the pool.
+    union
+    {
+        struct partgrid_node *next;
+        struct partgrid_node *next_free;
+    };
+} partgrid_node_s;
+
+typedef partgrid_node_s *part_cell_t;
+
+typedef struct proj_part_data
+{
+    part_cell_t *part_cell;
+}
+proj_part_data_s;
+
+static proj_part_data_s proj_data[MAX_PROJECTILE_COUNT];
+static partgrid_node_s partgrid_node_pool[PARTGRID_NODE_POOL_SIZE];
+static partgrid_node_s *partgrid_node_pool_ffree; // first free
+static part_cell_t partgrid[PARTGRID_ROWS][PARTGRID_COLS];
 
 
 
@@ -970,7 +995,7 @@ static void partgrid_cell_insert(partgrid_node_s **cell,
     *cell = new_node;
 }
 
-void game_physics_move_projs(FIXED vel_mult)
+static void game_physics_move_projs(FIXED vel_mult)
 {
     for (uint i = 0; i < MAX_PROJECTILE_COUNT; ++i)
     {
@@ -1029,6 +1054,7 @@ void game_physics_move_projs(FIXED vel_mult)
     }
 }
 
+#pragma endregion projectile physics
 
 
 
@@ -1036,8 +1062,10 @@ void game_physics_move_projs(FIXED vel_mult)
 
 
 
-
-
+//------------------------------------------------------------------------------
+// public
+//------------------------------------------------------------------------------
+#pragma region public
 
 void game_physics_init(void)
 {
@@ -1295,3 +1323,5 @@ void game_physics_on_proj_free(projectile_s *proj)
         partgrid_node_free(cell);
     }
 }
+
+#pragma endregion public
