@@ -94,9 +94,13 @@ void snd_init(void)
     REG_SND1SWEEP = SSW_OFF;
 
     REG_SND3SEL = SWAV_SEL_BANK(0) | SWAV_SEL_DIM(0);
-    memcpy32((void *)(REG_WAVE_RAM + 2), wave_noise_bin, 4);
+    // size of memcpy *should* be 4 words, but this is a remnant of a bug caused
+    // by misunderstanding of the specs, and the platform place sound honestly
+    // sounds better like this than when it actually works as intended.
+    // it's just like the smoke graphic in mario 64...
+    memcpy32((void *)REG_WAVE_RAM, wave_noise_bin, 2);
     REG_SND3SEL = SWAV_SEL_BANK(1) | SWAV_SEL_DIM(0);
-    memcpy32((void *)(REG_WAVE_RAM + 0), wave_tri_bin, 4);
+    memcpy32((void *)REG_WAVE_RAM, wave_tri_bin, 4);
     REG_SND3SEL = SWAV_SEL_BANK(0) | SWAV_SEL_DIM(0);
 }
 
@@ -356,7 +360,7 @@ static void snd_tick(uint tick_idx)
                         SFREQ_RATE(fx2int(rate) & SFREQ_RATE_MASK);
         }
         
-        if (reset || ch != 3) *reg_freq |= SFREQ_RESET;
+        if (reset || ch < 2) *reg_freq |= SFREQ_RESET;
     }
 }
 
