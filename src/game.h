@@ -187,10 +187,9 @@ typedef struct room_trans_state
 
 typedef struct game_camera
 {
-    s8 move_x;
-    // s8 move_y;
+    bool move_y;
     FIXED rel_x;
-    // FIXED target_y;
+    FIXED target_y;
     // FIXED vx, vy;
 }
 game_camera_s;

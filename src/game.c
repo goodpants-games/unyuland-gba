@@ -38,7 +38,8 @@ typedef struct game_state
 {
     entity_s entities[MAX_ENTITY_COUNT];
     projectile_s projectiles[MAX_PROJECTILE_COUNT];
-    int cam_x, cam_y;
+    FIXED cam_x, cam_y;
+    game_camera_s cam_data;
     room_trans_state_s room_trans;
     entity_s *active_water_tank;
     uint player_ammo;
@@ -498,43 +499,34 @@ static void update_dialogue()
     }
 }
 
+static void reset_camera(entity_s *player)
+{
+    game_camera_s *const cam_data = &g_game.cam_data;
+    cam_data->move_y = false;
+    cam_data->target_y = player->pos.y;
+
+    g_game.cam_x = player->pos.x;
+    g_game.cam_y = player->pos.y + cam_data->rel_x;
+}
+
 static void update_camera(entity_s *player)
 {
-    const FIXED dx_max = FX(10);
-    FIXED dx = player->pos.x - g_game.cam_x;
-    FIXED dy = player->pos.y - g_game.cam_y;
-
     game_camera_s *const cam_data = &g_game.cam_data;
+    
+    const FIXED face_offset = FX(12);
+    const FIXED x_scroll_speed = FX(0.5);
+    const FIXED y_scroll_speed = FX(1.0);
+    const FIXED rest_dy = FX(-4);
+    const FIXED dy_min = FX(-8 * 3);
+    const FIXED dy_max = FX(8 * 1);
 
-    // if (dx > dx_max)
-    // {
-    //     cam_data->move_x = 1;
-    // }
-    // else if (dx < -dx_max)
-    // {
-    //     cam_data->move_x = -1;
-    // }
-
-    // if (cam_data->move_x != 0)
-    // {
-    //     cam_data->target_x = player->pos.x + FX(8) * cam_data->move_x;
-    // }
-
-    // if (abs(dy) > FX(20)) cam_data->y_follow = true;
-
-    // bool grounded = player->actor.flags & ACTOR_FLAG_GROUNDED;
-    // if (grounded) cam_data->y_follow = false;
-
-    // if (grounded || cam_data->y_follow)
-    //     cam_data->target_y = player->pos.y;
-
-    FIXED target_x = player->actor.face_dir * FX(12);
+    FIXED target_x = player->actor.face_dir * face_offset;
 
     // cam_data->vx += fxmul(target_x - cam_data->rel_x, FX(0.01))
     //                 - fxmul(cam_data->vx, FX(0.15));
     {
         int sgn = sgn3(target_x - cam_data->rel_x);
-        cam_data->rel_x += fxmul(FX(sgn), FX(0.5));
+        cam_data->rel_x += x_scroll_speed * sgn;
         if (sgn3(target_x - cam_data->rel_x) != sgn)
             cam_data->rel_x = target_x;
     }
@@ -542,44 +534,35 @@ static void update_camera(entity_s *player)
     // cam_data->rel_x += cam_data->vx;
     g_game.cam_x = player->pos.x + cam_data->rel_x;
 
-    // cam_data->vy += fxmul(cam_data->target_y - g_game.cam_y, FX(0.01))
-    //                 - fxmul(cam_data->vy, FX(0.15));
-    // g_game.cam_y += cam_data->vy;
+    bool grounded = player->actor.flags & ACTOR_FLAG_GROUNDED;
+    if (grounded)
+    {
+        cam_data->target_y = player->pos.y + rest_dy;
+        cam_data->move_y = true;
+    }
 
-    const FIXED dy_max = FX(12);
+    if (cam_data->move_y)
+    {
+        int sgn = sgn3(cam_data->target_y - g_game.cam_y);
+        g_game.cam_y += y_scroll_speed * sgn;
+        if (sgn3(cam_data->target_y - g_game.cam_y) != sgn)
+        {
+            g_game.cam_y = cam_data->target_y;
+            cam_data->move_y = false;
+        }
+    }
 
-    if (dy > dy_max)
+    FIXED dy = player->pos.y - g_game.cam_y;
+    if (dy < dy_min)
+    {
+        g_game.cam_y = player->pos.y - dy_min;
+        cam_data->target_y = player->pos.y + rest_dy;
+        cam_data->move_y = true;
+    }
+    else if (dy > dy_max)
     {
         g_game.cam_y = player->pos.y - dy_max;
-        // cam_data->move_y = 1;
     }
-
-    if (dy < -dy_max)
-    {
-        g_game.cam_y = player->pos.y + dy_max;
-        // cam_data->move_y = -1;
-    }
-
-    // if (cam_data->move_y != 0)
-    // {
-    //     g_game.cam_y += FX(1) * cam_data->move_y;
-    //     FIXED new_dy = player->pos.y - g_game.cam_y;
-    //     if (new_dy > dy_max)
-    //         g_game.cam_y = player->pos.y - dy_max;
-    //     else if (new_dy < -dy_max)
-    //         g_game.cam_y = player->pos.y + dy_max;
-
-    //     if (sgn3(dy) != sgn3(new_dy))
-    //     {
-    //         g_game.cam_y = player->pos.y;
-    //         cam_data->move_y = 0;
-    //     }   
-    // }
-
-    // if (abs(cam_data->vx) < FX(0.2))
-    // {
-    //     cam_data->move_x = 0;
-    // }
 }
 
 void game_init(void)
@@ -1028,6 +1011,7 @@ static void change_room(const world_room_s *new_room)
 
     game_load_room(new_room);
     gfx_load_map(GAME_BG_IDX, new_room->map);
+    reset_camera(&g_game.entities[0]);
 }
 
 static void room_transition_inactive_update(entity_s *player)
@@ -1261,15 +1245,18 @@ void game_save_state(void)
         ++src_proj;
     }
 
-    game_saved_state.cam_x = g_game.cam_x;
-    game_saved_state.cam_y = g_game.cam_y;
-    game_saved_state.room_trans = g_game.room_trans;
-    game_saved_state.active_water_tank = g_game.active_water_tank;
-    game_saved_state.player_ammo = g_game.player_ammo;
-    game_saved_state.player_spit_mode = g_game.player_spit_mode;
-    game_saved_state.did_collect_orb = g_game.did_collect_orb;
-    game_saved_state.collected_rorbs = g_game.collected_rorbs;
-    game_saved_state.collected_borbs = g_game.collected_borbs;
+    #define SAVE_PROP(prop) game_saved_state.prop = g_game.prop
+    SAVE_PROP(cam_x);
+    SAVE_PROP(cam_y);
+    SAVE_PROP(room_trans);
+    SAVE_PROP(active_water_tank);
+    SAVE_PROP(player_ammo);
+    SAVE_PROP(player_spit_mode);
+    SAVE_PROP(did_collect_orb);
+    SAVE_PROP(collected_rorbs);
+    SAVE_PROP(collected_borbs);
+    SAVE_PROP(cam_data);
+    #undef SAVE_PROP
 }
 
 void game_restore_state(void)
@@ -1318,15 +1305,18 @@ void game_restore_state(void)
         ++src_proj;
     }
 
-    g_game.cam_x = game_saved_state.cam_x;
-    g_game.cam_y = game_saved_state.cam_y;
-    g_game.room_trans = game_saved_state.room_trans;
-    g_game.active_water_tank = game_saved_state.active_water_tank;
-    g_game.player_ammo = game_saved_state.player_ammo;
-    g_game.player_spit_mode = game_saved_state.player_spit_mode;
-    g_game.did_collect_orb = game_saved_state.did_collect_orb;
-    g_game.collected_rorbs = game_saved_state.collected_rorbs;
-    g_game.collected_borbs = game_saved_state.collected_borbs;
+    #define RESTORE_PROP(prop) g_game.prop = game_saved_state.prop
+    RESTORE_PROP(cam_x);
+    RESTORE_PROP(cam_y);
+    RESTORE_PROP(room_trans);
+    RESTORE_PROP(active_water_tank);
+    RESTORE_PROP(player_ammo);
+    RESTORE_PROP(player_spit_mode);
+    RESTORE_PROP(did_collect_orb);
+    RESTORE_PROP(collected_rorbs);
+    RESTORE_PROP(collected_borbs);
+    RESTORE_PROP(cam_data);
+    #undef RESTORE_PROP
     g_game.player_is_dead = false;
 
     gfx_mark_scroll_dirty(GAME_BG_IDX);
