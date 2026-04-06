@@ -17,5 +17,4 @@
 - update camera tracking:
   - stop x scroll when player changed direction while scrolling
   - y scroll to ground level when player is grounded
-- is mesen psg wave more accurate than mGBA?
 - create automap preprocessor
