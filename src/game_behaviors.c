@@ -712,7 +712,7 @@ static void behavior_player_droplet_update(entity_s *self)
             platf->pos.x = px;
             platf->pos.y = py;
             platf->col.w = 6;
-            platf->col.h = 2;
+            platf->col.h = 4;
             platf->col.group = COLGROUP_DEFAULT;
             platf->col.flags |= COL_FLAG_FLOOR_ONLY;
             platf->sprite.graphic_id = SPRID_GAME_ICE_PLATFORM;

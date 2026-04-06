@@ -106,6 +106,7 @@ typedef struct projectile
     u8 flags;
     u8 kind;
     u8 graphic_id;
+    bool did_touch_this_frame;
 
     u16 life;
 
