@@ -929,7 +929,7 @@ void game_render(void)
             sprite_frame = 0;
             sprite_hflip = false;
             sprite_vflip = false;
-            sprite_palette = 0;
+            sprite_palette = GFX_OBJPAL_MUL;
         }
         else
         {
