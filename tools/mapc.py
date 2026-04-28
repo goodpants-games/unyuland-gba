@@ -50,6 +50,16 @@ def parse(ifile_path: str, output_file: BinaryIO, tileset: Tileset):
         file_contents = ifile.read()
     
     tmx_data = xml.fromstring(file_contents)
+
+    # determine if the room is "outdoors"
+    # i.e., it has a property named "outdoors" that is a true boolean value
+    is_outdoors = False
+    room_props = tmx_data.find('properties')
+    if room_props is not None:
+        for prop in room_props.findall('property'):
+            if prop.get('name') == 'outdoors' and prop.get('type') == 'bool':
+                is_outdoors = prop.get('value') == 'true'
+
     layer = tmx_data.find('layer')
     if layer is None:
         raise Exception("map has no tile layer")
@@ -67,7 +77,8 @@ def parse(ifile_path: str, output_file: BinaryIO, tileset: Tileset):
     data = base64.b64decode(data_base64.text.strip())
 
     room_name = path.splitext(path.basename(ifile_path))[0]
-    output_file.write(struct.pack('<HHBxxxI', map_width, map_height, 1, 0))
+    output_file.write(struct.pack('<HHBBxxI', map_width, map_height, 1,
+                                  1 if is_outdoors else 0, 0))
 
     # get collision matrix
     col_data: list[int] = []

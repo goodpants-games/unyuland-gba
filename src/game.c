@@ -1012,6 +1012,9 @@ static void change_room(const world_room_s *new_room)
     game_load_room(new_room);
     gfx_load_map(GAME_BG_IDX, new_room->map);
     reset_camera(&g_game.entities[0]);
+
+    if (new_room->map->bg_id == 1)
+        LOG_DBG("load background");
 }
 
 static void room_transition_inactive_update(entity_s *player)

@@ -41,4 +41,5 @@
  <tile id="52" type="decor"/>
  <tile id="53" type="decor"/>
  <tile id="54" type="decor"/>
+ <tile id="55" type="decor"/>
 </tileset>

@@ -12,9 +12,12 @@
 #include "gfx.h"
 #include "log.h"
 #include "menu.h"
+#include "tonc_memmap.h"
 #include "tonc_video.h"
 #include "scenes.h"
 #include "automap.h"
+
+#include <sky_bg1_gfx.h>
 
 #define HUD_ROW_ORIGIN (GFX_TEXT_BMP_ROWS - 2)
 #define HUD_Y_ORIGIN   (HUD_ROW_ORIGIN * 8 + 6)
@@ -368,6 +371,10 @@ static void scene_load(uintptr_t data)
     gfx_ctl.bg[1].offset_y = 0;
     game_init();
 
+    gfx_ctl.bg[2].bpp = GFX_BG_4BPP;
+    gfx_ctl.bg[2].char_block = 1;
+    gfx_ctl.bg[2].enabled = true;
+
     game_load_room(room);
     game_reset_player_pos();
     setup_game_hud();
@@ -383,6 +390,9 @@ static void scene_load(uintptr_t data)
                      game_sprdb_gfxTilesLen);
     gfx_queue_memcpy(&tile_mem[1][0], automap_tiles_gfxTiles,
                      automap_tiles_gfxTilesLen);
+    
+    gfx_queue_memcpy(&se_mem[GFX_BG2_INDEX], sky_bg1_gfxMap, 32 * 32 * 2);
+    gfx_queue_memcpy(&tile_mem[1][0], sky_bg1_gfxTiles, sky_bg1_gfxTilesLen);
 }
 
 static void scene_unload(void)
