@@ -5,6 +5,7 @@
   it's literallyl probably because i need to fix the code that checks if
   the enemy is close to cam bounds before playing the sound.
   oh wait. but the spring sound broke too i think. hm. prob not then.
+  (uhh i probably fixed this)
 - clean up code "modularization" - refer to restructured gfx.c
 - fade between main menu and game scene in order to hide visual artifacts from
   vsync not meeting the time budget. although. i'm supposed to add like an
@@ -13,8 +14,5 @@
   not related to the project but just a note to self. also maybe make an
   algebraic inverse of the gba-color "function" to make color correction better.
 - fix tall room, also tall room backgrounds
-- make projectiles stop on player-created platforms
 - update camera tracking:
   - stop x scroll when player changed direction while scrolling
-  - y scroll to ground level when player is grounded
-- create automap preprocessor

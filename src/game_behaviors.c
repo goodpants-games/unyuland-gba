@@ -941,10 +941,10 @@ static void behavior_gun_enemy_update(entity_s *self)
         self->sprite.accum = 0;
         self->sprite.flags |= SPRITE_FLAG_PLAYING;
 
-        int screen_dx = fx2int(self->pos.x) - (g_game.cam_x + SCREEN_WIDTH / 4);
-        int screen_dy = fx2int(self->pos.y) - (g_game.cam_y + SCREEN_HEIGHT / 4);
+        int screen_dx = fx2int(self->pos.x - g_game.cam_x);
+        int screen_dy = fx2int(self->pos.y - g_game.cam_y);
         int screen_dist_sq = screen_dx * screen_dx + screen_dy * screen_dy;
-        if (screen_dist_sq < 100 * 100)
+        if (screen_dist_sq < 80 * 80)
             snd_play_no_overlap(SND_ID_ENEMY_SPIT);
     }
 }
