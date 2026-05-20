@@ -13,6 +13,5 @@
 - combine shaders agb001 and gba-color to create Ultimate Display Emulation.
   not related to the project but just a note to self. also maybe make an
   algebraic inverse of the gba-color "function" to make color correction better.
-- fix tall room, also tall room backgrounds
 - update camera tracking:
   - stop x scroll when player changed direction while scrolling
