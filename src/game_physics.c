@@ -1274,8 +1274,8 @@ void game_physics_update(void)
                         if (proj->did_touch_this_frame) continue;
                         proj->did_touch_this_frame = true;
 
-                        if (!(entity->flags & ENTITY_FLAG_MOVING))
-                            LOG_DBG("Proc");
+                        // if (!(entity->flags & ENTITY_FLAG_MOVING))
+                        //     LOG_DBG("Proc");
                         
                         bool keep;
                         if (entity->behavior &&

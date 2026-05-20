@@ -373,7 +373,11 @@ static void scene_load(uintptr_t data)
 
     gfx_ctl.bg[2].bpp = GFX_BG_4BPP;
     gfx_ctl.bg[2].char_block = 1;
-    gfx_ctl.bg[2].enabled = true;
+    gfx_ctl.bg[2].enabled = false;
+
+    gfx_ctl.bg[3].bpp = GFX_BG_4BPP;
+    gfx_ctl.bg[3].char_block = 1;
+    gfx_ctl.bg[3].enabled = false;
 
     game_load_room(room);
     game_reset_player_pos();
@@ -391,7 +395,9 @@ static void scene_load(uintptr_t data)
     gfx_queue_memcpy(&tile_mem[1][0], automap_tiles_gfxTiles,
                      automap_tiles_gfxTilesLen);
     
-    gfx_queue_memcpy(&se_mem[GFX_BG2_INDEX], sky_bg1_gfxMap, 32 * 32 * 2);
+    // copy sky_bg1 to bg 2 and 3. each half of the image contains 1024 tiles.
+    gfx_queue_memcpy(&se_mem[GFX_BG2_INDEX], sky_bg1_gfxMap, 1024 * 2);
+    gfx_queue_memcpy(&se_mem[GFX_BG3_INDEX], sky_bg1_gfxMap + 1024, 1024 * 2);
     gfx_queue_memcpy(&tile_mem[1][0], sky_bg1_gfxTiles, sky_bg1_gfxTilesLen);
 }
 
@@ -401,6 +407,8 @@ static void scene_unload(void)
     gfx_unload_map(1);
     gfx_ctl.bg[1].offset_x = 0;
     gfx_ctl.bg[1].offset_y = 0;
+    gfx_ctl.bg[2].enabled = false;
+    gfx_ctl.bg[3].enabled = false;
     gfx_text_bmap_dst_clear(0, SCREEN_HEIGHT_T);
     gfx_text_bmap_clear(0, 0, GFX_TEXT_BMP_COLS, GFX_TEXT_BMP_ROWS);
     gfx_reset_palette();

@@ -969,7 +969,7 @@ void gfx_init(void)
     gfx_ctl.bg[0].priority = 0;
     gfx_ctl.bg[1].priority = 1;
     gfx_ctl.bg[2].priority = 2;
-    gfx_ctl.bg[3].priority = 2;
+    gfx_ctl.bg[3].priority = 3;
 
     // REG_DISPCNT = DCNT_OBJ_1D;
 
@@ -1050,7 +1050,7 @@ void gfx_new_frame(void)
     bg_cnt[0] = BG_SBB(GFX_BG0_INDEX) | BG_REG_32x32;
     bg_cnt[1] = BG_SBB(GFX_BG1_INDEX) | BG_REG_32x32;
     bg_cnt[2] = BG_SBB(GFX_BG2_INDEX) | BG_REG_32x32;
-    bg_cnt[3] = BG_SBB(GFX_BG2_INDEX) | BG_REG_32x32;
+    bg_cnt[3] = BG_SBB(GFX_BG3_INDEX) | BG_REG_32x32;
 
     for (uint i = 0; i < 4; ++i)
     {
