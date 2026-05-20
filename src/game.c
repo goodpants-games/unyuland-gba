@@ -9,6 +9,7 @@
 #include "gfx.h"
 #include "math_util.h"
 #include "gba_util.h"
+#include "tonc_video.h"
 
 #define MAX_RENDER_OBJS ((MAX_ENTITY_COUNT + MAX_PROJECTILE_COUNT))
 #define FREE_QUEUE_MAX_SIZE 32
@@ -819,11 +820,19 @@ static inline bool renderer_cam_calc(int obj_x, int obj_y, int cam_x,
 
 void game_render(void)
 {
-    const int cam_x = fx2int(g_game.cam_x);
-    const int cam_y = fx2int(g_game.cam_y);
+    const FIXED cam_x = fx2int(g_game.cam_x);
+    const FIXED cam_y = fx2int(g_game.cam_y);
 
     gfx_ctl.bg[GAME_BG_IDX].offset_x = cam_x * 2 - SCREEN_WIDTH / 2;
     gfx_ctl.bg[GAME_BG_IDX].offset_y = cam_y * 2 - SCREEN_HEIGHT / 2;
+
+    const FIXED parallax_mul = FX(0.15);
+    // gfx_ctl.bg[GAME_BG_IDX].offset_x =
+    //     fx2int(fxmul(g_game.cam_x, parallax_mul)) * 2 - SCREEN_WIDTH / 2;
+    gfx_ctl.bg[2].offset_x =
+        fx2int(fxmul(g_game.cam_x - FX(SCREEN_WIDTH / 4), parallax_mul)) * 2;
+    gfx_ctl.bg[2].offset_y =
+        fx2int(fxmul(g_game.cam_y - FX(SCREEN_HEIGHT / 4), parallax_mul)) * 2;
 
     gfx_sprdb_s sprdb =
         gfx_get_sprdb((const gfx_root_header_s *)game_sprdb_bin);
