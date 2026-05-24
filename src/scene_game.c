@@ -126,6 +126,30 @@ static void setup_game_hud(void)
     update_hud_sprites(0, 0);
 }
 
+enum
+{
+    VRAM_BANK1_TILESET_AUTOMAP,
+    VRAM_BANK1_TILESET_SKY,
+};
+// function to load either the sky bg tileset or the automap tileset into
+// tile_mem bank 1
+static void vram_bank1_load(int id)
+{
+    if (id == VRAM_BANK1_TILESET_AUTOMAP)
+    {
+        // load automap tileset
+        gfx_queue_memcpy(&tile_mem[1][0], automap_tiles_gfxTiles,
+                        automap_tiles_gfxTilesLen);
+    
+    } else if (id == VRAM_BANK1_TILESET_SKY) {
+        // copy sky_bg1 to bg 2 and 3. each half of the image contains 1024
+        // tiles.
+        gfx_queue_memcpy(&se_mem[GFX_BG2_INDEX], sky_bg1_gfxMap, 1024 * 2);
+        gfx_queue_memcpy(&se_mem[GFX_BG3_INDEX], sky_bg1_gfxMap + 1024, 1024 * 2);
+        gfx_queue_memcpy(&tile_mem[1][0], sky_bg1_gfxTiles, sky_bg1_gfxTilesLen);
+    }
+}
+
 // TODO: maybe reorganize the code so these forward declarations are not
 // necessary
 static void unpause_game(void);
@@ -137,6 +161,10 @@ static void open_map(void)
 
     state.substate = SUBSTATE_MAP;
     automap_open_view(&state.automap, 1);
+
+    vram_bank1_load(VRAM_BANK1_TILESET_AUTOMAP);
+    gfx_ctl.bg[2].enabled = false;
+    gfx_ctl.bg[3].enabled = false;
 
     gfx_ctl.bg[1].char_block = 1;
     gfx_ctl.bg[1].bpp = GFX_BG_4BPP;
@@ -164,9 +192,15 @@ static void open_map(void)
 static void close_map(void)
 {
     automap_close_view(&state.automap);
+
     gfx_ctl.bg[1].char_block = 0;
     gfx_ctl.bg[1].bpp = GFX_BG_8BPP;
     gfx_load_map(1, g_game.room->map);
+
+    vram_bank1_load(VRAM_BANK1_TILESET_SKY);
+    bool enable_bg = g_game.room->map->bg_id == 1;
+    gfx_ctl.bg[2].enabled = enable_bg;
+    gfx_ctl.bg[3].enabled = enable_bg;
 
     // reset pause menu display
     gfx_text_bmap_dst_assign(0, 9, 0, GFX_TEXTPAL_NORMAL);
@@ -386,19 +420,17 @@ static void scene_load(uintptr_t data)
     mmStart(MOD_TESTMOD, MM_PLAY_LOOP);
     mmSetModuleVolume((int)(1024 * 0.3));
 
+    // load game tileset
     gfx_queue_memset(&tile_mem[0][0], 0,
                      (GFX_CHAR_GAME_TILESET + 2) * sizeof(TILE) * 4);
     gfx_queue_memcpy(&tile_mem[0][0] + GFX_CHAR_GAME_TILESET + 2,
                      tileset_gfxTiles, tileset_gfxTilesLen);
+    
+    vram_bank1_load(VRAM_BANK1_TILESET_SKY);
+    
+    // load sprite graphics data
     gfx_queue_memcpy(tile_mem_obj[0][0].data, game_sprdb_gfxTiles,
                      game_sprdb_gfxTilesLen);
-    gfx_queue_memcpy(&tile_mem[1][0], automap_tiles_gfxTiles,
-                     automap_tiles_gfxTilesLen);
-    
-    // copy sky_bg1 to bg 2 and 3. each half of the image contains 1024 tiles.
-    gfx_queue_memcpy(&se_mem[GFX_BG2_INDEX], sky_bg1_gfxMap, 1024 * 2);
-    gfx_queue_memcpy(&se_mem[GFX_BG3_INDEX], sky_bg1_gfxMap + 1024, 1024 * 2);
-    gfx_queue_memcpy(&tile_mem[1][0], sky_bg1_gfxTiles, sky_bg1_gfxTilesLen);
 }
 
 static void scene_unload(void)
