@@ -421,8 +421,7 @@ static void scene_load(uintptr_t data)
     mmSetModuleVolume((int)(1024 * 0.3));
 
     // load game tileset
-    gfx_queue_memset(&tile_mem[0][0], 0,
-                     (GFX_CHAR_GAME_TILESET + 2) * sizeof(TILE) * 4);
+    gfx_queue_memset(&tile_mem[0][0] + GFX_CHAR_GAME_TILESET, 0, sizeof(TILE));
     gfx_queue_memcpy(&tile_mem[0][0] + GFX_CHAR_GAME_TILESET + 1,
                      tileset_gfxTiles, tileset_gfxTilesLen);
     

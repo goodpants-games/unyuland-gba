@@ -384,9 +384,9 @@ static void write_scr_block16(const uint map_entry, u16 *p_dest)
         return;
     }
 
-    int gfx_id = map_entry & 0xFF;
+    int gfx_id = (map_entry - 1) & 0xFF;
     int v = gfx_id % 16 * 2 + gfx_id / 16 * 64;
-    v = (v - 1) + GFX_CHAR_GAME_TILESET / 2;
+    v = GFX_CHAR_GAME_TILESET + v + 1;
 
     const u32 se_flags = SE_PALBANK(GFX_BGPAL_BLACK_MUL);
 
