@@ -2,6 +2,8 @@
 #include <font_gfx.h>
 #include "gfx.h"
 #include "gba_util.h"
+#include "tonc_memdef.h"
+#include "tonc_memmap.h"
 #include <string.h>
 #include <stdalign.h>
 
@@ -120,28 +122,32 @@ void gfx_reset_palette(void)
     // pal bank 0: regular palette, may be darkened for room transition
     // pal bank 1: regular palette, with idx15 (peach) swapped out for black.
     //             also color index 0 *must* be black, so that 8bpp mode can
-    //             use idx 16 to refer to black.
-    // pal bank 2: 1-black, 2-yellow, 3-light blue, 15-white. used for text.
-    // pal bank 3: same as pal bank 2, but may be darkened for room transition.
-    // pal bank 4: bg user pal 0
-    // pal bank 5: bg user pal 1
-    for (int i = 0; i < 16; ++i)
-        pal_bg_bank[0][i] = gfx_palette[i];
+    //             use idx 16 to refer to black. may be darkened for room
+    //             transition.
+    // pal bank 2: regular palette, not darkened
+    // pal bank 3: 1-black, 2-yellow, 3-light blue, 15-white. used for text.
+    // pal bank 4: same as pal bank 2, but may be darkened for room transition.
+    // pal bank 5: bg user pal 0
+    // pal bank 6: bg user pal 1
+    for (int i = 0; i < 16; ++i) {
+        pal_bg_bank[GFX_BGPAL_MUL][i] = gfx_palette[i];
+        pal_bg_bank[GFX_BGPAL_NORMAL][i] = gfx_palette[i];
+    }
 
-    pal_bg_bank[1][0] = gfx_palette[GFX_PAL_BLACK];
+    pal_bg_bank[GFX_BGPAL_BLACK_MUL][0] = gfx_palette[GFX_PAL_BLACK];
     for (int i = 1; i < 16; ++i)
-        pal_bg_bank[1][i] = gfx_palette[i];
-    pal_bg_bank[1][15] = gfx_palette[GFX_PAL_BLACK];
+        pal_bg_bank[GFX_BGPAL_BLACK_MUL][i] = gfx_palette[i];
+    pal_bg_bank[GFX_BGPAL_BLACK_MUL][15] = gfx_palette[GFX_PAL_BLACK];
 
-    pal_bg_bank[2][1]  = gfx_palette[0];
-    pal_bg_bank[2][2]  = gfx_palette[GFX_PAL_YELLOW];
-    pal_bg_bank[2][3]  = gfx_palette[GFX_PAL_BLUE];
-    pal_bg_bank[2][15] = gfx_palette[GFX_PAL_WHITE];
+    pal_bg_bank[GFX_TEXTPAL_NORMAL][1]  = gfx_palette[0];
+    pal_bg_bank[GFX_TEXTPAL_NORMAL][2]  = gfx_palette[GFX_PAL_YELLOW];
+    pal_bg_bank[GFX_TEXTPAL_NORMAL][3]  = gfx_palette[GFX_PAL_BLUE];
+    pal_bg_bank[GFX_TEXTPAL_NORMAL][15] = gfx_palette[GFX_PAL_WHITE];
 
-    pal_bg_bank[3][1]  = gfx_palette[0];
-    pal_bg_bank[3][2]  = gfx_palette[GFX_PAL_YELLOW];
-    pal_bg_bank[3][3]  = gfx_palette[GFX_PAL_BLUE];
-    pal_bg_bank[3][15] = gfx_palette[GFX_PAL_WHITE];
+    pal_bg_bank[GFX_TEXTPAL_MUL][1]  = gfx_palette[0];
+    pal_bg_bank[GFX_TEXTPAL_MUL][2]  = gfx_palette[GFX_PAL_YELLOW];
+    pal_bg_bank[GFX_TEXTPAL_MUL][3]  = gfx_palette[GFX_PAL_BLUE];
+    pal_bg_bank[GFX_TEXTPAL_MUL][15] = gfx_palette[GFX_PAL_WHITE];
 
     for (uint i = 0; i < 16; ++i)
     {
@@ -218,7 +224,13 @@ void gfx_set_palette_multiplied(FIXED factor)
     }
 
     for (int i = 1; i < 16; ++i)
+    {
         pal_bg_bank[GFX_BGPAL_MUL][i] = gfx_mul_palette[i];
+        pal_bg_bank[GFX_BGPAL_BLACK_MUL][i] = gfx_mul_palette[i];
+    }
+
+    pal_bg_bank[GFX_BGPAL_BLACK_MUL][GFX_PAL_PEACH]
+        = gfx_mul_palette[GFX_PAL_BLACK];
 
     pal_bg_bank[GFX_TEXTPAL_MUL][1]  = gfx_mul_palette[0];
     pal_bg_bank[GFX_TEXTPAL_MUL][2]  = gfx_mul_palette[GFX_PAL_YELLOW];
@@ -376,9 +388,11 @@ static void write_scr_block16(const uint map_entry, u16 *p_dest)
     int v = gfx_id % 16 * 2 + gfx_id / 16 * 64;
     v = (v - 1) + GFX_CHAR_GAME_TILESET / 2;
 
-    u32 upper = ((v+1) << 16) | v;
+    const u32 se_flags = SE_PALBANK(GFX_BGPAL_BLACK_MUL);
+
+    u32 upper = (((v+1) | se_flags) << 16) | (v | se_flags);
     v += 32;
-    u32 lower = ((v+1) << 16) | v;
+    u32 lower = (((v+1) | se_flags) << 16) | (v | se_flags);
 
     if (map_entry & 0x100) // horiz flip
     {
@@ -398,7 +412,7 @@ static void write_scr_block16(const uint map_entry, u16 *p_dest)
     }
 
     *dest = upper;
-    *(dest + 16) = lower;;
+    *(dest + 16) = lower;
 }
 
 static void write_scr_block8(const uint map_entry, u16 *dest)

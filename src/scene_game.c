@@ -194,7 +194,7 @@ static void close_map(void)
     automap_close_view(&state.automap);
 
     gfx_ctl.bg[1].char_block = 0;
-    gfx_ctl.bg[1].bpp = GFX_BG_8BPP;
+    // gfx_ctl.bg[1].bpp = GFX_BG_8BPP;
     gfx_load_map(1, g_game.room->map);
 
     vram_bank1_load(VRAM_BANK1_TILESET_SKY);
@@ -376,7 +376,7 @@ static void update_hud(bool force_dirty)
 
 static void scene_load(uintptr_t data)
 {
-    gfx_ctl.bg[1].bpp = GFX_BG_8BPP;
+    gfx_ctl.bg[1].bpp = GFX_BG_4BPP;
     gfx_ctl.bg[1].char_block = 0;
     gfx_ctl.bg[1].enabled = true;
 
@@ -423,7 +423,7 @@ static void scene_load(uintptr_t data)
     // load game tileset
     gfx_queue_memset(&tile_mem[0][0], 0,
                      (GFX_CHAR_GAME_TILESET + 2) * sizeof(TILE) * 4);
-    gfx_queue_memcpy(&tile_mem[0][0] + GFX_CHAR_GAME_TILESET + 2,
+    gfx_queue_memcpy(&tile_mem[0][0] + GFX_CHAR_GAME_TILESET + 1,
                      tileset_gfxTiles, tileset_gfxTilesLen);
     
     vram_bank1_load(VRAM_BANK1_TILESET_SKY);

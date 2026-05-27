@@ -38,11 +38,12 @@
 #define GFX_CHAR_GAME_TILESET 0
 
 #define GFX_BGPAL_MUL         0
-#define GFX_BGPAL_NORMAL      1
-#define GFX_TEXTPAL_NORMAL    2
-#define GFX_TEXTPAL_MUL       3
-#define GFX_BGPAL_USER0       4
-#define GFX_BGPAL_USER1       5
+#define GFX_BGPAL_BLACK_MUL   1
+#define GFX_BGPAL_NORMAL      2
+#define GFX_TEXTPAL_NORMAL    3
+#define GFX_TEXTPAL_MUL       4
+#define GFX_BGPAL_USER0       5
+#define GFX_BGPAL_USER1       6
 
 #define GFX_OBJPAL_NORMAL     0
 #define GFX_OBJPAL_MUL        1
