@@ -178,7 +178,7 @@ def parse(ifile_path: str, output_file: BinaryIO, tileset: Tileset):
         # write entity data
         for ent in entities:
             ent_name = ent.get('name')
-            
+
             odata = bytearray()
             odata += struct.pack('<HHHH', int(float(ent.get('x'))),
                                  int(float(ent.get('y'))),
@@ -209,7 +209,7 @@ def parse(ifile_path: str, output_file: BinaryIO, tileset: Tileset):
                         case 'float':
                             odata.append(2)
                             fx_val = int(float(prop.get('value')) * 256)
-                            odata += struct.pack('<I', fx_val)
+                            odata += struct.pack('<I', fx_val)                        
 
                         case t:
                             raise Exception("unknown property type " + t)

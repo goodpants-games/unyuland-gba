@@ -27,26 +27,30 @@ id_map: dict[int, int] = dict([
 
     # basic edges
     (1,                           1),
-    (1 | ROT1_FLAG,               2),
-    (1 | ROT1_FLAG | VFLIP_FLAG,  2 | VFLIP_FLAG),
-    (1 | ROT2_FLAG,               1 | HFLIP_FLAG | VFLIP_FLAG),
-    (1 | ROT3_FLAG,               2 | HFLIP_FLAG | VFLIP_FLAG),
+    (1 | DFLIP_FLAG,              2 | HFLIP_FLAG),
 
     # basic outer corners
     (2,             3),
-    (2 | ROT1_FLAG, 3 | VFLIP_FLAG),
-    (2 | ROT2_FLAG, 3 | HFLIP_FLAG | VFLIP_FLAG),
-    (2 | ROT3_FLAG, 3 | HFLIP_FLAG),
+    (2 | DFLIP_FLAG,3 | HFLIP_FLAG | VFLIP_FLAG),
 
     # basic inner corners
     (3,             4),
-    (3 | ROT1_FLAG, 4 | VFLIP_FLAG),
-    (3 | ROT2_FLAG, 4 | HFLIP_FLAG | VFLIP_FLAG),
-    (3 | ROT3_FLAG, 4 | HFLIP_FLAG),
+    (3 | DFLIP_FLAG,4 | HFLIP_FLAG | VFLIP_FLAG),
+
+    # rock wall variants
+    (5, 7),
+    (6, 8),
+    (5 | DFLIP_FLAG, 14),
+    (6 | DFLIP_FLAG, 15),
+    (7, 9),
+    (8, 10),
+    (8 | DFLIP_FLAG, 11),
+    (9, 12),
+    (10, 13),
+    (9 | DFLIP_FLAG, 70),
 
     # wall in water fade
     (4,              5),
-    (4 | HFLIP_FLAG, 5 | HFLIP_FLAG),
 
     # cobblestone
     (37, 6),
@@ -86,6 +90,20 @@ id_map: dict[int, int] = dict([
     (99, 37),
     (100, 38),
 
+    # red incubator
+    (73, 56),
+    (74, 57),
+    (75, 58),
+    (89, 59),
+    (90, 60),
+    (91, 61),
+
+    # blue incubator
+    (76, 62),
+    (77, 0),
+    (92, 63),
+    (93, 79),
+
     # decor
     (21, 39),
     (22, 40),
@@ -104,8 +122,44 @@ id_map: dict[int, int] = dict([
     (41, 52),
     (42, 53),
     (43, 54),
+
+    (55, 64),
+    (56, 65),
+    (58, 66),
+    (59, 67),
+    (60, 68),
+    (61, 69),
+    (71, 80),
+    (72, 81),
 ])
 
+
+def convert_tile(tile: int) -> int|None:
+    # dflag is intentionally omitted here. it is instead treated as a special
+    # type of tile.
+    flags = tile & (HFLIP_FLAG | VFLIP_FLAG)
+    base_tile = tile & ~(HFLIP_FLAG | VFLIP_FLAG)
+
+    if not (base_tile in id_map):
+        return None
+
+    return id_map[base_tile] ^ flags
+
+
+def convert_obj(o: ET.Element) -> None:
+    # convert fragile_block with static=True to static_fragile_block
+    if o.get('name') == 'fragile_block':
+        oprops = o.find('properties')
+        if oprops is not None:
+            for prop in oprops.findall('property'):
+                if prop.get('name') == 'static' and prop.get('type') == 'bool':
+                    if prop.get('value') == 'true':
+                        o.set('name', 'static_fragile_block')
+                    oprops.remove(prop)
+        
+        if len(oprops) == 0:
+            o.remove(oprops)
+            o.text = None
 
 def write_tmx(ofile: TextIO, map_width: int, map_height: int, map_data: bytes,
               object_group: ET.Element|None):
@@ -143,6 +197,7 @@ def write_tmx(ofile: TextIO, map_width: int, map_height: int, map_data: bytes,
         objects.set('name', "Objects")
 
         for o in object_group:
+            convert_obj(o)
             objects.append(o)
     
     tree = ET.ElementTree(root)
@@ -183,12 +238,16 @@ def convert(ifile_path: str, ofile: TextIO):
         tid = tile_int & TILE_ID_MASK
         tflags = tile_int & TILE_FLAGS_MASK
 
-        if not ((tid - 1) | tflags) in id_map:
+        new_tile_int = convert_tile((tid - 1) | tflags)
+        if new_tile_int is None:
             tx = (i//4) % map_width 
             ty = (i//4) // map_width
-            raise RuntimeError(f"unrecognized tile at ({tx}, {ty})")
+            tname = str(tid - 1)
+            if tflags & DFLIP_FLAG:
+                tname = tname + "+D"
+            
+            raise RuntimeError(f"unrecognized tile at ({tx}, {ty}): {tname}")
         
-        new_tile_int = id_map[(tid - 1) | tflags]
         if new_tile_int == -1:
             omap_data.append(0)
         else:

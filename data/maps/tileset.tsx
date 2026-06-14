@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<tileset version="1.10" tiledversion="1.11.2" name="tileset" tilewidth="8" tileheight="8" tilecount="256" columns="16">
- <grid orientation="orthogonal" width="16" height="16"/>
- <image source="tileset_gfx.png" width="128" height="128"/>
+<tileset version="1.10" tiledversion="1.11.2" name="tileset" tilewidth="16" tileheight="16" tilecount="256" columns="16" tilerendersize="grid">
+ <image source="../graphics/tileset.png" width="256" height="128"/>
  <tile id="16" type="water"/>
  <tile id="17" type="water"/>
  <tile id="18" type="heat"/>
@@ -42,4 +41,72 @@
  <tile id="53" type="decor"/>
  <tile id="54" type="decor"/>
  <tile id="55" type="decor"/>
+ <tile id="56" type="decor"/>
+ <tile id="57" type="decor"/>
+ <tile id="58" type="decor"/>
+ <tile id="62" type="decor"/>
+ <tile id="64" type="decor"/>
+ <tile id="65" type="decor"/>
+ <tile id="66" type="decor"/>
+ <tile id="67" type="decor"/>
+ <tile id="68" type="decor"/>
+ <tile id="69" type="decor"/>
+ <tile id="70" type="decor"/>
+ <tile id="71" type="decor"/>
+ <tile id="72" type="decor"/>
+ <tile id="73" type="decor"/>
+ <tile id="74" type="decor"/>
+ <tile id="75" type="decor"/>
+ <tile id="76" type="decor"/>
+ <tile id="77" type="decor"/>
+ <tile id="78" type="decor"/>
+ <tile id="79" type="decor"/>
+ <tile id="80" type="decor"/>
+ <tile id="81" type="decor"/>
+ <tile id="82" type="decor"/>
+ <tile id="83" type="decor"/>
+ <tile id="84" type="decor"/>
+ <tile id="85" type="decor"/>
+ <tile id="86" type="decor"/>
+ <tile id="87" type="decor"/>
+ <tile id="88" type="decor"/>
+ <tile id="89" type="decor"/>
+ <tile id="90" type="decor"/>
+ <tile id="91" type="decor"/>
+ <tile id="92" type="decor"/>
+ <tile id="93" type="decor"/>
+ <tile id="94" type="decor"/>
+ <tile id="95" type="decor"/>
+ <tile id="96" type="decor"/>
+ <tile id="97" type="decor"/>
+ <tile id="98" type="decor"/>
+ <tile id="99" type="decor"/>
+ <tile id="100" type="decor"/>
+ <tile id="101" type="decor"/>
+ <tile id="102" type="decor"/>
+ <tile id="103" type="decor"/>
+ <tile id="104" type="decor"/>
+ <tile id="105" type="decor"/>
+ <tile id="106" type="decor"/>
+ <tile id="107" type="decor"/>
+ <tile id="108" type="decor"/>
+ <tile id="109" type="decor"/>
+ <tile id="110" type="decor"/>
+ <tile id="111" type="decor"/>
+ <tile id="112" type="decor"/>
+ <tile id="113" type="decor"/>
+ <tile id="114" type="decor"/>
+ <tile id="115" type="decor"/>
+ <tile id="116" type="decor"/>
+ <tile id="117" type="decor"/>
+ <tile id="118" type="decor"/>
+ <tile id="119" type="decor"/>
+ <tile id="120" type="decor"/>
+ <tile id="121" type="decor"/>
+ <tile id="122" type="decor"/>
+ <tile id="123" type="decor"/>
+ <tile id="124" type="decor"/>
+ <tile id="125" type="decor"/>
+ <tile id="126" type="decor"/>
+ <tile id="127" type="decor"/>
 </tileset>
