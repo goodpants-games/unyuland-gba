@@ -137,6 +137,7 @@ typedef struct player_data
     bool spitting;
     u8 cursor_frame;
     s8 death_timer;
+    s8 spit_trigger;
 } player_data_s;
 
 void entity_player_init(entity_s *self)
@@ -246,10 +247,10 @@ static bool player_simulate_droplet(int droplet_type, int dir, FIXED player_x,
     }
 }
 
-static void player_platform_spit(entity_s *self)
+static bool player_platform_spit(entity_s *self)
 {
-    if (!(self->actor.flags & ACTOR_FLAG_GROUNDED)) return;
-    if (g_game.player_ammo < 10) return;
+    if (!(self->actor.flags & ACTOR_FLAG_GROUNDED)) return false;
+    if (g_game.player_ammo < 10) return false;
 
     player_data_s *data = (player_data_s *)self->userdata;
 
@@ -284,17 +285,19 @@ static void player_platform_spit(entity_s *self)
         self->sprite.flags |= SPRITE_FLAG_PLAYING;
         self->vel.x = 0;
     }
+
+    return true;
 }
 
-static void player_bullet_spit(entity_s *self)
+static bool player_bullet_spit(entity_s *self)
 {
-    if (g_game.player_ammo < 1) return;
+    if (g_game.player_ammo < 1) return false;
     --g_game.player_ammo;
 
     snd_play(SND_ID_PLAYER_SHOOT);
 
     projectile_s *proj = projectile_alloc();
-    if (!proj) return;
+    if (!proj) return false;
 
     LOG_DBG("create player bullet");
 
@@ -320,6 +323,8 @@ static void player_bullet_spit(entity_s *self)
     proj->kind = PROJ_KIND_PLAYER;
     proj->graphic_id = SPRID_GAME_WATER_DROPLET;
     proj->life = 120;
+
+    return true;
 }
 
 static void behavior_player_death_update(entity_s *self)
@@ -342,6 +347,9 @@ static void behavior_player_update(entity_s *self)
         behavior_player_death_update(self);
         return;
     }
+
+    if (data->spit_trigger != 0)
+        --data->spit_trigger;
 
     // input
     self->actor.move_x = 0;
@@ -396,17 +404,25 @@ static void behavior_player_update(entity_s *self)
             jumped = true;
         }
 
+        if (key_hit(KEY_B))
+            data->spit_trigger = 8;
+
         if (can_move && !data->interactable)
         {
             show_cursor = (self->actor.flags & ACTOR_FLAG_GROUNDED) &&
                           g_game.player_spit_mode == PLAYER_SPIT_MODE_PLATFORM;
-            if (key_hit(KEY_B))
+            
+            bool did_spit = false;
+            if (data->spit_trigger > 0)
             {
                 if (g_game.player_spit_mode == PLAYER_SPIT_MODE_PLATFORM)
-                    player_platform_spit(self);
+                    did_spit = player_platform_spit(self);
                 else if (g_game.player_spit_mode == PLAYER_SPIT_MODE_BULLET)
-                    player_bullet_spit(self);
+                    did_spit = player_bullet_spit(self);
             }
+
+            if (did_spit)
+                data->spit_trigger = 0;
         }
 
         if (key_hit(KEY_L))
