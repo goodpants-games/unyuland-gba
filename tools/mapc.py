@@ -86,7 +86,7 @@ def parse(ifile_path: str, output_file: BinaryIO, tileset: Tileset):
         tile_int = (data[i] | (data[i+1] << 8) |
                    (data[i+2] << 16) | (data[i+3] << 24))
         tid = tile_int & 0x0FFFFFFF
-        cid = 0
+        cid = 3 if is_outdoors else 0
 
         if tid != 0:
             type_str = tileset.get(tid - 1)
