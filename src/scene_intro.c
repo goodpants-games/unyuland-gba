@@ -106,6 +106,7 @@ static void scene_unload(void)
 
     gfx_text_bmap_clear(0, 0, GFX_TEXT_BMP_COLS, GFX_TEXT_BMP_ROWS);
     gfx_text_bmap_dst_clear(0, SCREEN_HEIGHT_T);
+    gfx_reset_palette();
 }
 
 static void text_tick(void)
