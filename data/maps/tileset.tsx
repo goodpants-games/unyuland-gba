@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<tileset version="1.10" tiledversion="1.11.2" name="tileset" tilewidth="16" tileheight="16" tilecount="256" columns="16" tilerendersize="grid">
+<tileset version="1.10" tiledversion="1.11.2" name="tileset" tilewidth="16" tileheight="16" tilecount="128" columns="16" tilerendersize="grid">
  <image source="../graphics/tileset.png" width="256" height="128"/>
  <tile id="16" type="water"/>
  <tile id="17" type="water"/>
@@ -51,7 +51,6 @@
  <tile id="67" type="decor"/>
  <tile id="68" type="decor"/>
  <tile id="69" type="decor"/>
- <tile id="70" type="decor"/>
  <tile id="71" type="decor"/>
  <tile id="72" type="decor"/>
  <tile id="73" type="decor"/>
