@@ -12,7 +12,7 @@
 // not the actual tile rendered tile size, which is 16. but tiles are supposed
 // to be 8x8.
 #define WORLD_TILE_SIZE 8
-#define MAX_ORB_COUNT   8
+#define MAX_ORB_COUNT   9
 #define GAME_OAM_START 64
 #define GAME_OAM_COUNT 64
 
