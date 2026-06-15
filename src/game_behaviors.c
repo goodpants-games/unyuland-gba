@@ -425,7 +425,11 @@ static void behavior_player_update(entity_s *self)
                 data->spit_trigger = 0;
         }
 
+#ifdef DEVDEBUG
         if (key_hit(KEY_L))
+#else
+        if (key_hit(KEY_L | KEY_R))
+#endif
         {
             if (++g_game.player_spit_mode >= 2)
                 g_game.player_spit_mode = 0;
