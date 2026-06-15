@@ -15,3 +15,10 @@
   algebraic inverse of the gba-color "function" to make color correction better.
 - update camera tracking:
   - stop x scroll when player changed direction while scrolling
+- Add saving. it saves which orbs you collected. Duh.
+
+b05: player scared to go down Hole.
+player should be able to do a jig when hold down (very important)
+make the mushroom tied to that Riddle like. uniquely colored. or smth.
+"cradle" hint maybe not that useful? ? "you can push Blux around like the ice blocks! although can't touch them ... directly."
+add Saving.
