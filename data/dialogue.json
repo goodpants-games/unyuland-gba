@@ -122,11 +122,16 @@
     {
         "id": "room08_hint",
         "pages": [
-            "Did you know? If you jump up into a moveable block above you, the block will get bumped upwards.",
-            "It's called the Law of Conservation, Newton's 7th Law. I think. Something about a cradle...",
+            "Did you know? Blux can be pushed around, just like you can push ice blocks!",
+            "It's called the Law of Conversation, Newton's 7th Law. I think. Something about a cradle...",
             "I dunno. I'm not a physician.",
             "Actually I don't think this information is very useful...",
-            "Also if anyone knows how to get up that wall please tell me."
+            "You can't touch a Blux because you'll be covered in its goo. Bad idea.",
+            "Um. If you tried touching a Blux and are now reading this...",
+            "Uh. Sorry. Really sorry.",
+            "I can't, just, erase the text I write on these signs.",
+            "Also if anyone knows how to get up that wall please tell me.",
+            "I hate Newton. She makes everything so complicated."
         ]
     },
     {
@@ -143,9 +148,9 @@
     {
         "id": "room11_hint",
         "pages": [
-            "Obscured by view resides a tiny room",
-            "Across the pond. Approach by shooting ice.",
-            "Within this alcove lies a little shroom.",
+            "Obscured by view resides a tiny room.",
+            "To cross the pond, approach by shooting ice.",
+            "Within, there lies an oddly-colored shroom:",
             "I recommend to fire upwards thrice.",
             "Revealed to you will be a yellow 'key'."
         ]
