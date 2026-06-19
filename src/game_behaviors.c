@@ -1,6 +1,7 @@
 #include <tonc_math.h>
 #include <tonc_input.h>
 #include <tonc_video.h>
+#include <assert.h>
 #include "dialogue.h"
 #include "game.h"
 #include "log.h"
@@ -18,6 +19,10 @@
 #define PLAYER_SIDE_SPIT_TARGET_Y_OFF TO_FIXED(5.00)
 #define PLAYER_UP_SPIT_VY             TO_FIXED(3.00)
 #define PLAYER_SPIT_G_MULT            TO_FIXED(2.00)
+
+#define EDATA_SIZE_CHECK(strt) \
+    static_assert(sizeof(strt) <= 16, \
+                  "struct '" #strt "' exceeds storage capcity");
 
 static bool droplet_check_tile(FIXED x, FIXED y)
 {
@@ -52,6 +57,7 @@ typedef struct enemy_base
     s8 health;
 }
 enemy_base_s;
+EDATA_SIZE_CHECK(enemy_base_s)
 
 // if true, the calling function should return
 static bool enemy_base_update(entity_s *self)
@@ -139,6 +145,7 @@ typedef struct player_data
     s8 death_timer;
     s8 spit_trigger;
 } player_data_s;
+EDATA_SIZE_CHECK(player_data_s)
 
 void entity_player_init(entity_s *self)
 {
@@ -636,6 +643,7 @@ typedef struct player_bullet_data
     FIXED target_y;
 }
 player_bullet_data_s;
+EDATA_SIZE_CHECK(player_bullet_data_s)
 
 void entity_player_droplet_init(entity_s *self, FIXED px, FIXED py, int type,
                                 int dir)
@@ -776,6 +784,7 @@ typedef struct crawler_data
     FIXED home_x;
 }
 crawler_data_s;
+EDATA_SIZE_CHECK(crawler_data_s)
 
 void entity_crawler_init(entity_s *self, FIXED px, FIXED py, FIXED max_dist)
 {
@@ -866,6 +875,7 @@ typedef struct gun_enemy_data
     int dir_flags;
 }
 gun_enemy_data_s;
+EDATA_SIZE_CHECK(gun_enemy_data_s)
 
 void entity_gun_enemy_init(entity_s *self, FIXED px, FIXED py, bool ceil,
                            int dir_flags)
@@ -1138,6 +1148,7 @@ typedef struct sign_data
     const char *dialogue;
 }
 sign_data_s;
+EDATA_SIZE_CHECK(sign_data_s);
 
 void entity_sign_init(entity_s *self, FIXED px, FIXED py, const char *dialogue,
                       bool alt_appearance)
@@ -1267,6 +1278,7 @@ typedef struct fragile_block_data
 {
     int hits;
 } fragile_block_data_s;
+EDATA_SIZE_CHECK(fragile_block_data_s)
 
 void entity_fragile_block_init(entity_s *self, FIXED px, FIXED py)
 {
@@ -1324,6 +1336,7 @@ typedef struct orb_data
     bool blue;
 }
 orb_data_s;
+EDATA_SIZE_CHECK(orb_data_s)
 
 void entity_orb(entity_s *self, FIXED px, FIXED py, bool blue)
 {
