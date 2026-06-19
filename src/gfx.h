@@ -44,11 +44,15 @@
 #define GFX_TEXTPAL_MUL       4
 #define GFX_BGPAL_USER0       5
 #define GFX_BGPAL_USER1       6
+#define GFX_BGPAL_USER_COUNT  2
 
 #define GFX_OBJPAL_NORMAL     0
 #define GFX_OBJPAL_MUL        1
 #define GFX_OBJPAL_USER0      2
 #define GFX_OBJPAL_USER1      3
+#define GFX_OBJPAL_USER2      4
+#define GFX_OBJPAL_USER3      5
+#define GFX_OBJPAL_USER_COUNT 4
 
 typedef enum text_color
 {
@@ -194,8 +198,10 @@ typedef struct gfx_display_control
     gfx_win_s win[2];
     gfx_bg_s bg[4];
 
-    u8 bg_userpal[2][16];
-    u8 obj_userpal[2][16];
+    u8 bg_userpal[GFX_BGPAL_USER_COUNT][16];
+    u8 obj_userpal[GFX_OBJPAL_USER_COUNT][16];
+    u8 bg_userpal_mul;
+    u8 obj_userpal_mul;
 }
 gfx_display_control_s;
 

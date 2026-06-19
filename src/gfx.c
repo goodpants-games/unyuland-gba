@@ -151,10 +151,11 @@ void gfx_reset_palette(void)
 
     for (uint i = 0; i < 16; ++i)
     {
-        pal_bg_bank[GFX_BGPAL_USER0][i] =
-            gfx_palette[gfx_ctl.bg_userpal[0][i]];
-        pal_bg_bank[GFX_BGPAL_USER1][i] =
-            gfx_mul_palette[gfx_ctl.bg_userpal[1][i]];
+        for (uint j = 0; j < GFX_BGPAL_USER_COUNT; ++j)
+        {
+            pal_bg_bank[GFX_BGPAL_USER0 + j][i] =
+                gfx_palette[gfx_ctl.bg_userpal[j][i]];
+        }
     }
 
     // pal bank 0: regular palette
@@ -166,10 +167,11 @@ void gfx_reset_palette(void)
         pal_obj_bank[GFX_OBJPAL_NORMAL][i] = gfx_palette[i];
         pal_obj_bank[GFX_OBJPAL_MUL][i] = gfx_mul_palette[i];
 
-        pal_obj_bank[GFX_OBJPAL_USER0][i] =
-            gfx_palette[gfx_ctl.obj_userpal[0][i]];
-        pal_obj_bank[GFX_OBJPAL_USER1][i] =
-            gfx_palette[gfx_ctl.obj_userpal[1][i]];
+        for (uint j = 0; j < GFX_OBJPAL_USER_COUNT; ++j)
+        {
+            pal_obj_bank[GFX_OBJPAL_USER0 + j][i] =
+                gfx_palette[gfx_ctl.obj_userpal[j][i]];
+        }
     }
 
     // make all transparent colors display as purple in emulator debug views...
@@ -238,10 +240,26 @@ void gfx_set_palette_multiplied(FIXED factor)
     pal_bg_bank[GFX_TEXTPAL_MUL][15] = gfx_mul_palette[GFX_PAL_WHITE];
 
     for (int i = 1; i < 16; ++i)
-    {
         pal_obj_bank[GFX_OBJPAL_MUL][i] = gfx_mul_palette[i];
-        pal_obj_bank[GFX_OBJPAL_USER1][i] =
-            gfx_mul_palette[gfx_ctl.obj_userpal[1][i]];
+
+    // apply to bg user palettes
+    for (int p = 0; p < GFX_BGPAL_USER_COUNT; ++p)
+    {
+        u16 *pal = (gfx_ctl.bg_userpal_mul & (1 << p)) ?
+                   gfx_mul_palette : gfx_palette;
+        
+        for (int i = 1; i < 16; ++i)
+            pal_obj_bank[GFX_OBJPAL_USER0+p][i] = pal[gfx_ctl.obj_userpal[p][i]];
+    }
+
+    // apply to obj user palettes
+    for (int p = 0; p < GFX_OBJPAL_USER_COUNT; ++p)
+    {
+        u16 *pal = (gfx_ctl.obj_userpal_mul & (1 << p)) ?
+                   gfx_mul_palette : gfx_palette;
+        
+        for (int i = 1; i < 16; ++i)
+            pal_obj_bank[GFX_OBJPAL_USER0+p][i] = pal[gfx_ctl.obj_userpal[p][i]];
     }
 }
 
@@ -962,6 +980,9 @@ void* gfx_alloc_cpybuf(size_t size)
 
 void gfx_init(void)
 {
+    gfx_ctl.bg_userpal_mul  = 0b01111111;
+    gfx_ctl.obj_userpal_mul = 0b01111111;
+
     dma_cpypool_write = dma_cpypool;
     memcpy16(gfx_palette, gfx_palette_normal, 16);
     oam_init(gfx_oam_buffer, 128);
