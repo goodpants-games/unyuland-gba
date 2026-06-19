@@ -261,6 +261,7 @@ static void stop_sound(snd_slot_s *slot)
 static void snd_tick(uint tick_idx)
 {
     static snd_slot_s *last_channel_slot[4] = { NULL, NULL, NULL, NULL };
+    static u8 last_channel_vol[4] = { 0, 0, 0, 0 };
     snd_slot_s *channel_slot[4] = { NULL, NULL, NULL, NULL };
 
     if ((uint)next_snd_slot > MAX_ACTIVE_SOUNDS)
@@ -298,8 +299,7 @@ static void snd_tick(uint tick_idx)
         snd_slot_s *const slot = channel_slot[ch];
         u16 *reg_ctl = &reg_ctl_vals[ch][tick_idx];
         u16 *reg_freq = &reg_freq_vals[ch][tick_idx];
-
-        bool reset = channel_slot[ch] != last_channel_slot[ch];
+        
         last_channel_slot[ch] = slot;
 
         if (!slot)
@@ -315,8 +315,15 @@ static void snd_tick(uint tick_idx)
             }
 
             *reg_freq = 0;
+            last_channel_vol[ch] = -1;
             continue;
         }
+
+        u8 vol = (u8) fx2int(slot->vol) & 0xF;
+
+        bool reset = channel_slot[ch] != last_channel_slot[ch] ||
+                     vol != last_channel_vol[ch];
+        last_channel_vol[ch] = vol;
 
         static const uint duty_flags[] =
             { SSQR_DUTY1_2, SSQR_DUTY1_4, SSQR_DUTY1_8 };
@@ -334,11 +341,11 @@ static void snd_tick(uint tick_idx)
         }
         else if (ch == 3)
         {
-            *reg_ctl = SSQR_IVOL(fx2int(slot->vol));
+            *reg_ctl = SSQR_IVOL(vol);
         }
         else
         {
-            *reg_ctl = SSQR_IVOL(fx2int(slot->vol)) |
+            *reg_ctl = SSQR_IVOL(vol) |
                        duty_flags[slot->channel_config];
         }
         
@@ -360,7 +367,7 @@ static void snd_tick(uint tick_idx)
                         SFREQ_RATE(fx2int(rate) & SFREQ_RATE_MASK);
         }
         
-        if (reset || ch < 2) *reg_freq |= SFREQ_RESET;
+        if (reset) *reg_freq |= SFREQ_RESET;
     }
 }
 
