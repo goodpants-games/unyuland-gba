@@ -549,7 +549,7 @@ static const snd_cmd sound_enemy_hurt[] = {
 
 static const snd_cmd sound_enemy_death[] = {
     SNDCMD_PRIO(SNDCMD_PRIO_PLAYER),
-    SNDCMD_SET_CH(SNDCMD_CH_SQR2, SNDCMD_CH_SQR_DUTY2),
+    SNDCMD_SET_CH(SNDCMD_CH_SQR2, SNDCMD_CH_SQR_DUTY4),
     SNDCMD_PITCH(0, SNDCMD_KEY(Gb, 3)),
     SNDCMD_PITCH(1, SNDCMD_KEY(A, 2)),
     SNDCMD_PLAY_SWP(6),
