@@ -6,6 +6,7 @@
 #include "scenes.h"
 #include "menu.h"
 #include "gfx.h"
+#include "tonc_memdef.h"
 
 #include <game_logo_gfx.h>
 
@@ -262,6 +263,9 @@ static void scene_frame(void)
 
     if (start)
         scenemgr_change(&scene_desc_intro, 0);
+
+    if (key_held(KEY_R) && key_hit(KEY_SELECT))
+        scenemgr_change(&scene_desc_sndtest, 0);
 }
 
 const scene_desc_s scene_desc_menu = {
