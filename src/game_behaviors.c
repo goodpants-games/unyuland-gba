@@ -55,6 +55,7 @@ static bool droplet_check_tile(FIXED x, FIXED y)
 typedef struct enemy_base
 {
     s8 health;
+    u8 hurt_flash;
 }
 enemy_base_s;
 EDATA_SIZE_CHECK(enemy_base_s)
@@ -64,8 +65,17 @@ static bool enemy_base_update(entity_s *self)
 {
     enemy_base_s *data = (enemy_base_s *)&self->userdata;
 
+    self->sprite.palette = ((data->hurt_flash >> 1) & 1)
+                           ? GFX_OBJPAL_USER2 : GFX_OBJPAL_MUL;
+
+    if (data->hurt_flash > 0)
+        --data->hurt_flash;
+
     if (data->health < 0)
     {
+        if (data->hurt_flash == 0)
+            data->hurt_flash = 7;
+
         if (--data->health < -60)
             entity_queue_free(self);
         return true;
@@ -89,6 +99,8 @@ static bool enemy_base_proj_touch(entity_s *self, projectile_s *proj,
 {
     enemy_base_s *data = (enemy_base_s *)&self->userdata;
     if (proj->kind != PROJ_KIND_PLAYER) return true;
+
+    data->hurt_flash = 7;
 
     if (--data->health == 0)
     {

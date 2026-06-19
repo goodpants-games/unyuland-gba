@@ -591,6 +591,10 @@ void game_init(void)
     entity_player_init(player);
     player->pos.x = int2fx(16);
     player->pos.y = int2fx(16);
+
+    // init hurt flash palette
+    for (int i = 1; i < 16; ++i)
+        gfx_ctl.obj_userpal[2][i] = GFX_PAL_RED;
 }
 
 void game_update(void)
