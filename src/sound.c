@@ -538,6 +538,15 @@ static const snd_cmd sound_enemy_spit[] = {
     SNDCMD_END,
 };
 
+static const snd_cmd sound_enemy_hurt[] = {
+    SNDCMD_PRIO(SNDCMD_PRIO_DEFAULT),
+    SNDCMD_SET_CH(SNDCMD_CH_SQR2, SNDCMD_CH_SQR_DUTY4),
+    SNDCMD_PITCH(0, SNDCMD_KEY(E, 3)),
+    SNDCMD_PITCH(1, SNDCMD_KEY(A, 2)),
+    SNDCMD_PLAY_SWP(6),
+    SNDCMD_END
+};
+
 static const snd_cmd sound_enemy_death[] = {
     SNDCMD_PRIO(SNDCMD_PRIO_PLAYER),
     SNDCMD_SET_CH(SNDCMD_CH_SQR2, SNDCMD_CH_SQR_DUTY2),
@@ -606,6 +615,7 @@ void init_sound_table(void)
     snd_sounds[SND_ID_CHECKPOINT]     = sound_checkpoint;
     snd_sounds[SND_ID_SPRING]         = sound_spring;
     snd_sounds[SND_ID_ENEMY_SPIT]     = sound_enemy_spit;
+    snd_sounds[SND_ID_ENEMY_HURT]     = sound_enemy_hurt;
     snd_sounds[SND_ID_ENEMY_DIE]      = sound_enemy_death;
     snd_sounds[SND_ID_MENU_MOVE]      = sound_menu_move;
     snd_sounds[SND_ID_MENU_SELECT]    = sound_menu_select;

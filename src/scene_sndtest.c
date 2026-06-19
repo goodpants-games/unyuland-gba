@@ -15,6 +15,7 @@ static const char *sound_names[SND_SOUND_COUNT] = {
     "CHECKPOINT",
     "SPRING",
     "ENEMY_SPIT",
+    "ENEMY_HURT",
     "ENEMY_DIE",
     "MENU_MOVE",
     "MENU_SELECT",

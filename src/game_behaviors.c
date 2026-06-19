@@ -127,6 +127,8 @@ static bool enemy_base_proj_touch(entity_s *self, projectile_s *proj,
     {
         self->vel.x = 0;
         self->vel.y = 0;
+
+        snd_play(SND_ID_ENEMY_HURT);
     }
 
     return false;
