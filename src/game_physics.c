@@ -996,7 +996,7 @@ static void partgrid_cell_insert(partgrid_node_s **cell,
     *cell = new_node;
 }
 
-IWRAM_CODE
+ARM_FUNC NO_INLINE
 static void game_physics_move_projs(FIXED vel_mult)
 {
     for (uint i = 0; i < MAX_PROJECTILE_COUNT; ++i)
@@ -1052,6 +1052,81 @@ static void game_physics_move_projs(FIXED vel_mult)
             // move node to new cell (or create a new node if not exists)
             partgrid_cell_insert(new_part_cell, node);
             pdata->part_cell = new_part_cell;
+        }
+    }
+
+    // projectile/entity collision detection
+    for (int i = 0; i < col_ent_count; ++i)
+    {
+        entity_coldata_s *const col_ent = col_ents[i];
+        entity_s *entity = col_ent->ent;
+
+        if (!(entity->col.mask & COLGROUP_PROJECTILE)) continue;
+        if (entity->col.flags & COL_FLAG_MONITOR_ONLY) continue;
+
+        const FIXED col_w = col_ent->width;
+        const FIXED col_h = col_ent->height;
+
+        const int el = entity->pos.x;
+        const int et = entity->pos.y;
+        const int er = (entity->pos.x + col_w);
+        const int eb = (entity->pos.y + col_h);
+
+        int min_px = el / (FIX_ONE * PARTGRID_CEL_W);
+        int min_py = et / (FIX_ONE * PARTGRID_CEL_H);
+        int max_px = er / (FIX_ONE * PARTGRID_CEL_W);
+        int max_py = eb / (FIX_ONE * PARTGRID_CEL_H);
+
+        // clamp bounds to partition grid
+        if      (min_px < 0)              min_px = 0;
+        else if (min_px >= PARTGRID_COLS) min_px = PARTGRID_COLS - 1;
+        if      (max_px < 0)              max_px = 0;
+        else if (max_px >= PARTGRID_COLS) max_px = PARTGRID_COLS - 1;
+
+        if      (min_py < 0)              min_py = 0;
+        else if (min_py >= PARTGRID_ROWS) min_py = PARTGRID_ROWS - 1;
+        if      (max_py < 0)              max_py = 0;
+        else if (max_py >= PARTGRID_ROWS) max_py = PARTGRID_ROWS - 1;
+
+        for (int y = min_py; y <= max_py; ++y)
+        {
+            for (int x = min_px; x <= max_px; ++x)
+            {
+                // traverse linked list
+                for (partgrid_node_s *node = partgrid[y][x]; node;
+                    node = node->next)
+                {
+                    projectile_s *proj = node->projectile;
+
+                    if (proj->flags & PROJ_FLAG_QFREE) continue;
+
+                    FIXED px = proj->px;
+                    FIXED py = proj->py;
+
+                    if (!(px > el && px < er && py > et && py < eb))
+                        continue;
+
+                    if (proj->did_touch_this_frame) continue;
+                    proj->did_touch_this_frame = true;
+
+                    // if (!(entity->flags & ENTITY_FLAG_MOVING))
+                    //     LOG_DBG("Proc");
+                    
+                    bool keep;
+                    if (entity->behavior &&
+                        entity->behavior->proj_touch)
+                    {
+                        keep = entity->behavior->proj_touch(entity, proj);
+                    }
+                    else
+                    {
+                        keep = false;
+                    }
+                    
+                    if (!keep)
+                        projectile_queue_free(proj);
+                }
+            }
         }
     }
 }
@@ -1217,84 +1292,7 @@ void game_physics_update(void)
     }
 
     for (int iter = 0; iter < 2; ++iter)
-    {
         game_physics_move_projs(FIX_ONE / 2);
-
-        // projectile/entity collision detection
-        for (int i = 0; i < col_ent_count; ++i)
-        {
-            entity_coldata_s *const col_ent = col_ents[i];
-            entity_s *entity = col_ent->ent;
-
-            if (!(entity->col.mask & COLGROUP_PROJECTILE)) continue;
-            if (entity->col.flags & COL_FLAG_MONITOR_ONLY) continue;
-
-            const FIXED col_w = col_ent->width;
-            const FIXED col_h = col_ent->height;
-
-            const int el = entity->pos.x;
-            const int et = entity->pos.y;
-            const int er = (entity->pos.x + col_w);
-            const int eb = (entity->pos.y + col_h);
-
-            int min_px = el / (FIX_ONE * PARTGRID_CEL_W);
-            int min_py = et / (FIX_ONE * PARTGRID_CEL_H);
-            int max_px = er / (FIX_ONE * PARTGRID_CEL_W);
-            int max_py = eb / (FIX_ONE * PARTGRID_CEL_H);
-
-            // clamp bounds to partition grid
-            if      (min_px < 0)              min_px = 0;
-            else if (min_px >= PARTGRID_COLS) min_px = PARTGRID_COLS - 1;
-            if      (max_px < 0)              max_px = 0;
-            else if (max_px >= PARTGRID_COLS) max_px = PARTGRID_COLS - 1;
-
-            if      (min_py < 0)              min_py = 0;
-            else if (min_py >= PARTGRID_ROWS) min_py = PARTGRID_ROWS - 1;
-            if      (max_py < 0)              max_py = 0;
-            else if (max_py >= PARTGRID_ROWS) max_py = PARTGRID_ROWS - 1;
-
-            for (int y = min_py; y <= max_py; ++y)
-            {
-                for (int x = min_px; x <= max_px; ++x)
-                {
-                    // traverse linked list
-                    for (partgrid_node_s *node = partgrid[y][x]; node;
-                        node = node->next)
-                    {
-                        projectile_s *proj = node->projectile;
-
-                        if (proj->flags & PROJ_FLAG_QFREE) continue;
-
-                        FIXED px = proj->px;
-                        FIXED py = proj->py;
-
-                        if (!(px > el && px < er && py > et && py < eb))
-                            continue;
-
-                        if (proj->did_touch_this_frame) continue;
-                        proj->did_touch_this_frame = true;
-
-                        // if (!(entity->flags & ENTITY_FLAG_MOVING))
-                        //     LOG_DBG("Proc");
-                        
-                        bool keep;
-                        if (entity->behavior &&
-                            entity->behavior->proj_touch)
-                        {
-                            keep = entity->behavior->proj_touch(entity, proj);
-                        }
-                        else
-                        {
-                            keep = false;
-                        }
-                        
-                        if (!keep)
-                            projectile_queue_free(proj);
-                    }
-                }
-            }
-        }
-    }
 
     PROFILE_END(projectiles_t);
 
