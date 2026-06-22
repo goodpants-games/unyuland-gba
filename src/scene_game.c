@@ -417,9 +417,6 @@ static void scene_load(uintptr_t data)
     game_reset_player_pos();
     setup_game_hud();
 
-    mmStart(MOD_TESTMOD, MM_PLAY_LOOP);
-    mmSetModuleVolume((int)(1024 * 0.3));
-
     // load game tileset
     gfx_queue_memset(&tile_mem[0][0] + GFX_CHAR_GAME_TILESET, 0, sizeof(TILE));
     gfx_queue_memcpy(&tile_mem[0][0] + GFX_CHAR_GAME_TILESET + 1,
@@ -434,7 +431,7 @@ static void scene_load(uintptr_t data)
 
 static void scene_unload(void)
 {
-    mmStop();
+    game_deinit();
     gfx_unload_map(1);
     gfx_ctl.bg[1].offset_x = 0;
     gfx_ctl.bg[1].offset_y = 0;

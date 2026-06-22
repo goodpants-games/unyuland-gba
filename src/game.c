@@ -2,6 +2,7 @@
 #include <tonc.h>
 #include <world.h>
 #include <string.h>
+#include <maxmod.h>
 
 #include "game.h"
 #include "game_physics.h"
@@ -578,6 +579,7 @@ void game_init(void)
         },
         .cam_x = int2fx(SCREEN_WIDTH / 4),
         .cam_y = int2fx(SCREEN_HEIGHT / 4),
+        .cur_music = UINT8_MAX
     };
 
     last_obj_index = 0;
@@ -595,6 +597,11 @@ void game_init(void)
     // init hurt flash palette
     for (int i = 1; i < 16; ++i)
         gfx_ctl.obj_userpal[2][i] = GFX_PAL_RED;
+}
+
+void game_deinit()
+{
+    mmStop();
 }
 
 void game_update(void)
@@ -771,6 +778,13 @@ void game_load_room(const world_room_s *room)
         {
             game_load_entity(&load_ent);
         }
+    }
+
+    if (g_game.cur_music != room->music)
+    {
+        mmStop();
+        g_game.cur_music = room->music;
+        mmStart(g_game.cur_music, MM_PLAY_LOOP);
     }
 }
 

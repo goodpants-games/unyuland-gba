@@ -238,6 +238,8 @@ typedef struct game {
     u8 collected_orbs_count;
     // list of rooms in which the orb was collected
     const world_room_s *collected_orbs[MAX_ORB_COUNT];
+
+    u8 cur_music;
 } game_s;
 
 typedef enum entity_load_prop_type
@@ -282,6 +284,7 @@ void projectile_free(projectile_s *proj);
 bool projectile_queue_free(projectile_s *proj);
 
 void game_init(void);
+void game_deinit(void);
 void game_update(void);
 void game_load_room(const world_room_s *room);
 void game_reset_player_pos(void);

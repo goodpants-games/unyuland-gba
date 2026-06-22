@@ -6,6 +6,7 @@ import json
 import typing
 import struct
 import ioutil
+import xml.etree.ElementTree as xml
 
 ROOM_SCREEN_WIDTH = 15
 ROOM_SCREEN_HEIGHT = 11
@@ -38,6 +39,7 @@ class RoomData:
         self.y = y
         self.w = w
         self.h = h
+        self.music = "caves"
 
 class Array2D:
     def __init__(self: typing.Self, w: int, h: int, data: list):
@@ -74,6 +76,31 @@ def abort_errors():
         raise RuntimeError("multiple errors occurred: " + err_text)
 
 
+def get_room_music(world_path: str, room_name: str) -> str:
+    room_path: str = path.join(path.dirname(world_path), room_name)
+    
+    with open(room_path, 'r') as ifile:
+        tmx_data = xml.fromstring(ifile.read())
+    
+    room_music = "caves"
+    room_props = tmx_data.find('properties')
+    if room_props is not None:
+        for prop in room_props.findall('property'):
+            if prop.get('name') == 'music':
+                room_music = prop.get('value')
+    
+    # check that the music file exists
+    mod_exts = {"mod", "s3m", "xm", "it"}
+    music_dir = path.abspath(path.join(world_path, '../../music'))
+    for ext in mod_exts:
+        if path.exists(path.join(music_dir, f'{room_music}.{ext}')):
+            return room_music    
+    
+    g_errors.append(
+        RuntimeError(f"music file named '{room_music}' does not exist"))
+
+    
+
 def worldproc(world_path: str, room_list: list[str],
               out_json: typing.TextIO|None = None,
               out_bin: typing.BinaryIO|None = None,
@@ -89,8 +116,12 @@ def worldproc(world_path: str, room_list: list[str],
     rooms: dict[str, RoomData] = {}
     for map_json in world_data['maps']:
         name, _ = path.splitext(map_json['fileName'])
-        rooms[name] = RoomData(name, map_json['x'], map_json['y'],
-                               map_json['width'], map_json['height'])
+        mus = get_room_music(world_path, map_json['fileName'])
+
+        room_data = RoomData(name, map_json['x'], map_json['y'],
+                             map_json['width'], map_json['height'])
+        room_data.music = mus
+        rooms[name] = room_data
     
     # get bounding box of world
     min_x =  0x7FFFFFFF
@@ -193,6 +224,7 @@ def generate_c_source(rooms: list[str], room_data: dict[str, RoomData],
 typedef struct world_room
 {{
     u8 x, y;
+    u8 music;
     const map_header_s *map;
 }}
 world_room_s;
@@ -203,7 +235,9 @@ extern const u8 world_matrix[WORLD_MATRIX_HEIGHT][WORLD_MATRIX_WIDTH];
 #endif""")
     
     with open(fc_path, 'w') as fc:
-        fc.write("#include \"world.h\"\n\n")
+        fc.write("#include <soundbank.h>\n")
+        fc.write("#include \"world.h\"\n")
+        fc.write("\n")
 
         for name in rooms:
             fc.write("#include <")
@@ -217,8 +251,10 @@ const world_room_s world_rooms[WORLD_ROOM_COUNT] = {{""")
             data = room_data[name]
             room_x = data.x // WORLD_GRID_WIDTH
             room_y = data.y // WORLD_GRID_HEIGHT
+            room_music = data.music.upper()
 
             fc.write(f"\n    {{ .x = {room_x}, .y = {room_y}, ")
+            fc.write(f".music = MOD_{room_music}, ")
             fc.write(".map = (const map_header_s *)")
             fc.write(name)
             fc.write("_map },")
