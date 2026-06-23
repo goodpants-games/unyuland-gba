@@ -3,5 +3,6 @@
 
 #define ARM_FUNC
 #define NO_INLINE __attribute__((noinline))
+#define PLATFORM_PC
 
 #endif
