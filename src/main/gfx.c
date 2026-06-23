@@ -1136,7 +1136,7 @@ void gfx_new_frame(void)
     REG_BG2CNT = bg_cnt[2];
     REG_BG3CNT = bg_cnt[3];
 
-#ifdef DEVDEBUG
+#if defined(DEVDEBUG) && defined(PLATFORM_GBA)
     if (REG_VCOUNT < 160)
         LOG_WRN("gfx_new_frame took too long! %i", REG_VCOUNT);
 #endif

@@ -13,7 +13,7 @@ void mgba_printf(int level, const char* string, ...)
     switch (level)
     {
     case MGBA_LOG_DEBUG:
-        fprintf(stderr, "[ERR] ");
+        fprintf(stderr, "[DBG] ");
         break;
 
     case MGBA_LOG_INFO:
