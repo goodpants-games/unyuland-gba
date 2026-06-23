@@ -50,5 +50,18 @@ $(OUTPUT).gba: $(OUTPUT).elf
 $(OUTPUT).elf: $(OFILES)
 endef
 
+#---------------------------------------------------------------------------------
+# This rule creates assembly source files using grit
+# grit takes an image file and a .grit describing how the file is to be processed
+# add additional rules like this for each image extension
+# you use in the graphics folders
+#---------------------------------------------------------------------------------
+%_gfx.s %_gfx.h: %.png %.grit
+#---------------------------------------------------------------------------------
+	@echo "grit $<"
+	@grit $< -fts -o$*_gfx
+
+
+#---------------------------------------------------------------------------------
 export PLATFORM_MAKEFILE := $(TOPLEVEL)/makefiles/gba.mk
 include $(TOPLEVEL)/makefiles/common.mk

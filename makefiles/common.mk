@@ -95,7 +95,7 @@ export OFILES_GRAPHICS := $(addsuffix _gfx.o,$(PNGFILES:.png=))
 export OFILES_MAPS := $(addsuffix .o,$(MAPFILES)) world.o automap.bin.o
 
 export OFILES_SPRITES := $(addsuffix _sprdb.bin.o,$(SPRFILES:.sprdb=))\
-                         $(addsuffix _sprdb_gfx.s,$(SPRFILES:.sprdb=))
+                         $(addsuffix _sprdb_gfx.o,$(SPRFILES:.sprdb=))
 
 export OFILES_INTERMEDIATE := sinelut.bin.o dlg.bin.o pitchlut.bin.o\
                               wave_tri.bin.o wave_noise.bin.o
@@ -132,6 +132,47 @@ else
 $(eval $(BUILD_TARGETS))
 
 #---------------------------------------------------------------------------------
+# allow seeing compiler command lines with make V=1 (similar to autotools' silent)
+#---------------------------------------------------------------------------------
+ifeq ($(V),1)
+    SILENTMSG := @true
+    SILENTCMD :=
+else
+    SILENTMSG := @echo
+    SILENTCMD := @
+endif
+
+#---------------------------------------------------------------------------------
+# Generate compile commands
+#---------------------------------------------------------------------------------
+ADD_COMPILE_COMMAND ?= @true
+
+#---------------------------------------------------------------------------------
+# rules to compile .cpp, .c, and .s files
+#---------------------------------------------------------------------------------
+
+%.o: %.cpp
+	$(SILENTMSG) $(notdir $<)
+	$(ADD_COMPILE_COMMAND) add $(CXX) "$(_EXTRADEFS) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@" $<
+	$(SILENTCMD)$(CXX) -MMD -MP -MF $(DEPSDIR)/$*.d $(_EXTRADEFS) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@ $(ERROR_FILTER)
+
+%.o: %.c
+	$(SILENTMSG) $(notdir $<)
+	$(ADD_COMPILE_COMMAND) add $(CC) "$(_EXTRADEFS) $(CPPFLAGS) $(CFLAGS) -c $< -o $@" $<
+	$(SILENTCMD)$(CC) -MMD -MP -MF $(DEPSDIR)/$*.d $(_EXTRADEFS) $(CPPFLAGS) $(CFLAGS) -c $< -o $@ $(ERROR_FILTER)
+
+%.o: %.s
+	$(SILENTMSG) $(notdir $<)
+	$(ADD_COMPILE_COMMAND) add $(CC) "-x assembler-with-cpp $(_EXTRADEFS) $(CPPFLAGS) $(ASFLAGS) -c $< -o $@" $<
+	$(SILENTCMD)$(CC) -MMD -MP -MF $(DEPSDIR)/$*.d -x assembler-with-cpp $(_EXTRADEFS) $(CPPFLAGS) $(ASFLAGS) -c $< -o $@ $(ERROR_FILTER)
+
+%.o: %.S
+	$(SILENTMSG) $(notdir $<)
+	$(ADD_COMPILE_COMMAND) add $(CC) "-x assembler-with-cpp $(_EXTRADEFS) $(CPPFLAGS) $(ASFLAGS) -c $< -o $@" $<
+	$(SILENTCMD)$(CC) -MMD -MP -MF $(DEPSDIR)/$*.d -x assembler-with-cpp $(_EXTRADEFS) $(CPPFLAGS) $(ASFLAGS) -c $< -o $@ $(ERROR_FILTER)
+
+
+#---------------------------------------------------------------------------------
 # The bin2o rule should be copied and modified
 # for each extension used in the data directories
 #---------------------------------------------------------------------------------
@@ -150,17 +191,6 @@ soundbank.bin soundbank.h : $(AUDIOFILES)
 #---------------------------------------------------------------------------------
 	@echo $(notdir $<)
 	@$(bin2o)
-
-#---------------------------------------------------------------------------------
-# This rule creates assembly source files using grit
-# grit takes an image file and a .grit describing how the file is to be processed
-# add additional rules like this for each image extension
-# you use in the graphics folders
-#---------------------------------------------------------------------------------
-%_gfx.s %_gfx.h: %.png %.grit
-#---------------------------------------------------------------------------------
-	@echo "grit $<"
-	@grit $< -fts -o$*_gfx
 
 #---------------------------------------------------------------------------------
 # These rules convert Tiled level files to a more efficient format readable by
