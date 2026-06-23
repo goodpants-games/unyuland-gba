@@ -171,7 +171,7 @@ typedef struct entity
         s16 oy;
     } sprite;
 
-    s32 userdata[4];
+    uintptr_t userdata[4];
     const behavior_def_s *behavior;
 } entity_s;
 

@@ -24,7 +24,7 @@
 #define PLAYER_SPIT_G_MULT            TO_FIXED(2.00)
 
 #define EDATA_SIZE_CHECK(strt) \
-    static_assert(sizeof(strt) <= 16, \
+    static_assert(sizeof(strt) <= sizeof(uintptr_t) * 4, \
                   "struct '" #strt "' exceeds storage capcity");
 
 static bool droplet_check_tile(FIXED x, FIXED y)
