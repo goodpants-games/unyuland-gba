@@ -28,7 +28,7 @@ endef
 
 define BUILD_TARGETS
 $(OUTPUT): $(OFILES)
-	$(SILENTCMD)$(CC) $(OFILES) $(LDFLAGS) -o $(OUTPUT)
+	$(SILENTCMD)$(CC) $(OFILES) $(LDFLAGS) $(LIBS) -o $(OUTPUT)
 endef
 
 #---------------------------------------------------------------------------------

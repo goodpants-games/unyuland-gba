@@ -1,4 +1,3 @@
-#include <__stdarg_va_list.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdbool.h>
