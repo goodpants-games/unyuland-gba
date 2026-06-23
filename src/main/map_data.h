@@ -4,7 +4,6 @@
 #include <tonc_core.h>
 #include <tonc_types.h>
 #include <stddef.h>
-#include "mgba.h"
 #include "math_util.h"
 
 #define MAP_GFX_FORMAT_GBA      0 // hardware GBA screen-entry format

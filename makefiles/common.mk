@@ -117,8 +117,8 @@ export LIBPATHS	:=	$(foreach dir,$(LIBDIRS),-L$(dir)/lib)
 
 #---------------------------------------------------------------------------------
 $(BUILD):
-	@[ -d $@ ] || mkdir -p $@
-	@$(MAKE) --no-print-directory -C $(BUILD) -f $(PLATFORM_MAKEFILE)
+	$(SILENTCMD)[ -d $@ ] || mkdir -p $@
+	$(SILENTCMD)$(MAKE) --no-print-directory -C $(BUILD) -f $(PLATFORM_MAKEFILE)
 
 #---------------------------------------------------------------------------------
 clean:

@@ -25,7 +25,7 @@
 
 #include <stdarg.h>
 #include <string.h>
-#include "printf.h"
+#include <printf.h>
 #include "mgba.h"
 
 #define REG_DEBUG_ENABLE (vu16*) 0x4FFF780
