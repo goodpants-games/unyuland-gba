@@ -46,32 +46,6 @@ void obj_copy(OBJ_ATTR *dst, const OBJ_ATTR *src, uint count);
 void obj_hide_multi(OBJ_ATTR *obj, uint count);
 void obj_unhide_multi(OBJ_ATTR *obj, u16 mode, uint count);
 
-// --- Obj affine only ---
-void obj_aff_copy(OBJ_AFFINE *dst, const OBJ_AFFINE *src, uint count);
-
-INLINE void obj_aff_set(OBJ_AFFINE *oaff, 
-	FIXED pa, FIXED pb, FIXED pc, FIXED pd);
-INLINE void obj_aff_identity(OBJ_AFFINE *oaff);
-INLINE void obj_aff_scale(OBJ_AFFINE *oaff, FIXED sx, FIXED sy);
-INLINE void obj_aff_shearx(OBJ_AFFINE *oaff, FIXED hx);
-INLINE void obj_aff_sheary(OBJ_AFFINE *oaff, FIXED hy);
-
-void obj_aff_rotate(OBJ_AFFINE *oaff, u16 alpha);
-void obj_aff_rotscale(OBJ_AFFINE *oaff, FIXED sx, FIXED sy, u16 alpha);
-void obj_aff_premul(OBJ_AFFINE *dst, const OBJ_AFFINE *src);
-void obj_aff_postmul(OBJ_AFFINE *dst, const OBJ_AFFINE *src);
-
-void obj_aff_rotscale2(OBJ_AFFINE *oaff, const AFF_SRC *as);
-void obj_rotscale_ex(OBJ_ATTR *obj, OBJ_AFFINE *oaff, const AFF_SRC_EX *asx);
-
-
-// inverse (object -> screen) functions, could be useful
-// inverses (prototypes)
-INLINE void obj_aff_scale_inv(OBJ_AFFINE *oa, FIXED wx, FIXED wy);
-INLINE void obj_aff_rotate_inv(OBJ_AFFINE *oa, u16 theta);
-INLINE void obj_aff_shearx_inv(OBJ_AFFINE *oa, FIXED hx);
-INLINE void obj_aff_sheary_inv(OBJ_AFFINE *oa, FIXED hy);
-
 /*!	\}	*/
 
 
@@ -127,59 +101,5 @@ INLINE int obj_get_height(const OBJ_ATTR *obj)
 {	return obj_get_size(obj)[1];						}
 
 
-// --- Affine only ---
-
-
-//! Set the elements of an \a object affine matrix.
-INLINE void obj_aff_set(OBJ_AFFINE *oaff, 
-	FIXED pa, FIXED pb, FIXED pc, FIXED pd)
-{
-	oaff->pa= pa;	oaff->pb= pb;
-	oaff->pc= pc;	oaff->pd= pd;
-}
-
-//! Set an object affine matrix to the identity matrix
-INLINE void obj_aff_identity(OBJ_AFFINE *oaff)
-{
-	oaff->pa= 0x0100l;	oaff->pb= 0;
-	oaff->pc= 0;		oaff->pd= 0x0100;
-}
-
-//! Set an object affine matrix for scaling.
-INLINE void obj_aff_scale(OBJ_AFFINE *oaff, FIXED sx, FIXED sy)
-{
-	oaff->pa= sx;	oaff->pb= 0;
-	oaff->pc= 0;	oaff->pd= sy;
-}
-
-INLINE void obj_aff_shearx(OBJ_AFFINE *oaff, FIXED hx)
-{
-	oaff->pa= 0x0100;	oaff->pb= hx;
-	oaff->pc= 0;		oaff->pd= 0x0100;
-}
-
-INLINE void obj_aff_sheary(OBJ_AFFINE *oaff, FIXED hy)
-{
-	oaff->pa= 0x0100;	oaff->pb= 0;
-	oaff->pc= hy;		oaff->pd= 0x0100;
-}
-
-
-// --- Inverse operations ---
-
-INLINE void obj_aff_scale_inv(OBJ_AFFINE *oaff, FIXED wx, FIXED wy)
-{	obj_aff_scale(oaff, ((1<<24)/wx)>>8, ((1<<24)/wy)>>8);	}
-
-INLINE void obj_aff_rotate_inv(OBJ_AFFINE *oaff, u16 theta)
-{	obj_aff_rotate(oaff, -theta);		}
-
-INLINE void obj_aff_shearx_inv(OBJ_AFFINE *oaff, FIXED hx)
-{	obj_aff_shearx(oaff, -hx);								}
-
-INLINE void obj_aff_sheary_inv(OBJ_AFFINE *oaff, FIXED hy)
-{	obj_aff_sheary(oaff, -hy);								}
-
-
-/*! \}	*/
 
 #endif // TONC_OAM

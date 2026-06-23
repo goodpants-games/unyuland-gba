@@ -12,15 +12,15 @@ LIBTONC := $(DEVKITPRO)/libtonc
 #---------------------------------------------------------------------------------
 # platform-specific sources
 #---------------------------------------------------------------------------------
-SOURCES		:= src/gba
+SOURCES := src/gba
 
 
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
 ARCH	:=	-mthumb -mthumb-interwork
-CFLAGS	:=	-mcpu=arm7tdmi -mtune=arm7tdmi $(ARCH)
-ASFLAGS	:=	$(ARCH)
+CFLAGS	:=	-DPLATFORM_GBA -mcpu=arm7tdmi -mtune=arm7tdmi $(ARCH)
+ASFLAGS	:=	-DPLATFORM_GBA $(ARCH)
 LDFLAGS	:=	$(ARCH) -Wl,-Map,$(notdir $*.map)
 
 

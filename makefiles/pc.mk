@@ -1,7 +1,22 @@
+PKGCONF ?= pkg-config
+CC ?= gcc
+
+TARGET := unyuland
+
 #---------------------------------------------------------------------------------
 # platform-specific sources
 #---------------------------------------------------------------------------------
-SOURCES		:= src/pc/tonc src/pc/maxmod src/pc
+SOURCES := src/pc/tonc src/pc/maxmod src/pc    
+
+
+#---------------------------------------------------------------------------------
+# any extra libraries we wish to link with the project
+#---------------------------------------------------------------------------------
+LIBNAMES := sdl3
+
+LIBS    := $(shell $(PKGCONF) --libs $(LIBNAMES))
+CFLAGS  := -DPLATFORM_PC $(shell $(PKGCONF) --cflags $(LIBNAMES))
+ASFLAGS := -DPLATFORM_PC
 
 
 #---------------------------------------------------------------------------------
@@ -12,8 +27,8 @@ define CLEAN =
 endef
 
 define BUILD_TARGETS
-$(OUTPUT).exe: $(OFILES)
-	$(SILENTCMD)$(CC) $(OFILES) $(LDFLAGS) -o $(OUTPUT).exe
+$(OUTPUT): $(OFILES)
+	$(SILENTCMD)$(CC) $(OFILES) $(LDFLAGS) -o $(OUTPUT)
 endef
 
 #---------------------------------------------------------------------------------
@@ -33,7 +48,7 @@ endef
 #---------------------------------------------------------------------------------
 define bin2o
         $(eval _tmpasm := $(shell mktemp))
-        $(SILENTCMD)bin2s -a 4 -H `(echo $(<F) | tr . _)`.h $< > $(_tmpasm)
+        $(SILENTCMD)bin2s $(BIN2S_FLAGS) -a 4 -H `(echo $(<F) | tr . _)`.h $< > $(_tmpasm)
         $(SILENTCMD)$(CC) -x assembler-with-cpp $(CPPFLAGS) $(ASFLAGS) -c $(_tmpasm) -o $(<F).o
         @rm $(_tmpasm)
 endef

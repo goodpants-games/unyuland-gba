@@ -52,7 +52,7 @@
 #define EWRAM_DATA
 
 //! Put <b>non</b>-initialized variable in EWRAM.
-#define  EWRAM_BSS __attribute__((section(".sbss")))
+#define  EWRAM_BSS
 
 //! Put function in IWRAM.
 #define IWRAM_CODE

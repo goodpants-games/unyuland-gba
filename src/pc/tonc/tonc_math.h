@@ -202,27 +202,6 @@ INLINE FIXED fxdiv64(FIXED fa, FIXED fb);
 
 /*! \}	*/
 
-// === LUT ============================================================
-
-
-/*!	\addtogroup grpMathLut	*/
-/*! \{	*/
-
-#define SIN_LUT_SIZE 514	// 512 for main lut, 2 extra for lerp
-#define DIV_LUT_SIZE 257	// 256 for main lut, 1 extra for lerp
-
-extern s32 div_lut[257];	// .16f
-extern s16 sin_lut[514];	// .12f
-
-INLINE s32 lu_sin(uint theta);
-INLINE s32 lu_cos(uint theta);
-INLINE uint lu_div(uint x);
-
-INLINE int lu_lerp32(const s32 lut[], uint x, const uint shift);
-INLINE int lu_lerp16(const s16 lut[], uint x, const uint shift);
-
-/*! \}	*/
-
 // === POINT ==========================================================
 
 struct RECT;
@@ -409,56 +388,6 @@ INLINE FIXED fxmul64(FIXED fa, FIXED fb)
 //! Divide two fixed point values using 64bit math.
 INLINE FIXED fxdiv64(FIXED fa, FIXED fb)
 {	return ( ((s64)fa)<<FIX_SHIFT)/(fb);	}
-
-
-// --- LUT ------------------------------------------------------------
-
-//! Look-up a sine value (2&#960; = 0x10000)
-/*! \param theta Angle in [0,FFFFh] range
-*	 \return .12f sine value
-*/
-INLINE s32 lu_sin(uint theta)
-{	return sin_lut[(theta>>7)&0x1FF];	}
-
-//! Look-up a cosine value (2&#960; = 0x10000)
-/*! \param theta Angle in [0,FFFFh] range
-*	 \return .12f cosine value
-*/
-INLINE s32 lu_cos(uint theta)
-{	return sin_lut[((theta>>7)+128)&0x1FF];	}
-
-//! Look-up a division value between 0 and 255
-/*! \param x reciprocal to look up.
-*	 \return 1/x (.16f)
-*/
-INLINE uint lu_div(uint x)
-{	return div_lut[x];	}
-
-
-//! Linear interpolator for 32bit LUTs.
-/*! A lut is essentially the discrete form of a function, f(<i>x</i>).
-*	You can get values for non-integer \e x via (linear) 
-*	interpolation between f(x) and f(x+1).
-*	\param lut	The LUT to interpolate from.
-*	\param x	Fixed point number to interpolate at.
-*	\param shift	Number of fixed-point bits of \a x.
-*/
-INLINE int lu_lerp32(const s32 lut[], uint x, const uint shift)
-{
-	int xa, ya, yb;
-	xa=x>>shift;
-	ya= lut[xa]; yb= lut[xa+1];
-	return ya + ( (yb-ya)*(x-(xa<<shift))>>shift );
-}
-
-//! As lu_lerp32, but for 16bit LUTs.
-INLINE int lu_lerp16(const s16 lut[], uint x, const uint shift)
-{
-	int xa, ya, yb;
-	xa=x>>shift;
-	ya= lut[xa]; yb= lut[xa+1];
-	return ya + ( (yb-ya)*(x-(xa<<shift))>>shift );	
-}
 
 
 // --- Point ----------------------------------------------------------

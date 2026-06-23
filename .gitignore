@@ -1,7 +1,9 @@
 *.elf
 *.gba
 *.sav
+*.exe
 *.tiled-session
+/unyuland
 
 .clangd
 build

@@ -18,7 +18,10 @@ DEVDEBUG ?= yes
 # the makefile is found
 #
 #---------------------------------------------------------------------------------
-TARGET		:= $(notdir $(CURDIR))
+ifeq ($(origin TARGET), undefined)
+    TARGET	:= $(notdir $(CURDIR))
+endif
+
 BUILD		:= build
 SOURCES		:= $(SOURCES) src/main
 INCLUDES	:= include

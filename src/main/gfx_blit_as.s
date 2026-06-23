@@ -1,3 +1,5 @@
+#ifdef PLATFORM_GBA
+
 #include "gfx.h"
 
 #define ROW_STRIDE ((GFX_TEXT_BMP_COLS - 1) * 32)
@@ -299,3 +301,5 @@ gfx_text_bmap_fill:
     @ done
     pop {r4-r11}
     bx lr
+
+#endif
