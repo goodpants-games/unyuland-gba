@@ -2,6 +2,9 @@
 #include <tonc_input.h>
 #include <tonc_video.h>
 #include <assert.h>
+#include <maxmod.h>
+#include <soundbank.h>
+
 #include "dialogue.h"
 #include "game.h"
 #include "log.h"
@@ -1430,7 +1433,8 @@ static void orb_display_dialogue(bool blue)
             buf_ptr += sprintf(buf_ptr, "%i more orbs left!\f", red_required - count);
         }
     }
-
+    
+    game_play_jingle(blue ? MOD_ORBGET2 : MOD_ORBGET);
     game_start_dialogue(game_dialogue_buffer);
 }
 

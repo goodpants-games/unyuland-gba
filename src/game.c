@@ -618,6 +618,12 @@ void game_update(void)
         return;
     }
 
+    if (g_game.did_jingle_finish)
+    {
+        g_game.did_jingle_finish = false;
+        mmResume();
+    }
+
     entity_s *player = &g_game.entities[0];
     g_game.active_interactable = NULL;
 
@@ -997,6 +1003,31 @@ void game_reset_player_pos(void)
     entity_s *player = &g_game.entities[0];
     player->pos.x = g_game.room_player_x;
     player->pos.y = g_game.room_player_y;
+}
+
+static mm_word mm_event_handler(mm_word msg, mm_word param)
+{
+    LOG_DBG("maxmod event: %i, %i", msg, param);
+
+    switch (msg)
+    {
+    case MMCB_SONGFINISHED:
+        if (param == 1)
+        {
+            g_game.did_jingle_finish = true;
+            mmSetEventHandler(NULL);
+        }
+        break;
+    }
+
+    return 0;
+}
+
+void game_play_jingle(int module_idx)
+{
+    mmPause();
+    mmJingle(module_idx);
+    mmSetEventHandler(mm_event_handler);
 }
 
 static void change_room(const world_room_s *new_room)

@@ -240,6 +240,7 @@ typedef struct game {
     const world_room_s *collected_orbs[MAX_ORB_COUNT];
 
     u8 cur_music;
+    bool did_jingle_finish;
 } game_s;
 
 typedef enum entity_load_prop_type
@@ -292,6 +293,7 @@ void game_render(void);
 void game_save_state(void);
 void game_restore_state(void);
 void game_start_dialogue(const char *dialogue);
+void game_play_jingle(int module_idx);
 
 // buffer for dynamic construction of dialogue
 EWRAM_BSS extern char game_dialogue_buffer[DIALOGUE_BUFFER_SIZE];
