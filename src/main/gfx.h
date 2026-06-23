@@ -24,7 +24,7 @@
 #include <tonc_core.h>
 #include "map_data.h"
 #include "log.h"
-#include "gba_util.h"
+#include <platutil.h>
 
 #define SCRW_T16 (SCREEN_WIDTH / 16)
 #define SCRH_T16 (SCREEN_HEIGHT / 16)

@@ -1,7 +1,7 @@
 #include <tonc.h>
 #include <font_gfx.h>
 #include "gfx.h"
-#include "gba_util.h"
+#include <platutil.h>
 #include "tonc_memdef.h"
 #include "tonc_memmap.h"
 #include <string.h>

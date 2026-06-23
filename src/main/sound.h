@@ -2,7 +2,7 @@
 #define SOUND_H
 
 #include <tonc_types.h>
-#include "gba_util.h"
+#include <platutil.h>
 
 typedef u16 snd_cmd;
 

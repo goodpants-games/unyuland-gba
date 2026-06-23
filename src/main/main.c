@@ -6,8 +6,9 @@
 
 #include "gfx.h"
 #include "log.h"
-#include "tonc_irq.h"
-#include "gba_util.h"
+#include <tonc_irq.h>
+#include <platutil.h>
+#include <platform.h>
 #include "scenes.h"
 
 // #define MAIN_PROFILE
@@ -30,6 +31,7 @@ struct
 __attribute((aligned(4)))
 static u8 mm_mixing_buf[MM_MIXLEN_16KHZ];
 
+#ifdef PLATFORM_GBA
 // Fuck you maxmod documentation. Fuckign hell.
 // Shows me code that runs mmFrame in the main loop before VBlankIntrWait. As if
 // that's how you were supposed to do it. Guess what. I wasted two days of
@@ -51,14 +53,17 @@ ARM_FUNC static void vbl(void)
     REG_IME = 1; // enable nested interrupts
     mmFrame();
 }
+#endif
 
-int main(void)
+void platform_app_init(void)
 {
     LOG_INIT();
 
+#ifdef PLATFORM_GBA
     irq_init(NULL);
     irq_add(II_VBLANK, vbl);
     irq_add(II_HBLANK, snd_irq_hblank);
+#endif
 
     gfx_init();
 
@@ -85,29 +90,24 @@ int main(void)
     profile_start();
     #endif
 
-    while (true)
-    {
-        // screen_print(&se_mat[GFX_BG0_INDEX][18][0], "Hello, world!");
+    scenemgr_frame();
+}
 
-        key_poll();
+void platform_app_frame(void)
+{
+    #ifdef MAIN_PROFILE
+    frame_len = 0;
+    profile_start();
+    #endif
 
-        scenemgr_frame();
-        
-        #ifdef MAIN_PROFILE
-        frame_len = profile_stop();
-        LOG_DBG("frame usage: %.1f%%", (float)frame_len / 280896.f * 100.f);
-        #endif
+    gfx_new_frame();
+    snd_frame();
 
-        VBlankIntrWait();
-
-        #ifdef MAIN_PROFILE
-        frame_len = 0;
-        profile_start();
-        #endif
-
-        gfx_new_frame();
-        snd_frame();
-    }
-
-    return 0;
+    key_poll();
+    scenemgr_frame();
+    
+    #ifdef MAIN_PROFILE
+    frame_len = profile_stop();
+    LOG_DBG("frame usage: %.1f%%", (float)frame_len / 280896.f * 100.f);
+    #endif
 }

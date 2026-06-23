@@ -9,7 +9,7 @@
 #include "log.h"
 #include "gfx.h"
 #include "math_util.h"
-#include "gba_util.h"
+#include <platutil.h>
 #include "tonc_video.h"
 
 #define MAX_RENDER_OBJS ((MAX_ENTITY_COUNT + MAX_PROJECTILE_COUNT))

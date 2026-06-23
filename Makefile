@@ -31,7 +31,7 @@ LIBTONC := $(DEVKITPRO)/libtonc
 #---------------------------------------------------------------------------------
 TARGET		:= $(notdir $(CURDIR))
 BUILD		:= build
-SOURCES		:= src
+SOURCES		:= src/main src/gba
 INCLUDES	:= include
 DATA		:= data/bin
 MUSIC		:= data/music
@@ -138,7 +138,7 @@ export OFILES := $(OFILES_BIN) $(OFILES_GRAPHICS) $(OFILES_INTERMEDIATE)\
 export INCLUDE	:=	$(foreach dir,$(INCLUDES),-iquote $(CURDIR)/$(dir)) \
 					$(foreach dir,$(LIBDIRS),-I$(dir)/include) \
 					-I$(CURDIR)/$(BUILD) \
-                    -I$(CURDIR)/$(SOURCES)
+                    $(foreach dir,$(SOURCES),-I$(CURDIR)/$(dir))
 
 export LIBPATHS	:=	$(foreach dir,$(LIBDIRS),-L$(dir)/lib)
 

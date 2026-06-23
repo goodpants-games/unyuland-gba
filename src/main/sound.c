@@ -9,7 +9,7 @@
 #include "log.h"
 #include "tonc_core.h"
 #include "tonc_types.h"
-#include "gba_util.h"
+#include <platutil.h>
 #include "math_util.h"
 
 #define TICKS_PER_PART     8

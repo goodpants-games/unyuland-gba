@@ -6,7 +6,7 @@
 #include "game_physics.h"
 #include "datastruct.h"
 #include "math_util.h"
-#include "gba_util.h"
+#include <platutil.h>
 #include "log.h"
 
 //------------------------------------------------------------------------------
