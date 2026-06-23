@@ -14,6 +14,8 @@
 #ifndef TONC_CORE
 #define TONC_CORE
 
+#include <string.h>
+
 #include "tonc_memmap.h"
 #include "tonc_memdef.h"
 
@@ -148,11 +150,11 @@ INLINE void *toncset32(void *dst, u32 src, uint count);
 
 
 // Fast memcpy/set
-void memset16(void *dst, u16 hw, uint hwcount);
-void memcpy16(void *dst, const void* src, uint hwcount);
+INLINE void memset16(void *dst, u16 hw, uint hwcount);
+INLINE void memcpy16(void *dst, const void* src, uint hwcount);
 
-IWRAM_CODE void memset32(void *dst, u32 wd, uint wcount);
-IWRAM_CODE void memcpy32(void *dst, const void* src, uint wcount);
+INLINE void memset32(void *dst, u32 wd, uint wcount);
+INLINE void memcpy32(void *dst, const void* src, uint wcount);
 
 
 //!	Fastfill for halfwords, analogous to memset()
@@ -163,7 +165,12 @@ IWRAM_CODE void memcpy32(void *dst, const void* src, uint wcount);
 *	\note	\a dst <b>must</b> be halfword aligned.
 *	\note \a r0 returns as \a dst + \a hwcount*2.
 */
-void memset16(void *dst, u16 hw, uint hwcount);
+INLINE void memset16(void *dst, u16 hw, uint hwcount)
+{
+	u16 *p = (u16 *)dst;
+	for (; hwcount != 0; --hwcount)
+		*(p++) = hw;
+}
 
 //!	\brief Copy for halfwords.
 /*!	Uses <code>memcpy32()</code> if \a hwn>6 and 
@@ -175,7 +182,10 @@ void memset16(void *dst, u16 hw, uint hwcount);
 	\note \a r0 and \a r1 return as 
 	  \a dst + \a hwcount*2 and \a src + \a hwcount*2.
 */
-void memcpy16(void *dst, const void* src, uint hwcount);
+INLINE void memcpy16(void *dst, const void* src, uint hwcount)
+{
+	memcpy(dst, src, hwcount * 2);
+}
 
 
 //!	Fast-fill by words, analogous to memset()
@@ -187,7 +197,12 @@ void memcpy16(void *dst, const void* src, uint hwcount);
 	\note	\a dst <b>must</b> be word aligned.
 	\note \a r0 returns as \a dst + \a wdcount*4.
 */
-IWRAM_CODE void memset32(void *dst, u32 wd, uint wdcount);
+INLINE void memset32(void *dst, u32 wd, uint wdcount)
+{
+	u32 *p = (u32 *)dst;
+	for (; wdcount != 0; --wdcount)
+		*(p++) = wd;
+}
 
 
 //!	\brief Fast-copy by words.
@@ -199,7 +214,10 @@ IWRAM_CODE void memset32(void *dst, u32 wd, uint wdcount);
 	\note	\a r0 and \a r1 return as 
 	  \a dst + \a wdcount*4 and \a src + \a wdcount*4.
 */
-IWRAM_CODE void memcpy32(void *dst, const void* src, uint wdcount);
+INLINE void memcpy32(void *dst, const void* src, uint wdcount)
+{
+	memcpy(dst, src, wdcount * 4);
+}
 
 //\}
 

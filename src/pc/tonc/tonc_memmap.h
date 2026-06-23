@@ -53,7 +53,7 @@
 
 //! \name Main sections
 //\{
-extern u8 tonc__mem_io[0x3FE];
+extern u8 tonc__mem_io[0x400];
 extern u8 tonc__mem_pal[PAL_SIZE];
 extern u8 tonc__mem_vram[VRAM_SIZE];
 extern u8 tonc__mem_oam[OAM_SIZE];
