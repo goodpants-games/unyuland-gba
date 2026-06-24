@@ -15,6 +15,7 @@ void platform_app_frame(void);
 
 static SDL_Window *s_window = NULL;
 static SDL_GLContext s_gl = NULL;
+static uint s_key_input = 0x3FF;
 
 struct gfx_state
 {
@@ -256,12 +257,47 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     return SDL_APP_CONTINUE;  /* carry on with the program! */
 }
 
+static uint get_key_input_flag(SDL_Keycode key)
+{
+    switch (key)
+    {
+    case SDLK_Z:      return 0x01; // A
+    case SDLK_X:      return 0x02; // B
+    case SDLK_C:      return 0x20; // L
+    case SDLK_V:      return 0x40; // R
+    case SDLK_ESCAPE: return 0x08; // Start 
+    case SDLK_TAB:    return 0x04; // Select
+    default:          return 0x00;
+    }
+}
+
 /* This function runs when a new event (mouse input, keypresses, etc) occurs. */
 SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 {
-    if (event->type == SDL_EVENT_QUIT) {
+    switch (event->type)
+    {
+    case SDL_EVENT_QUIT:
         return SDL_APP_SUCCESS;  /* end the program, reporting success to the OS. */
+
+    case SDL_EVENT_KEY_DOWN:
+    {
+        uint k = get_key_input_flag(event->key.key);
+        if (k)
+            s_key_input &= ~k;
+
+        break;
     }
+        
+    case SDL_EVENT_KEY_UP:
+    {
+        uint k = get_key_input_flag(event->key.key);
+        if (k)
+            s_key_input |= k;
+
+        break;
+    }
+    }
+    
     return SDL_APP_CONTINUE;  /* carry on with the program! */
 }
 
@@ -319,6 +355,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 {
     u64 frame_start_us = SDL_GetTicksNS() / 1000;
 
+    REG_KEYINPUT = s_key_input;
     platform_app_frame();
 
     update_vram();
