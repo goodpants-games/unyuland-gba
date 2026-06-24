@@ -1278,7 +1278,9 @@ void game_physics_update(void)
     substeps |= substeps >> 16;
     ++substeps;
 
-    FIXED vel_mult = FIX_ONE / substeps;
+    FIXED vel_mult = 0;
+    if (substeps != 0)
+        vel_mult = FIX_ONE / substeps;
 
     PROFILE_END(start_t);
 
