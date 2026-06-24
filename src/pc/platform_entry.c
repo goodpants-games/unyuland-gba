@@ -8,6 +8,8 @@
 #include <tonc_video.h>
 #include <glad/glad.h>
 
+#include "display.h"
+
 #define WINDOW_SCALE 3
 
 void platform_app_init(void);
@@ -305,55 +307,6 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
     return SDL_APP_CONTINUE;  /* carry on with the program! */
 }
 
-static inline u32 r5g5b5a1_to_rgba32(u16 color)
-{
-    u8 r = color & 0x1F;
-    u8 g = (color >> 5) & 0x1F;
-    u8 b = (color >> 10) & 0x1F;
-    // u8 a = 1;
-    
-    // multiplier should be 8.22; max color component is now 248
-    // eh. good enough.
-    return (r * 8) | ((g * 8) << 8) | ((b * 8) << 16) | (0xFF000000);
-}
-
-static void update_vram(void)
-{
-    u32 palette[256];
-    for (int i = 0; i < 256; ++i)
-        palette[i] = r5g5b5a1_to_rgba32(pal_bg_mem[i]);
-
-    u32 *tmem = (u32 *)tile_mem[0];
-    u32 tmp_row[8];
-    for (int y = 0; y < 20; ++y)
-    {
-        for (int x = 0; x < 30; ++x)
-        {
-            u32 *ocol = &s_gfx_state.screen_pixels[(y * SCREEN_WIDTH + x) * 8];
-
-            for (int iy = 0; iy < 8; ++iy)
-            {
-                u32 row = *(tmem++);
-                tmp_row[0] = palette[(row >> 0 ) & 0xF];
-                tmp_row[1] = palette[(row >> 4 ) & 0xF];
-                tmp_row[2] = palette[(row >> 8 ) & 0xF];
-                tmp_row[3] = palette[(row >> 12) & 0xF];
-                tmp_row[4] = palette[(row >> 16) & 0xF];
-                tmp_row[5] = palette[(row >> 20) & 0xF];
-                tmp_row[6] = palette[(row >> 24) & 0xF];
-                tmp_row[7] = palette[(row >> 28) & 0xF];
-
-                memcpy(ocol, tmp_row, sizeof(u32) * 8);
-                ocol += SCREEN_WIDTH;
-            }
-        }
-    }
-
-    glBindTexture(GL_TEXTURE_2D, s_gfx_state.screen_tex);
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT,
-                    GL_RGBA, GL_UNSIGNED_BYTE, s_gfx_state.screen_pixels);
-}
-
 /* This function runs once per frame, and is the heart of the program. */
 SDL_AppResult SDL_AppIterate(void *appstate)
 {
@@ -362,7 +315,12 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     REG_KEYINPUT = s_key_input;
     platform_app_frame();
 
-    update_vram();
+    g_display_buffer = s_gfx_state.screen_pixels;
+    display_update();
+
+    glBindTexture(GL_TEXTURE_2D, s_gfx_state.screen_tex);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT,
+                    GL_RGBA, GL_UNSIGNED_BYTE, s_gfx_state.screen_pixels);
 
     int win_sx, win_sy;
     SDL_GetWindowSizeInPixels(s_window, &win_sx, &win_sy);
