@@ -16,7 +16,7 @@ SOURCES := src/pc/tonc src/pc/maxmod src/pc
 LIBNAMES := sdl3
 
 LIBS    := $(shell $(PKGCONF) --libs $(LIBNAMES))
-CFLAGS  := -DPLATFORM_PC -gdwarf-4 $(shell $(PKGCONF) --cflags $(LIBNAMES))
+CFLAGS  := -DPLATFORM_PC -gdwarf-4 -Og $(shell $(PKGCONF) --cflags $(LIBNAMES))
 ASFLAGS := -DPLATFORM_PC
 
 ifeq ($(OS), Windows_NT)
