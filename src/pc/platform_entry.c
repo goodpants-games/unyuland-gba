@@ -28,10 +28,10 @@ struct gfx_state
 static s_gfx_state;
 
 static const char *VS_SOURCE =
-    "#version 130\n"
-    "in vec2 a_position;\n"
-    "in vec2 a_texcoord;\n"
-    "out vec2 v_texcoord;\n"
+    "precision mediump float;\n"
+    "attribute vec2 a_position;\n"
+    "attribute vec2 a_texcoord;\n"
+    "varying vec2 v_texcoord;\n"
     "uniform mat4 u_matrix;\n"
     "void main() {\n"
     "   v_texcoord = a_texcoord;\n"
@@ -39,12 +39,11 @@ static const char *VS_SOURCE =
     "}\n";
 
 static const char *FS_SOURCE =
-    "#version 130\n"
-    "in vec2 v_texcoord;\n"
-    "out vec4 o_color;\n"
+    "precision mediump float;\n"
+    "varying vec2 v_texcoord;\n"
     "uniform sampler2D u_texture;\n"
     "void main() {\n"
-    "   o_color = texture2D(u_texture, v_texcoord);\n"
+    "   gl_FragColor = texture2D(u_texture, v_texcoord);\n"
     "}\n";
 
 static void gl_debug_output(GLenum source, GLenum type, GLuint id,
@@ -160,6 +159,7 @@ static bool gfx_state_init(void)
     }
 
     GLuint prog = glCreateProgram();
+
     glBindAttribLocation(prog, 0, "a_position");
     glBindAttribLocation(prog, 1, "a_texcoord");
     glAttachShader(prog, vs);
@@ -178,26 +178,32 @@ static bool gfx_state_init(void)
         return false;
     }
 
+    s_gfx_state.display_prog = prog;
+
     return true;
 }
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 {
+    SDL_SetHint(SDL_HINT_VIDEO_FORCE_EGL, "1");
+
     if (!SDL_Init(SDL_INIT_VIDEO))
     {
         SDL_Log("Couldn't initialize SDL: %s", SDL_GetError());
         return SDL_APP_FAILURE;
     }
 
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+#ifdef DEVDEBUG
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
+#endif
 
     const int scr_w = SCREEN_WIDTH * WINDOW_SCALE;
     const int scr_h = SCREEN_HEIGHT * WINDOW_SCALE;
     const SDL_WindowFlags win_flags =
-        SDL_WINDOW_OPENGL| SDL_WINDOW_HIGH_PIXEL_DENSITY;
+        SDL_WINDOW_OPENGL | SDL_WINDOW_HIGH_PIXEL_DENSITY;
     
     s_window = SDL_CreateWindow("Unyuland", scr_w, scr_h, win_flags);
     if (!s_window)
@@ -213,31 +219,37 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         return SDL_APP_FAILURE;
     }
 
-    if (!gladLoadGLLoader((void *)SDL_GL_GetProcAddress))
+    if (!gladLoadGLES2Loader((void *)SDL_GL_GetProcAddress))
     {
         SDL_Log("OpenGL loader failed!");
         return SDL_APP_FAILURE;
     }
 
+    
     SDL_GL_MakeCurrent(s_window, s_gl);
     SDL_GL_SetSwapInterval(1);
-    
-    GLint gl_flags;
-    glGetIntegerv(GL_CONTEXT_FLAGS, &gl_flags);
-    if (gl_flags & GL_CONTEXT_FLAG_DEBUG_BIT)
+
     {
-        glEnable(GL_DEBUG_OUTPUT);
-        glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
-        glDebugMessageCallback(gl_debug_output, NULL);
-        glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, NULL,
-                              GL_TRUE);
+        // print supported exts
+        fprintf(stderr, "exts: %s\n", glGetString(GL_EXTENSIONS));
     }
+
+    const GLubyte *str = glGetString(GL_VENDOR);
+    fprintf(stderr, "%s\n", str);
+    
+#ifdef DEVDEBUG
+    glEnable(GL_DEBUG_OUTPUT);
+    glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+    glDebugMessageCallback(gl_debug_output, NULL);
+    glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, NULL,
+                            GL_TRUE);
+#endif
 
     if (!gfx_state_init())
         return SDL_APP_FAILURE;
 
     for (int i = 0; i < SCREEN_WIDTH * SCREEN_HEIGHT; ++i)
-        s_gfx_state.screen_pixels[i] = 0x00FF00FF;
+        s_gfx_state.screen_pixels[i] = 0xFF000000;
     
     platform_app_init();
 
@@ -267,6 +279,10 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     glClear(GL_COLOR_BUFFER_BIT);
 
     // update texture
+    for (int i = 0; i < SCREEN_WIDTH * SCREEN_HEIGHT; ++i)
+    {
+        s_gfx_state.screen_pixels[i] = ((u32 *)MEM_VRAM)[i];
+    }
     glBindTexture(GL_TEXTURE_2D, s_gfx_state.screen_tex);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT,
                     GL_RGBA, GL_UNSIGNED_BYTE, s_gfx_state.screen_pixels);
@@ -275,6 +291,18 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     glUseProgram(s_gfx_state.display_prog);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, s_gfx_state.screen_tex);
+
+    {
+        GLint loc = glGetUniformLocation(s_gfx_state.display_prog, "u_matrix");
+        float mat[16] = {
+            1, 0, 0, 0,
+            0, 1, 0, 0,
+            0, 0, 1, 0,
+            0, 0, 0, 1
+        };
+
+        glUniformMatrix4fv(loc, 1, GL_FALSE, mat);
+    }
 
     // bind geometry and attributes
     typedef struct
