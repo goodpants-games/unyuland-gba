@@ -261,13 +261,17 @@ static uint get_key_input_flag(SDL_Keycode key)
 {
     switch (key)
     {
-    case SDLK_Z:      return 0x01; // A
-    case SDLK_X:      return 0x02; // B
-    case SDLK_C:      return 0x20; // L
-    case SDLK_V:      return 0x40; // R
-    case SDLK_ESCAPE: return 0x08; // Start 
-    case SDLK_TAB:    return 0x04; // Select
-    default:          return 0x00;
+    case SDLK_Z:      return 0x001; // A
+    case SDLK_X:      return 0x002; // B
+    case SDLK_C:      return 0x200; // L
+    case SDLK_V:      return 0x100; // R
+    case SDLK_ESCAPE: return 0x008; // Start 
+    case SDLK_TAB:    return 0x004; // Select
+    case SDLK_RIGHT:  return 0x010; // Right
+    case SDLK_LEFT:   return 0x020; // Left
+    case SDLK_UP:     return 0x040; // Up
+    case SDLK_DOWN:   return 0x080; // Down
+    default:          return 0x000;
     }
 }
 
@@ -319,7 +323,7 @@ static void update_vram(void)
     for (int i = 0; i < 256; ++i)
         palette[i] = r5g5b5a1_to_rgba32(pal_bg_mem[i]);
 
-    u32 *tmem = (u32 *)tile_mem[2];
+    u32 *tmem = (u32 *)tile_mem[0];
     u32 tmp_row[8];
     for (int y = 0; y < 20; ++y)
     {
