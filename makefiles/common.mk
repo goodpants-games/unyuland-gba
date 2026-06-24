@@ -22,7 +22,10 @@ ifeq ($(origin TARGET), undefined)
     TARGET	:= $(notdir $(CURDIR))
 endif
 
-BUILD		:= build
+ifeq ($(origin BUILD), undefined)
+    BUILD	:= build
+endif
+
 SOURCES		:= $(SOURCES) src/main
 INCLUDES	:= include
 DATA		:= data/bin
@@ -34,7 +37,7 @@ SPRITES     := data/sprites
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
-CFLAGS += -g -Wall -O2 -DPRINTF_INCLUDE_CONFIG_H -std=gnu11
+CFLAGS += -Wall -DPRINTF_INCLUDE_CONFIG_H -std=gnu11
 CFLAGS += $(INCLUDE)
 
 ifeq ($(DEVDEBUG),yes)

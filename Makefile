@@ -6,4 +6,6 @@ gba:
 pc:
 	@$(MAKE) -f makefiles/pc.mk $(word 2, $(MAKECMDGOALS))
 
-.PHONY: gba pc
+clean:
+
+.PHONY: gba pc clean

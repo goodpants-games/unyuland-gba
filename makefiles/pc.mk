@@ -2,6 +2,7 @@ PKGCONF ?= pkg-config
 CC ?= gcc
 
 TARGET := unyuland
+BUILD  := buildpc
 
 #---------------------------------------------------------------------------------
 # platform-specific sources
@@ -15,7 +16,7 @@ SOURCES := src/pc/tonc src/pc/maxmod src/pc
 LIBNAMES := sdl3
 
 LIBS    := $(shell $(PKGCONF) --libs $(LIBNAMES))
-CFLAGS  := -DPLATFORM_PC $(shell $(PKGCONF) --cflags $(LIBNAMES))
+CFLAGS  := -DPLATFORM_PC -gdwarf-4 $(shell $(PKGCONF) --cflags $(LIBNAMES))
 ASFLAGS := -DPLATFORM_PC
 
 ifeq ($(OS), Windows_NT)
@@ -27,12 +28,12 @@ endif
 # targets
 #---------------------------------------------------------------------------------
 define CLEAN =
-@rm -fr $(BUILD) $(TARGET).elf $(TARGET).gba
+@rm -fr $(BUILD) $(OUTPUT)
 endef
 
 define BUILD_TARGETS
 $(OUTPUT): $(OFILES)
-	$(SILENTCMD)$(CC) $(OFILES) $(LDFLAGS) $(LIBS) -o $(OUTPUT)
+	$(SILENTCMD)$(CC) $(OFILES) $(LDFLAGS) $(CFLAGS) $(LIBS) -o $(OUTPUT)
 endef
 
 #---------------------------------------------------------------------------------
