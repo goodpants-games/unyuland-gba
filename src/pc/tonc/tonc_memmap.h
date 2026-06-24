@@ -265,88 +265,88 @@ extern u8 tonc__mem_oam[OAM_SIZE];
 
 //! \name Display registers
 //\{
-#define REG_DISPCNT			*(vu32*)(REG_BASE+0x0000)	//!< Display control
-#define REG_DISPSTAT		*(vu16*)(REG_BASE+0x0004)	//!< Display status
-#define REG_VCOUNT			*(vu16*)(REG_BASE+0x0006)	//!< Scanline count
+#define REG_DISPCNT			*(u32*)(REG_BASE+0x0000)	//!< Display control
+#define REG_DISPSTAT		*(u16*)(REG_BASE+0x0004)	//!< Display status
+#define REG_VCOUNT			*(u16*)(REG_BASE+0x0006)	//!< Scanline count
 //\}
 
 //! \name Background control registers
 //\{
-#define REG_BGCNT			((vu16*)(REG_BASE+0x0008))	//!< Bg control array
+#define REG_BGCNT			((u16*)(REG_BASE+0x0008))	//!< Bg control array
 
-#define REG_BG0CNT			*(vu16*)(REG_BASE+0x0008)	//!< Bg0 control
-#define REG_BG1CNT			*(vu16*)(REG_BASE+0x000A)	//!< Bg1 control
-#define REG_BG2CNT			*(vu16*)(REG_BASE+0x000C)	//!< Bg2 control
-#define REG_BG3CNT			*(vu16*)(REG_BASE+0x000E)	//!< Bg3 control
+#define REG_BG0CNT			*(u16*)(REG_BASE+0x0008)	//!< Bg0 control
+#define REG_BG1CNT			*(u16*)(REG_BASE+0x000A)	//!< Bg1 control
+#define REG_BG2CNT			*(u16*)(REG_BASE+0x000C)	//!< Bg2 control
+#define REG_BG3CNT			*(u16*)(REG_BASE+0x000E)	//!< Bg3 control
 //\}
 
 //! \name Regular background scroll registers. (write only!)
 //\{
 #define REG_BG_OFS			((BG_POINT*)(REG_BASE+0x0010))	//!< Bg scroll array
 
-#define REG_BG0HOFS			*(vu16*)(REG_BASE+0x0010)		//!< Bg0 horizontal scroll
-#define REG_BG0VOFS			*(vu16*)(REG_BASE+0x0012)		//!< Bg0 vertical scroll
-#define REG_BG1HOFS			*(vu16*)(REG_BASE+0x0014)		//!< Bg1 horizontal scroll
-#define REG_BG1VOFS			*(vu16*)(REG_BASE+0x0016)		//!< Bg1 vertical scroll
-#define REG_BG2HOFS			*(vu16*)(REG_BASE+0x0018)		//!< Bg2 horizontal scroll
-#define REG_BG2VOFS			*(vu16*)(REG_BASE+0x001A)		//!< Bg2 vertical scroll
-#define REG_BG3HOFS			*(vu16*)(REG_BASE+0x001C)		//!< Bg3 horizontal scroll
-#define REG_BG3VOFS			*(vu16*)(REG_BASE+0x001E)		//!< Bg3 vertical scroll
+#define REG_BG0HOFS			*(u16*)(REG_BASE+0x0010)		//!< Bg0 horizontal scroll
+#define REG_BG0VOFS			*(u16*)(REG_BASE+0x0012)		//!< Bg0 vertical scroll
+#define REG_BG1HOFS			*(u16*)(REG_BASE+0x0014)		//!< Bg1 horizontal scroll
+#define REG_BG1VOFS			*(u16*)(REG_BASE+0x0016)		//!< Bg1 vertical scroll
+#define REG_BG2HOFS			*(u16*)(REG_BASE+0x0018)		//!< Bg2 horizontal scroll
+#define REG_BG2VOFS			*(u16*)(REG_BASE+0x001A)		//!< Bg2 vertical scroll
+#define REG_BG3HOFS			*(u16*)(REG_BASE+0x001C)		//!< Bg3 horizontal scroll
+#define REG_BG3VOFS			*(u16*)(REG_BASE+0x001E)		//!< Bg3 vertical scroll
 //\}
 
 //! \name Affine background parameters. (write only!)
 //\{
 #define REG_BG_AFFINE		((BG_AFFINE*)(REG_BASE+0x0000))	//!< Bg affine array
 
-#define REG_BG2PA			*(vs16*)(REG_BASE+0x0020)	//!< Bg2 matrix.pa
-#define REG_BG2PB			*(vs16*)(REG_BASE+0x0022)	//!< Bg2 matrix.pb
-#define REG_BG2PC			*(vs16*)(REG_BASE+0x0024)	//!< Bg2 matrix.pc
-#define REG_BG2PD			*(vs16*)(REG_BASE+0x0026)	//!< Bg2 matrix.pd
-#define REG_BG2X			*(vs32*)(REG_BASE+0x0028)	//!< Bg2 x scroll
-#define REG_BG2Y			*(vs32*)(REG_BASE+0x002C)	//!< Bg2 y scroll
-#define REG_BG3PA			*(vs16*)(REG_BASE+0x0030)	//!< Bg3 matrix.pa.
-#define REG_BG3PB			*(vs16*)(REG_BASE+0x0032)	//!< Bg3 matrix.pb
-#define REG_BG3PC			*(vs16*)(REG_BASE+0x0034)	//!< Bg3 matrix.pc
-#define REG_BG3PD			*(vs16*)(REG_BASE+0x0036)	//!< Bg3 matrix.pd
-#define REG_BG3X			*(vs32*)(REG_BASE+0x0038)	//!< Bg3 x scroll
-#define REG_BG3Y			*(vs32*)(REG_BASE+0x003C)	//!< Bg3 y scroll
+#define REG_BG2PA			*(s16*)(REG_BASE+0x0020)	//!< Bg2 matrix.pa
+#define REG_BG2PB			*(s16*)(REG_BASE+0x0022)	//!< Bg2 matrix.pb
+#define REG_BG2PC			*(s16*)(REG_BASE+0x0024)	//!< Bg2 matrix.pc
+#define REG_BG2PD			*(s16*)(REG_BASE+0x0026)	//!< Bg2 matrix.pd
+#define REG_BG2X			*(s32*)(REG_BASE+0x0028)	//!< Bg2 x scroll
+#define REG_BG2Y			*(s32*)(REG_BASE+0x002C)	//!< Bg2 y scroll
+#define REG_BG3PA			*(s16*)(REG_BASE+0x0030)	//!< Bg3 matrix.pa.
+#define REG_BG3PB			*(s16*)(REG_BASE+0x0032)	//!< Bg3 matrix.pb
+#define REG_BG3PC			*(s16*)(REG_BASE+0x0034)	//!< Bg3 matrix.pc
+#define REG_BG3PD			*(s16*)(REG_BASE+0x0036)	//!< Bg3 matrix.pd
+#define REG_BG3X			*(s32*)(REG_BASE+0x0038)	//!< Bg3 x scroll
+#define REG_BG3Y			*(s32*)(REG_BASE+0x003C)	//!< Bg3 y scroll
 //\}
 
 //! \name Windowing registers
 //\{
-#define REG_WIN0H			*(vu16*)(REG_BASE+0x0040)	//!< win0 right, left (0xLLRR)
-#define REG_WIN1H			*(vu16*)(REG_BASE+0x0042)	//!< win1 right, left (0xLLRR)
-#define REG_WIN0V			*(vu16*)(REG_BASE+0x0044)	//!< win0 bottom, top (0xTTBB)
-#define REG_WIN1V			*(vu16*)(REG_BASE+0x0046)	//!< win1 bottom, top (0xTTBB)
-#define REG_WININ			*(vu16*)(REG_BASE+0x0048)	//!< win0, win1 control
-#define REG_WINOUT			*(vu16*)(REG_BASE+0x004A)	//!< winOut, winObj control
+#define REG_WIN0H			*(u16*)(REG_BASE+0x0040)	//!< win0 right, left (0xLLRR)
+#define REG_WIN1H			*(u16*)(REG_BASE+0x0042)	//!< win1 right, left (0xLLRR)
+#define REG_WIN0V			*(u16*)(REG_BASE+0x0044)	//!< win0 bottom, top (0xTTBB)
+#define REG_WIN1V			*(u16*)(REG_BASE+0x0046)	//!< win1 bottom, top (0xTTBB)
+#define REG_WININ			*(u16*)(REG_BASE+0x0048)	//!< win0, win1 control
+#define REG_WINOUT			*(u16*)(REG_BASE+0x004A)	//!< winOut, winObj control
 //\}
 
 //! \name Alternate Windowing registers
 //\{
-#define REG_WIN0R			*(vu8*)(REG_BASE+0x0040)	//!< Win 0 right
-#define REG_WIN0L			*(vu8*)(REG_BASE+0x0041)	//!< Win 0 left
-#define REG_WIN1R			*(vu8*)(REG_BASE+0x0042)	//!< Win 1 right
-#define REG_WIN1L			*(vu8*)(REG_BASE+0x0043)	//!< Win 1 left
+#define REG_WIN0R			*(u8*)(REG_BASE+0x0040)	//!< Win 0 right
+#define REG_WIN0L			*(u8*)(REG_BASE+0x0041)	//!< Win 0 left
+#define REG_WIN1R			*(u8*)(REG_BASE+0x0042)	//!< Win 1 right
+#define REG_WIN1L			*(u8*)(REG_BASE+0x0043)	//!< Win 1 left
 
-#define REG_WIN0B			*(vu8*)(REG_BASE+0x0044)	//!< Win 0 bottom
-#define REG_WIN0T			*(vu8*)(REG_BASE+0x0045)	//!< Win 0 top
-#define REG_WIN1B			*(vu8*)(REG_BASE+0x0046)	//!< Win 1 bottom
-#define REG_WIN1T			*(vu8*)(REG_BASE+0x0047)	//!< Win 1 top
+#define REG_WIN0B			*(u8*)(REG_BASE+0x0044)	//!< Win 0 bottom
+#define REG_WIN0T			*(u8*)(REG_BASE+0x0045)	//!< Win 0 top
+#define REG_WIN1B			*(u8*)(REG_BASE+0x0046)	//!< Win 1 bottom
+#define REG_WIN1T			*(u8*)(REG_BASE+0x0047)	//!< Win 1 top
 
-#define REG_WIN0CNT			*(vu8*)(REG_BASE+0x0048)	//!< window 0 control
-#define REG_WIN1CNT			*(vu8*)(REG_BASE+0x0049)	//!< window 1 control
-#define REG_WINOUTCNT		*(vu8*)(REG_BASE+0x004A)	//!< Out window control
-#define REG_WINOBJCNT		*(vu8*)(REG_BASE+0x004B)	//!< Obj window control
+#define REG_WIN0CNT			*(u8*)(REG_BASE+0x0048)	//!< window 0 control
+#define REG_WIN1CNT			*(u8*)(REG_BASE+0x0049)	//!< window 1 control
+#define REG_WINOUTCNT		*(u8*)(REG_BASE+0x004A)	//!< Out window control
+#define REG_WINOBJCNT		*(u8*)(REG_BASE+0x004B)	//!< Obj window control
 //\}
 
 
 //! \name Graphic effects
 //\{
-#define REG_MOSAIC			*(vu32*)(REG_BASE+0x004C)	//!< Mosaic control
-#define REG_BLDCNT			*(vu16*)(REG_BASE+0x0050)	//!< Alpha control
-#define REG_BLDALPHA		*(vu16*)(REG_BASE+0x0052)	//!< Fade level
-#define REG_BLDY			*(vu16*)(REG_BASE+0x0054)	//!< Blend levels
+#define REG_MOSAIC			*(u32*)(REG_BASE+0x004C)	//!< Mosaic control
+#define REG_BLDCNT			*(u16*)(REG_BASE+0x0050)	//!< Alpha control
+#define REG_BLDALPHA		*(u16*)(REG_BASE+0x0052)	//!< Fade level
+#define REG_BLDY			*(u16*)(REG_BASE+0x0054)	//!< Blend levels
 //\}
 
 
@@ -355,127 +355,127 @@ extern u8 tonc__mem_oam[OAM_SIZE];
 
 //! \name Channel 1: Square wave with sweep
 //\{
-#define REG_SND1SWEEP		*(vu16*)(REG_BASE+0x0060)	//!< Channel 1 Sweep
-#define REG_SND1CNT			*(vu16*)(REG_BASE+0x0062)	//!< Channel 1 Control
-#define REG_SND1FREQ		*(vu16*)(REG_BASE+0x0064)	//!< Channel 1 frequency
+#define REG_SND1SWEEP		*(u16*)(REG_BASE+0x0060)	//!< Channel 1 Sweep
+#define REG_SND1CNT			*(u16*)(REG_BASE+0x0062)	//!< Channel 1 Control
+#define REG_SND1FREQ		*(u16*)(REG_BASE+0x0064)	//!< Channel 1 frequency
 //\}
 
 //! \name Channel 2: Simple square wave
 //\{
-#define REG_SND2CNT			*(vu16*)(REG_BASE+0x0068)	//!< Channel 2 control
-#define REG_SND2FREQ		*(vu16*)(REG_BASE+0x006C)	//!< Channel 2 frequency
+#define REG_SND2CNT			*(u16*)(REG_BASE+0x0068)	//!< Channel 2 control
+#define REG_SND2FREQ		*(u16*)(REG_BASE+0x006C)	//!< Channel 2 frequency
 //\}
 
 //! \name Channel 3: Wave player
 //\{
-#define REG_SND3SEL			*(vu16*)(REG_BASE+0x0070)	//!< Channel 3 wave select
-#define REG_SND3CNT			*(vu16*)(REG_BASE+0x0072)	//!< Channel 3 control
-#define REG_SND3FREQ		*(vu16*)(REG_BASE+0x0074)	//!< Channel 3 frequency
+#define REG_SND3SEL			*(u16*)(REG_BASE+0x0070)	//!< Channel 3 wave select
+#define REG_SND3CNT			*(u16*)(REG_BASE+0x0072)	//!< Channel 3 control
+#define REG_SND3FREQ		*(u16*)(REG_BASE+0x0074)	//!< Channel 3 frequency
 //\}
 
 //! \name Channel 4: Noise generator
 //\{
-#define REG_SND4CNT			*(vu16*)(REG_BASE+0x0078)	//!< Channel 4 control
-#define REG_SND4FREQ		*(vu16*)(REG_BASE+0x007C)	//!< Channel 4 frequency
+#define REG_SND4CNT			*(u16*)(REG_BASE+0x0078)	//!< Channel 4 control
+#define REG_SND4FREQ		*(u16*)(REG_BASE+0x007C)	//!< Channel 4 frequency
 //\}
 
 //! \name Sound control
 //\{
-#define REG_SNDCNT			*(vu32*)(REG_BASE+0x0080)	//!< Main sound control
-#define REG_SNDDMGCNT		*(vu16*)(REG_BASE+0x0080)	//!< DMG channel control
-#define REG_SNDDSCNT		*(vu16*)(REG_BASE+0x0082)	//!< Direct Sound control
-#define REG_SNDSTAT			*(vu16*)(REG_BASE+0x0084)	//!< Sound status
-#define REG_SNDBIAS			*(vu16*)(REG_BASE+0x0088)	//!< Sound bias
+#define REG_SNDCNT			*(u32*)(REG_BASE+0x0080)	//!< Main sound control
+#define REG_SNDDMGCNT		*(u16*)(REG_BASE+0x0080)	//!< DMG channel control
+#define REG_SNDDSCNT		*(u16*)(REG_BASE+0x0082)	//!< Direct Sound control
+#define REG_SNDSTAT			*(u16*)(REG_BASE+0x0084)	//!< Sound status
+#define REG_SNDBIAS			*(u16*)(REG_BASE+0x0088)	//!< Sound bias
 //\}
 
 //! \name Sound buffers
 //\{
-#define REG_WAVE_RAM		 (vu32*)(REG_BASE+0x0090)	//!< Channel 3 wave buffer
+#define REG_WAVE_RAM		 (u32*)(REG_BASE+0x0090)	//!< Channel 3 wave buffer
 
-#define REG_WAVE_RAM0		*(vu32*)(REG_BASE+0x0090)
-#define REG_WAVE_RAM1		*(vu32*)(REG_BASE+0x0094)
-#define REG_WAVE_RAM2		*(vu32*)(REG_BASE+0x0098)
-#define REG_WAVE_RAM3		*(vu32*)(REG_BASE+0x009C)
+#define REG_WAVE_RAM0		*(u32*)(REG_BASE+0x0090)
+#define REG_WAVE_RAM1		*(u32*)(REG_BASE+0x0094)
+#define REG_WAVE_RAM2		*(u32*)(REG_BASE+0x0098)
+#define REG_WAVE_RAM3		*(u32*)(REG_BASE+0x009C)
 
-#define REG_FIFO_A			*(vu32*)(REG_BASE+0x00A0)	//!< DSound A FIFO
-#define REG_FIFO_B			*(vu32*)(REG_BASE+0x00A4)	//!< DSound B FIFO
+#define REG_FIFO_A			*(u32*)(REG_BASE+0x00A0)	//!< DSound A FIFO
+#define REG_FIFO_B			*(u32*)(REG_BASE+0x00A4)	//!< DSound B FIFO
 //\}
 
 //! \name DMA registers
 //\{
 #define REG_DMA			((volatile DMA_REC*)(REG_BASE+0x00B0))	//!< DMA as DMA_REC array
 
-#define REG_DMA0SAD			*(vu32*)(REG_BASE+0x00B0)	//!< DMA 0 Source address
-#define REG_DMA0DAD			*(vu32*)(REG_BASE+0x00B4)	//!< DMA 0 Destination address
-#define REG_DMA0CNT			*(vu32*)(REG_BASE+0x00B8)	//!< DMA 0 Control
+#define REG_DMA0SAD			*(u32*)(REG_BASE+0x00B0)	//!< DMA 0 Source address
+#define REG_DMA0DAD			*(u32*)(REG_BASE+0x00B4)	//!< DMA 0 Destination address
+#define REG_DMA0CNT			*(u32*)(REG_BASE+0x00B8)	//!< DMA 0 Control
 
-#define REG_DMA1SAD			*(vu32*)(REG_BASE+0x00BC)	//!< DMA 1 Source address
-#define REG_DMA1DAD			*(vu32*)(REG_BASE+0x00C0)	//!< DMA 1 Destination address
-#define REG_DMA1CNT			*(vu32*)(REG_BASE+0x00C4)	//!< DMA 1 Control
+#define REG_DMA1SAD			*(u32*)(REG_BASE+0x00BC)	//!< DMA 1 Source address
+#define REG_DMA1DAD			*(u32*)(REG_BASE+0x00C0)	//!< DMA 1 Destination address
+#define REG_DMA1CNT			*(u32*)(REG_BASE+0x00C4)	//!< DMA 1 Control
 
-#define REG_DMA2SAD			*(vu32*)(REG_BASE+0x00C8)	//!< DMA 2 Source address
-#define REG_DMA2DAD			*(vu32*)(REG_BASE+0x00CC)	//!< DMA 2 Destination address
-#define REG_DMA2CNT			*(vu32*)(REG_BASE+0x00D0)	//!< DMA 2 Control
+#define REG_DMA2SAD			*(u32*)(REG_BASE+0x00C8)	//!< DMA 2 Source address
+#define REG_DMA2DAD			*(u32*)(REG_BASE+0x00CC)	//!< DMA 2 Destination address
+#define REG_DMA2CNT			*(u32*)(REG_BASE+0x00D0)	//!< DMA 2 Control
 
-#define REG_DMA3SAD			*(vu32*)(REG_BASE+0x00D4)	//!< DMA 3 Source address
-#define REG_DMA3DAD			*(vu32*)(REG_BASE+0x00D8)	//!< DMA 3 Destination address
-#define REG_DMA3CNT			*(vu32*)(REG_BASE+0x00DC)	//!< DMA 3 Control
+#define REG_DMA3SAD			*(u32*)(REG_BASE+0x00D4)	//!< DMA 3 Source address
+#define REG_DMA3DAD			*(u32*)(REG_BASE+0x00D8)	//!< DMA 3 Destination address
+#define REG_DMA3CNT			*(u32*)(REG_BASE+0x00DC)	//!< DMA 3 Control
 //\}
 
 //! \name Timer registers
 //\{
 #define REG_TM			((volatile TMR_REC*)(REG_BASE+0x0100))	//!< Timers as TMR_REC array
 
-#define REG_TM0D			*(vu16*)(REG_BASE+0x0100)	//!< Timer 0 data
-#define REG_TM0CNT			*(vu16*)(REG_BASE+0x0102)	//!< Timer 0 control
-#define REG_TM1D			*(vu16*)(REG_BASE+0x0104)	//!< Timer 1 data
-#define REG_TM1CNT			*(vu16*)(REG_BASE+0x0106)	//!< Timer 1 control
-#define REG_TM2D			*(vu16*)(REG_BASE+0x0108)	//!< Timer 2 data
-#define REG_TM2CNT			*(vu16*)(REG_BASE+0x010A)	//!< Timer 2 control
-#define REG_TM3D			*(vu16*)(REG_BASE+0x010C)	//!< Timer 3 data
-#define REG_TM3CNT			*(vu16*)(REG_BASE+0x010E)	//!< Timer 3 control
+#define REG_TM0D			*(u16*)(REG_BASE+0x0100)	//!< Timer 0 data
+#define REG_TM0CNT			*(u16*)(REG_BASE+0x0102)	//!< Timer 0 control
+#define REG_TM1D			*(u16*)(REG_BASE+0x0104)	//!< Timer 1 data
+#define REG_TM1CNT			*(u16*)(REG_BASE+0x0106)	//!< Timer 1 control
+#define REG_TM2D			*(u16*)(REG_BASE+0x0108)	//!< Timer 2 data
+#define REG_TM2CNT			*(u16*)(REG_BASE+0x010A)	//!< Timer 2 control
+#define REG_TM3D			*(u16*)(REG_BASE+0x010C)	//!< Timer 3 data
+#define REG_TM3CNT			*(u16*)(REG_BASE+0x010E)	//!< Timer 3 control
 //\}
 
 //! \name Serial communication
 //{
-#define REG_SIOCNT			*(vu16*)(REG_BASE+0x0128)	//!< Serial IO control (Normal/MP/UART)
+#define REG_SIOCNT			*(u16*)(REG_BASE+0x0128)	//!< Serial IO control (Normal/MP/UART)
 
-#define REG_SIODATA			((vu32*)(REG_BASE+0x0120))
-#define REG_SIODATA32		*(vu32*)(REG_BASE+0x0120)	//!< Normal/UART 32bit data
-#define REG_SIODATA8		*(vu16*)(REG_BASE+0x012A)	//!< Normal/UART 8bit data
+#define REG_SIODATA			((u32*)(REG_BASE+0x0120))
+#define REG_SIODATA32		*(u32*)(REG_BASE+0x0120)	//!< Normal/UART 32bit data
+#define REG_SIODATA8		*(u16*)(REG_BASE+0x012A)	//!< Normal/UART 8bit data
 
-#define REG_SIOMULTI		((vu16*)(REG_BASE+0x0120))	//!< Multiplayer data array
-#define REG_SIOMULTI0		*(vu16*)(REG_BASE+0x0120)	//!< MP master data
-#define REG_SIOMULTI1		*(vu16*)(REG_BASE+0x0122)	//!< MP Slave 1 data
-#define REG_SIOMULTI2		*(vu16*)(REG_BASE+0x0124)	//!< MP Slave 2 data 
-#define REG_SIOMULTI3		*(vu16*)(REG_BASE+0x0126)	//!< MP Slave 3 data
+#define REG_SIOMULTI		((u16*)(REG_BASE+0x0120))	//!< Multiplayer data array
+#define REG_SIOMULTI0		*(u16*)(REG_BASE+0x0120)	//!< MP master data
+#define REG_SIOMULTI1		*(u16*)(REG_BASE+0x0122)	//!< MP Slave 1 data
+#define REG_SIOMULTI2		*(u16*)(REG_BASE+0x0124)	//!< MP Slave 2 data 
+#define REG_SIOMULTI3		*(u16*)(REG_BASE+0x0126)	//!< MP Slave 3 data
 
-#define REG_SIOMLT_RECV		*(vu16*)(REG_BASE+0x0120)	//!< MP data receiver
-#define REG_SIOMLT_SEND		*(vu16*)(REG_BASE+0x012A)	//!< MP data sender
+#define REG_SIOMLT_RECV		*(u16*)(REG_BASE+0x0120)	//!< MP data receiver
+#define REG_SIOMLT_SEND		*(u16*)(REG_BASE+0x012A)	//!< MP data sender
 //\}
 
 //! \name Keypad registers
 //\{
-#define REG_KEYINPUT		*(vu16*)(REG_BASE+0x0130)	//!< Key status (read only??)
-#define REG_KEYCNT			*(vu16*)(REG_BASE+0x0132)	//!< Key IRQ control
+#define REG_KEYINPUT		*(u16*)(REG_BASE+0x0130)	//!< Key status (read only??)
+#define REG_KEYCNT			*(u16*)(REG_BASE+0x0132)	//!< Key IRQ control
 //\}
 
 //! \name Joybus communication
 //\{
-#define REG_RCNT			*(vu16*)(REG_BASE+0x0134)	//!< SIO Mode Select/General Purpose Data
-#define REG_JOYCNT			*(vu16*)(REG_BASE+0x0140)	//!< JOY bus control
-#define REG_JOY_RECV		*(vu32*)(REG_BASE+0x0150)	//!< JOY bus receiever
-#define REG_JOY_TRANS		*(vu32*)(REG_BASE+0x0154)	//!< JOY bus transmitter
-#define REG_JOYSTAT			*(vu16*)(REG_BASE+0x0158)	//!< JOY bus status
+#define REG_RCNT			*(u16*)(REG_BASE+0x0134)	//!< SIO Mode Select/General Purpose Data
+#define REG_JOYCNT			*(u16*)(REG_BASE+0x0140)	//!< JOY bus control
+#define REG_JOY_RECV		*(u32*)(REG_BASE+0x0150)	//!< JOY bus receiever
+#define REG_JOY_TRANS		*(u32*)(REG_BASE+0x0154)	//!< JOY bus transmitter
+#define REG_JOYSTAT			*(u16*)(REG_BASE+0x0158)	//!< JOY bus status
 //\}
 
 //! \name Interrupt / System registers
 //\{
-#define REG_IE				*(vu16*)(REG_BASE+0x0200)	//!< IRQ enable
-#define REG_IF				*(vu16*)(REG_BASE+0x0202)	//!< IRQ status/acknowledge
-#define REG_WAITCNT			*(vu16*)(REG_BASE+0x0204)	//!< Waitstate control
-#define REG_IME				*(vu16*)(REG_BASE+0x0208)	//!< IRQ master enable
-#define REG_PAUSE			*(vu16*)(REG_BASE+0x0300)	//!< Pause system (?)
+#define REG_IE				*(u16*)(REG_BASE+0x0200)	//!< IRQ enable
+#define REG_IF				*(u16*)(REG_BASE+0x0202)	//!< IRQ status/acknowledge
+#define REG_WAITCNT			*(u16*)(REG_BASE+0x0204)	//!< Waitstate control
+#define REG_IME				*(u16*)(REG_BASE+0x0208)	//!< IRQ master enable
+#define REG_PAUSE			*(u16*)(REG_BASE+0x0300)	//!< Pause system (?)
 //\}
 
 /*!	\}	*/
@@ -492,79 +492,79 @@ extern u8 tonc__mem_oam[OAM_SIZE];
 */
 /*!	\{	*/
 
-#define REG_BLDMOD			*(vu16*)(REG_BASE+0x0050)	// alpha control
-#define REG_COLEV			*(vu16*)(REG_BASE+0x0052)	// fade level
-#define REG_COLEY			*(vu16*)(REG_BASE+0x0054)	// blend levels
+#define REG_BLDMOD			*(u16*)(REG_BASE+0x0050)	// alpha control
+#define REG_COLEV			*(u16*)(REG_BASE+0x0052)	// fade level
+#define REG_COLEY			*(u16*)(REG_BASE+0x0054)	// blend levels
 
 // sound regs as in belogic and GBATek (mostly for compatability)
-#define REG_SOUND1CNT		*(vu32*)(REG_BASE+0x0060)
-#define REG_SOUND1CNT_L		*(vu16*)(REG_BASE+0x0060)
-#define REG_SOUND1CNT_H		*(vu16*)(REG_BASE+0x0062)
-#define REG_SOUND1CNT_X		*(vu16*)(REG_BASE+0x0064)
-#define REG_SOUND2CNT_L		*(vu16*)(REG_BASE+0x0068)
-#define REG_SOUND2CNT_H		*(vu16*)(REG_BASE+0x006C)
-#define REG_SOUND3CNT		*(vu32*)(REG_BASE+0x0070)
-#define REG_SOUND3CNT_L		*(vu16*)(REG_BASE+0x0070)
-#define REG_SOUND3CNT_H		*(vu16*)(REG_BASE+0x0072)
-#define REG_SOUND3CNT_X		*(vu16*)(REG_BASE+0x0074)
-#define REG_SOUND4CNT_L		*(vu16*)(REG_BASE+0x0078)
-#define REG_SOUND4CNT_H		*(vu16*)(REG_BASE+0x007C)
-#define REG_SOUNDCNT		*(vu32*)(REG_BASE+0x0080)
-#define REG_SOUNDCNT_L		*(vu16*)(REG_BASE+0x0080)
-#define REG_SOUNDCNT_H		*(vu16*)(REG_BASE+0x0082)
-#define REG_SOUNDCNT_X		*(vu16*)(REG_BASE+0x0084)
-#define REG_SOUNDBIAS		*(vu16*)(REG_BASE+0x0088)
+#define REG_SOUND1CNT		*(u32*)(REG_BASE+0x0060)
+#define REG_SOUND1CNT_L		*(u16*)(REG_BASE+0x0060)
+#define REG_SOUND1CNT_H		*(u16*)(REG_BASE+0x0062)
+#define REG_SOUND1CNT_X		*(u16*)(REG_BASE+0x0064)
+#define REG_SOUND2CNT_L		*(u16*)(REG_BASE+0x0068)
+#define REG_SOUND2CNT_H		*(u16*)(REG_BASE+0x006C)
+#define REG_SOUND3CNT		*(u32*)(REG_BASE+0x0070)
+#define REG_SOUND3CNT_L		*(u16*)(REG_BASE+0x0070)
+#define REG_SOUND3CNT_H		*(u16*)(REG_BASE+0x0072)
+#define REG_SOUND3CNT_X		*(u16*)(REG_BASE+0x0074)
+#define REG_SOUND4CNT_L		*(u16*)(REG_BASE+0x0078)
+#define REG_SOUND4CNT_H		*(u16*)(REG_BASE+0x007C)
+#define REG_SOUNDCNT		*(u32*)(REG_BASE+0x0080)
+#define REG_SOUNDCNT_L		*(u16*)(REG_BASE+0x0080)
+#define REG_SOUNDCNT_H		*(u16*)(REG_BASE+0x0082)
+#define REG_SOUNDCNT_X		*(u16*)(REG_BASE+0x0084)
+#define REG_SOUNDBIAS		*(u16*)(REG_BASE+0x0088)
 
-#define REG_WAVE			 (vu32*)(REG_BASE+0x0090)
-#define REG_FIFOA			*(vu32*)(REG_BASE+0x00A0)
-#define REG_FIFOB			*(vu32*)(REG_BASE+0x00A4)
-
-
-#define REG_DMA0CNT_L		*(vu16*)(REG_BASE+0x00B8) // count
-#define REG_DMA0CNT_H		*(vu16*)(REG_BASE+0x00BA) // flags
-#define REG_DMA1CNT_L		*(vu16*)(REG_BASE+0x00C4)
-#define REG_DMA1CNT_H		*(vu16*)(REG_BASE+0x00C6)
-#define REG_DMA2CNT_L		*(vu16*)(REG_BASE+0x00D0)
-#define REG_DMA2CNT_H		*(vu16*)(REG_BASE+0x00D2)
-#define REG_DMA3CNT_L		*(vu16*)(REG_BASE+0x00DC)
-#define REG_DMA3CNT_H		*(vu16*)(REG_BASE+0x00DE)
-
-#define REG_TM0CNT_L		*(vu16*)(REG_BASE+0x0100)
-#define REG_TM0CNT_H		*(vu16*)(REG_BASE+0x0102)
-
-#define REG_TM1CNT_L		*(vu16*)(REG_BASE+0x0104)
-#define REG_TM1CNT_H		*(vu16*)(REG_BASE+0x0106)
-
-#define REG_TM2CNT_L		*(vu16*)(REG_BASE+0x0108)
-#define REG_TM2CNT_H		*(vu16*)(REG_BASE+0x010a)
-
-#define REG_TM3CNT_L		*(vu16*)(REG_BASE+0x010c)
-#define REG_TM3CNT_H		*(vu16*)(REG_BASE+0x010e)
+#define REG_WAVE			 (u32*)(REG_BASE+0x0090)
+#define REG_FIFOA			*(u32*)(REG_BASE+0x00A0)
+#define REG_FIFOB			*(u32*)(REG_BASE+0x00A4)
 
 
-#define REG_KEYS			*(vu16*)(REG_BASE+0x0130)	// Key status
-#define REG_P1				*(vu16*)(REG_BASE+0x0130)	// for backward combatibility
-#define REG_P1CNT			*(vu16*)(REG_BASE+0x0132)	// ditto
+#define REG_DMA0CNT_L		*(u16*)(REG_BASE+0x00B8) // count
+#define REG_DMA0CNT_H		*(u16*)(REG_BASE+0x00BA) // flags
+#define REG_DMA1CNT_L		*(u16*)(REG_BASE+0x00C4)
+#define REG_DMA1CNT_H		*(u16*)(REG_BASE+0x00C6)
+#define REG_DMA2CNT_L		*(u16*)(REG_BASE+0x00D0)
+#define REG_DMA2CNT_H		*(u16*)(REG_BASE+0x00D2)
+#define REG_DMA3CNT_L		*(u16*)(REG_BASE+0x00DC)
+#define REG_DMA3CNT_H		*(u16*)(REG_BASE+0x00DE)
 
-#define REG_SCD0			*(vu16*)(REG_BASE+0x0120)
-#define REG_SCD1			*(vu16*)(REG_BASE+0x0122)
-#define REG_SCD2			*(vu16*)(REG_BASE+0x0124)
-#define REG_SCD3			*(vu16*)(REG_BASE+0x0126)
-#define REG_SCCNT			*(vu32*)(REG_BASE+0x0128)
-#define REG_SCCNT_L			*(vu16*)(REG_BASE+0x0128)
-#define REG_SCCNT_H			*(vu16*)(REG_BASE+0x012A)
+#define REG_TM0CNT_L		*(u16*)(REG_BASE+0x0100)
+#define REG_TM0CNT_H		*(u16*)(REG_BASE+0x0102)
 
-#define REG_R				*(vu16*)(REG_BASE+0x0134)
-#define REG_HS_CTRL			*(vu16*)(REG_BASE+0x0140)
-#define REG_JOYRE			*(vu32*)(REG_BASE+0x0150)
-#define REG_JOYRE_L			*(vu16*)(REG_BASE+0x0150)
-#define REG_JOYRE_H			*(vu16*)(REG_BASE+0x0152)
-#define REG_JOYTR			*(vu32*)(REG_BASE+0x0154)
-#define REG_JOYTR_L			*(vu16*)(REG_BASE+0x0154)
-#define REG_JOYTR_H			*(vu16*)(REG_BASE+0x0156)
-#define REG_JSTAT			*(vu16*)(REG_BASE+0x0158)
+#define REG_TM1CNT_L		*(u16*)(REG_BASE+0x0104)
+#define REG_TM1CNT_H		*(u16*)(REG_BASE+0x0106)
 
-#define REG_WSCNT			*(vu16*)(REG_BASE+0x0204)
+#define REG_TM2CNT_L		*(u16*)(REG_BASE+0x0108)
+#define REG_TM2CNT_H		*(u16*)(REG_BASE+0x010a)
+
+#define REG_TM3CNT_L		*(u16*)(REG_BASE+0x010c)
+#define REG_TM3CNT_H		*(u16*)(REG_BASE+0x010e)
+
+
+#define REG_KEYS			*(u16*)(REG_BASE+0x0130)	// Key status
+#define REG_P1				*(u16*)(REG_BASE+0x0130)	// for backward combatibility
+#define REG_P1CNT			*(u16*)(REG_BASE+0x0132)	// ditto
+
+#define REG_SCD0			*(u16*)(REG_BASE+0x0120)
+#define REG_SCD1			*(u16*)(REG_BASE+0x0122)
+#define REG_SCD2			*(u16*)(REG_BASE+0x0124)
+#define REG_SCD3			*(u16*)(REG_BASE+0x0126)
+#define REG_SCCNT			*(u32*)(REG_BASE+0x0128)
+#define REG_SCCNT_L			*(u16*)(REG_BASE+0x0128)
+#define REG_SCCNT_H			*(u16*)(REG_BASE+0x012A)
+
+#define REG_R				*(u16*)(REG_BASE+0x0134)
+#define REG_HS_CTRL			*(u16*)(REG_BASE+0x0140)
+#define REG_JOYRE			*(u32*)(REG_BASE+0x0150)
+#define REG_JOYRE_L			*(u16*)(REG_BASE+0x0150)
+#define REG_JOYRE_H			*(u16*)(REG_BASE+0x0152)
+#define REG_JOYTR			*(u32*)(REG_BASE+0x0154)
+#define REG_JOYTR_L			*(u16*)(REG_BASE+0x0154)
+#define REG_JOYTR_H			*(u16*)(REG_BASE+0x0156)
+#define REG_JSTAT			*(u16*)(REG_BASE+0x0158)
+
+#define REG_WSCNT			*(u16*)(REG_BASE+0x0204)
 
 /*!	\}	*/
 
