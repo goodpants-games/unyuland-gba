@@ -9,6 +9,7 @@
 
 .clangd
 build
+buildpc
 
 __pycache__
 .DS_Store
