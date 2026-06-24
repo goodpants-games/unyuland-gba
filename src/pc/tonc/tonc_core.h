@@ -251,25 +251,6 @@ INLINE u32 hword2word(u16 h0, u16 h1);
 /*!	\addtogroup grpDma	*/
 /*!	\{	*/
 
-//! General purpose DMA transfer macro
-/*!	\param _dst	Destination address.
-	\param _src	Source address.
-	\param count	Number of transfers.
-	\param ch	DMA channel.
-	\param mode	DMA mode.
-*/
-#define DMA_TRANSFER(_dst, _src, count, ch, mode)	\
-do {										\
-	REG_DMA[ch].cnt= 0;						\
-	REG_DMA[ch].src= (const void*)(_src);	\
-	REG_DMA[ch].dst= (void*)(_dst);			\
-	REG_DMA[ch].cnt= (count) | (mode);		\
-} while(0)
-
-
-INLINE void dma_cpy(void *dst, const void *src, uint count, uint ch, u32 mode);
-INLINE void dma_fill(void *dst, volatile u32 src, uint count, uint ch, u32 mode);
-
 INLINE void dma3_cpy(void *dst, const void *src, uint size);
 INLINE void dma3_fill(void *dst, volatile u32 src, uint size);
 
@@ -281,8 +262,8 @@ INLINE void dma3_fill(void *dst, volatile u32 src, uint size);
 // --------------------------------------------------------------------
 
 
-INLINE void profile_start(void);
-INLINE uint profile_stop(void);
+void profile_start(void);
+uint profile_stop(void);
 
 
 // --------------------------------------------------------------------
@@ -485,38 +466,6 @@ INLINE u32 hword2word(u16 h0, u16 h1)
 /*!	\addtogroup grpDma	*/
 /*!	\{	*/
 
-//! Generic DMA copy routine.
-/*!	\param dst	Destination address.
-*	\param src	Source address.
-*	\param count	Number of copies to perform.
-*	\param ch	DMA channel.
-*	\param mode	DMA transfer mode.
-*	\note	\a count is the number of copies, not the size in bytes.
-*/
-INLINE void dma_cpy(void *dst, const void *src, uint count, uint ch, u32 mode)
-{
-	REG_DMA[ch].cnt= 0;
-	REG_DMA[ch].src= src;
-	REG_DMA[ch].dst= dst;
-	REG_DMA[ch].cnt= mode | count;
-}
-
-//! Generic DMA fill routine.
-/*!	\param dst	Destination address.
-*	\param src	Source value.
-*	\param count	Number of copies to perform.
-*	\param ch	DMA channel.
-*	\param mode	DMA transfer mode.
-*	\note	\a count is the number of copies, not the size in bytes.
-*/
-INLINE void dma_fill(void *dst, volatile u32 src, uint count, uint ch, u32 mode)
-{
-	REG_DMA[ch].cnt= 0;
-	REG_DMA[ch].src= (const void*)&src;
-	REG_DMA[ch].dst= dst;
-	REG_DMA[ch].cnt= count | mode | DMA_SRC_FIXED;
-}
-
 //! Specific DMA copier, using channel 3, word transfers.
 /*!	\param dst	Destination address.
 *	\param src	Source address.
@@ -524,7 +473,7 @@ INLINE void dma_fill(void *dst, volatile u32 src, uint count, uint ch, u32 mode)
 *	\note	\a size is the number of bytes
 */
 INLINE void dma3_cpy(void *dst, const void *src, uint size)
-{	dma_cpy(dst, src, size/4, 3, DMA_CPY32);	}
+{ memcpy(dst, src, size/4*4); }
 
 //! Specific DMA filler, using channel 3, word transfers.
 /*!	\param dst	Destination address.
@@ -533,7 +482,12 @@ INLINE void dma3_cpy(void *dst, const void *src, uint size)
 *	\note	\a size is the number of bytes
 */
 INLINE void dma3_fill(void *dst, volatile u32 src, uint size)
-{	dma_fill(dst, src, size/4, 3, DMA_FILL32);	}
+{
+	size /= 4;
+	u32 *p = (u32 *)dst;
+	for (; size != 0; --size)
+		*(p++) = src;
+}
 
 /*! \}	*/
 
@@ -556,35 +510,6 @@ INLINE int qran(void)
 */
 INLINE int qran_range(int min, int max)	
 {	return (qran()*(max-min)>>QRAN_SHIFT)+min;		}
-
-
-// --- Timer ----------------------------------------------------------
-
-/*!	\addtogroup grpTimer	*/
-/*!	\{	*/
-
-//! Start a profiling run
-/*!	\note Routine uses timers 3 and 3; if you're already using these
-*	  somewhere, chaos is going to ensue.
-*/
-INLINE void profile_start(void)
-{
-	REG_TM2D= 0;	REG_TM3D= 0;
-    REG_TM2CNT= 0;	REG_TM3CNT= 0;
-    REG_TM3CNT= TM_ENABLE | TM_CASCADE;
-    REG_TM2CNT= TM_ENABLE;
-}
-
-//! Stop a profiling run and return the time since its start.
-/*!	\return 32bit cycle count
-*/
-INLINE uint profile_stop(void)
-{
-   REG_TM2CNT= 0;
-   return (REG_TM3D<<16)|REG_TM2D;
-}
-
-/*!	\}	/addtogroup	*/
 
 
 #endif // TONC_CORE

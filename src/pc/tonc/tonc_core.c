@@ -7,6 +7,8 @@
 //
 // === NOTES ===
 
+#include <SDL3/SDL.h>
+
 #include "tonc_memmap.h"
 #include "tonc_core.h"
 
@@ -233,5 +235,34 @@ u32 octant_rot(int x0, int y0)
     if(x<y) { oct ^= 1; }
     return oct;
 }
+
+
+
+// --- Timer ----------------------------------------------------------
+
+/*!	\addtogroup grpTimer	*/
+/*!	\{	*/
+
+static u64 profile_start_time;
+
+//! Start a profiling run
+/*!	\note Routine uses timers 3 and 3; if you're already using these
+*	  somewhere, chaos is going to ensue.
+*/
+void profile_start(void)
+{
+	profile_start_time = SDL_GetTicksNS();
+}
+
+//! Stop a profiling run and return the time since its start.
+/*!	\return 32bit cycle count
+*/
+uint profile_stop(void)
+{
+	u64 dt_us = (SDL_GetTicksNS() - profile_start_time) / 1e6;
+	return (uint)((dt_us * 1678e10) / 1e12);
+}
+
+/*!	\}	/addtogroup	*/
 
 //	EOF

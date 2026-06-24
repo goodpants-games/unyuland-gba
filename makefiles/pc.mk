@@ -18,6 +18,10 @@ LIBS    := $(shell $(PKGCONF) --libs $(LIBNAMES))
 CFLAGS  := -DPLATFORM_PC $(shell $(PKGCONF) --cflags $(LIBNAMES))
 ASFLAGS := -DPLATFORM_PC
 
+ifeq ($(OS), Windows_NT)
+  LIBS += -mconsole
+endif
+
 
 #---------------------------------------------------------------------------------
 # targets
