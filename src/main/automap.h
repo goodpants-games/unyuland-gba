@@ -35,6 +35,7 @@ typedef struct automap
 automap_s;
 
 void automap_init(automap_s *map);
+void automap_deinit(void);
 void automap_open_view(automap_s *map, int bg_idx);
 void automap_close_view(automap_s *map);
 void automap_set_pos(automap_s *map, const world_room_s *room, int local_x,

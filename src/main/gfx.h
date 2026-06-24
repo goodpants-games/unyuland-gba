@@ -132,8 +132,8 @@ typedef struct gfx_sprdb
 gfx_sprdb_s;
 
 typedef struct gfx_root_header {
-    uintptr_t  frame_pool;
-    uintptr_t  obj_pool;
+    u32 frame_pool;
+    u32 obj_pool;
     
     gfx_sprite_s sprite0;
 } gfx_root_header_s;
@@ -221,6 +221,9 @@ INLINE void gfx_unload_map(uint bg_idx)
     gfx_ctl.bg[bg_idx].map_width = 0;
     gfx_ctl.bg[bg_idx].map_height = 0;
 }
+
+uint gfx_alloc_scrblock_writer(map_write_scrblock_f func);
+void gfx_free_scrblock_writer(uint id);
 
 void* gfx_alloc_cpybuf(size_t size);
 bool gfx_queue_memcpy(void *dst, const void *src, size_t size);

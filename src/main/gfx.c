@@ -278,6 +278,8 @@ void gfx_set_palette_multiplied(FIXED factor)
 //------------------------------------------------------------------------------
 #pragma region map scrolling
 
+#define MAX_SCRBLOCK_WRITER_COUNT 16
+
 typedef struct bg_scroll_data
 {
     uint old_offset_x;
@@ -286,6 +288,7 @@ typedef struct bg_scroll_data
 } bg_scroll_data_s;
 
 static EWRAM_BSS bg_scroll_data_s bg_scroll_data[4];
+static EWRAM_BSS map_write_scrblock_f scrblock_writers[MAX_SCRBLOCK_WRITER_COUNT];
 
 IWRAM_CODE
 static void update_map_scroll_t(uint bg_idx, uint size_shift, uint dst_shift,
@@ -456,8 +459,12 @@ static void update_map_scroll(uint bg_idx)
             break;
 
         case MAP_GFX_FORMAT_CUSTOM16:
-            update_map_scroll_t(bg_idx, 4, 1, bg->map->custom_scrblock_write);
+        {
+            map_write_scrblock_f writer =
+                scrblock_writers[bg->map->custom_scrblock_write - 1];
+            update_map_scroll_t(bg_idx, 4, 1, writer);
             break;
+        }
         
         default:
             LOG_ERR("invalid map gfx format %u", bg->map->gfx_format);
@@ -484,6 +491,34 @@ void gfx_load_map(uint bg_idx, const map_header_s *map)
     bg->map_width = map->width;
     bg->map_height = map->height;
     sdata->screen_dirty = true;
+}
+
+uint gfx_alloc_scrblock_writer(map_write_scrblock_f func)
+{
+    if (func == NULL) return 0;
+
+    for (uint i = 0; i < MAX_SCRBLOCK_WRITER_COUNT; ++i)
+    {
+        if (scrblock_writers[i]) continue;
+        scrblock_writers[i] = func;
+        return i + 1;
+    }
+
+    return 0;
+}
+
+void gfx_free_scrblock_writer(uint id)
+{
+    if (id == 0) return;
+    --id;
+
+    if (id >= MAX_SCRBLOCK_WRITER_COUNT)
+    {
+        LOG_ERR("gfx_free_scrblock_writer: invalid id");
+        return;
+    }
+
+    scrblock_writers[id] = NULL;
 }
 
 #pragma endregion

@@ -432,6 +432,7 @@ static void scene_load(uintptr_t data)
 static void scene_unload(void)
 {
     game_deinit();
+    automap_deinit();
     gfx_unload_map(1);
     gfx_ctl.bg[1].offset_x = 0;
     gfx_ctl.bg[1].offset_y = 0;

@@ -21,6 +21,8 @@
 #define ICON_MIN_Y 7
 #define ICON_MAX_Y ((SCREEN_HEIGHT / 2) - 15 - 5)
 
+static uint scrblock_writer_handle;
+
 static void scrblock_write(uint map_entry, u16 *dest)
 {
     const u32 *src32 = (const u32 *)(automap_tiles_gfxMap + (map_entry * 2));
@@ -48,12 +50,14 @@ void automap_init(automap_s *map)
         + AUTOMAP_MARGIN_Y * 8;
 
     // initialize scrollmap data as empty (i.e. grid pattern)
+    scrblock_writer_handle = gfx_alloc_scrblock_writer(scrblock_write);
+
     map->scrmap_header = (map_header_s)
     {
         .gfx_format = MAP_GFX_FORMAT_CUSTOM16,
         .width = AUTOMAP_WIDTH,
         .height = AUTOMAP_HEIGHT,
-        .custom_scrblock_write = scrblock_write,
+        .custom_scrblock_write = scrblock_writer_handle,
         .gfx_data_offset = offsetof(automap_s, scrmap)
                            - offsetof(automap_s, scrmap_header)
     };
@@ -78,6 +82,11 @@ void automap_init(automap_s *map)
             map->scrmap[y][x] = v;
         }
     }
+}
+
+void automap_deinit(void)
+{
+    gfx_free_scrblock_writer(scrblock_writer_handle);
 }
 
 static inline void automap_clamp_spos(automap_s *map)

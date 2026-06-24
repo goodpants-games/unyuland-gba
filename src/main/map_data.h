@@ -21,7 +21,11 @@ typedef struct map_header
 
     // 2 bytes of padding
 
-    map_write_scrblock_f custom_scrblock_write; // used with custom16
+    // writer func: used with custom16
+    // this is actually a 32-bit number representing an abstract handle to the
+    // writer method, solely because of the PC port. It's expected to be a
+    // u32 buut the PC port may be a 64-bit application. So. Like.
+    uint custom_scrblock_write;
     u32 col_data_offset;
     u32 gfx_data_offset;
     u32 ent_data_offset;
