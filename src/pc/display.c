@@ -11,6 +11,12 @@ static u32 s_palette[256];
 static const u16 *s_bg_ctl_addr_table[4] =
     {&REG_BG0CNT, &REG_BG1CNT, &REG_BG2CNT, &REG_BG3CNT};
 
+static const u16 *s_bg_ctl_hofs[4] =
+    {&REG_BG0HOFS, &REG_BG1HOFS, &REG_BG2HOFS, &REG_BG3HOFS};
+
+static const u16 *s_bg_ctl_vofs[4] =
+    {&REG_BG0VOFS, &REG_BG1VOFS, &REG_BG2VOFS, &REG_BG3VOFS};
+
 static inline u32 r5g5b5a1_to_rgba32(u16 color)
 {
     u8 r = color & 0x1F;
@@ -37,21 +43,31 @@ static void draw_bg(uint bg_idx, uint bg_prio)
     uint cbb_idx = (bg_ctl & BG_CBB_MASK) >> BG_CBB_SHIFT;
     uint sbb_idx = (bg_ctl & BG_SBB_MASK) >> BG_SBB_SHIFT;
 
+    uint hofs = (uint) *(s_bg_ctl_hofs[bg_idx]) & 0xFF;
+    uint vofs = (uint) *(s_bg_ctl_vofs[bg_idx]) & 0xFF;
+    uint hofs_frac = hofs & 7;
+    uint vofs_frac = vofs & 7;
+
     TILE *tmem = tile_mem[cbb_idx];
     SCR_ENTRY *semem = se_mem[sbb_idx];
 
-    for (int y = 0; y < 20; ++y)
+    uint se_col = vofs / 8;
+    for (int y = 1; y < 20; ++y)
     {
-        SCR_ENTRY *se = semem;
-
-        for (int x = 0; x < 30; ++x)
+        uint se_row = hofs / 8;
+        for (int x = 1; x < 30; ++x)
         {
-            u16 se_data = *(se++);
+            u16 se_data = semem[se_col * 32 + se_row];
+            se_row = (se_row + 1) & 31;
+
             uint tid = (se_data & SE_ID_MASK) >> SE_ID_SHIFT;
             uint pal_id = (se_data & SE_PALBANK_MASK) >> SE_PALBANK_SHIFT;
             u32 *tile = (u32 *)(tmem + tid);
 
-            u32 *ocol = DISPBUF + ((y * SCREEN_WIDTH + x) * 8);
+            uint draw_x = x * 8 - hofs_frac;
+            uint draw_y = y * 8 - vofs_frac;
+
+            u32 *ocol = DISPBUF + (draw_y * SCREEN_WIDTH + draw_x);
             u32 *pal = s_palette + pal_id * 16;
             for (int iy = 0; iy < 8; ++iy)
             {
@@ -68,7 +84,7 @@ static void draw_bg(uint bg_idx, uint bg_prio)
             }
         }
 
-        semem += 32;
+        se_col = (se_col + 1) & 31;
     }
 }
 
