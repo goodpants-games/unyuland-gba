@@ -9,6 +9,8 @@
 - Add saving. it saves which orbs you collected. Duh.
 - add enemy hurt sfx
 - Add final boss and beginning area depicting unyu villag.
+- Fix respawning when just started the game.
+  that is, create a state snapshot on launch
 
 b05: player scared to go down Hole.
 player should be able to do a jig when hold down (very important)
