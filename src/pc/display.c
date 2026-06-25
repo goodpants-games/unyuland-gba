@@ -28,9 +28,10 @@ static inline u32 r5g5b5a1_to_rgba32(u16 color)
     return (r * 8) | ((g * 8) << 8) | ((b * 8) << 16) | (0xFF000000);
 }
 
-static inline void blit_pixel(u32 *out, u32 *pal, uint pali)
+static inline void blit_pixel(u32 *out, int out_idx, u32 *pal, uint pali)
 {
-    if (pali > 0) *out = pal[pali];
+    if (out_idx < 0 || out_idx >= SCREEN_WIDTH) return;
+    if (pali > 0) out[out_idx] = pal[pali];
 }
 
 static void draw_bg(uint bg_idx, uint bg_prio)
@@ -52,35 +53,58 @@ static void draw_bg(uint bg_idx, uint bg_prio)
     SCR_ENTRY *semem = se_mem[sbb_idx];
 
     uint se_col = vofs / 8;
-    for (int y = 1; y < 20; ++y)
+    for (int y = 0; y <= 20; ++y)
     {
         uint se_row = hofs / 8;
-        for (int x = 1; x < 30; ++x)
+        for (int x = 0; x <= 30; ++x)
         {
             u16 se_data = semem[se_col * 32 + se_row];
             se_row = (se_row + 1) & 31;
 
             uint tid = (se_data & SE_ID_MASK) >> SE_ID_SHIFT;
             uint pal_id = (se_data & SE_PALBANK_MASK) >> SE_PALBANK_SHIFT;
+            bool flip_x = se_data & SE_HFLIP;
+            bool flip_y = se_data & SE_VFLIP;
+
             u32 *tile = (u32 *)(tmem + tid);
+            int tile_ptr_delta = 1;
 
-            uint draw_x = x * 8 - hofs_frac;
-            uint draw_y = y * 8 - vofs_frac;
-
-            u32 *ocol = DISPBUF + (draw_y * SCREEN_WIDTH + draw_x);
-            u32 *pal = s_palette + pal_id * 16;
-            for (int iy = 0; iy < 8; ++iy)
+            if (flip_y)
             {
-                u32 row = *(tile++);
-                blit_pixel(ocol+0, pal, (row >> 0 ) & 0xF);
-                blit_pixel(ocol+1, pal, (row >> 4 ) & 0xF);
-                blit_pixel(ocol+2, pal, (row >> 8 ) & 0xF);
-                blit_pixel(ocol+3, pal, (row >> 12) & 0xF);
-                blit_pixel(ocol+4, pal, (row >> 16) & 0xF);
-                blit_pixel(ocol+5, pal, (row >> 20) & 0xF);
-                blit_pixel(ocol+6, pal, (row >> 24) & 0xF);
-                blit_pixel(ocol+7, pal, (row >> 28) & 0xF);
-                ocol += SCREEN_WIDTH;
+                tile_ptr_delta = -1;
+                tile += 7;
+            }
+
+            int draw_x = x * 8 - hofs_frac;
+            int draw_y = y * 8 - vofs_frac;
+
+            u32 *pal = s_palette + pal_id * 16;
+            for (int i = 0; i < 8; ++i)
+            {
+                if (draw_y >= 0 && draw_y < SCREEN_HEIGHT)
+                {
+                    u32 *ocol = DISPBUF + draw_y * SCREEN_WIDTH;
+                    u32 row = *tile;
+
+                    if (flip_x)
+                    {
+                        row = ((row & 0xFFFF0000) >> 16) | ((row & 0x0000FFFF) << 16);
+                        row = ((row & 0xFF00FF00) >> 8) | ((row & 0x00FF00FF) << 8);
+                        row = ((row & 0xF0F0F0F0) >> 4) | ((row & 0x0F0F0F0F) << 4);
+                    }
+
+                    blit_pixel(ocol, draw_x + 0, pal, (row >> 0 ) & 0xF);
+                    blit_pixel(ocol, draw_x + 1, pal, (row >> 4 ) & 0xF);
+                    blit_pixel(ocol, draw_x + 2, pal, (row >> 8 ) & 0xF);
+                    blit_pixel(ocol, draw_x + 3, pal, (row >> 12) & 0xF);
+                    blit_pixel(ocol, draw_x + 4, pal, (row >> 16) & 0xF);
+                    blit_pixel(ocol, draw_x + 5, pal, (row >> 20) & 0xF);
+                    blit_pixel(ocol, draw_x + 6, pal, (row >> 24) & 0xF);
+                    blit_pixel(ocol, draw_x + 7, pal, (row >> 28) & 0xF);
+                }
+
+                tile += tile_ptr_delta;
+                ++draw_y;
             }
         }
 
