@@ -5,6 +5,22 @@
 
 #define DISPBUF g_display_buffer
 
+#define CLIP_MASK_WINOUT 1
+#define CLIP_MASK_WIN0   2
+#define CLIP_MASK_WIN1   4
+#define CLIP_MASK_WININ  (CLIP_MASK_WIN0 | CLIP_MASK_WIN1)
+
+typedef struct sprite_shape
+{
+    u8 x, y;
+} sprite_shape_s;
+
+typedef struct object_bins
+{
+    u8 bins[4][128];
+    u8 bin_sz[4];
+} object_bins_s;
+
 u32 *g_display_buffer = NULL;
 static u32 s_bg_palette[256];
 static u32 s_obj_palette[256];
@@ -18,11 +34,8 @@ static const u16 *s_bg_ctl_hofs[4] =
 static const u16 *s_bg_ctl_vofs[4] =
     {&REG_BG0VOFS, &REG_BG1VOFS, &REG_BG2VOFS, &REG_BG3VOFS};
 
-typedef struct sprite_shape
-{
-    u8 x, y;
-}
-sprite_shape_s;
+static u8 s_cur_clip_mask = 0;
+static u8 s_clip_mask[SCREEN_HEIGHT][SCREEN_WIDTH];
 
 static const sprite_shape_s s_sprite_shape_desc[16] = {
     // square
@@ -46,10 +59,20 @@ static inline u32 r5g5b5a1_to_rgba32(u16 color)
     return (r * 8) | ((g * 8) << 8) | ((b * 8) << 16) | (0xFF000000);
 }
 
-static inline void blit_pixel(u32 *out, int out_idx, u32 *pal, uint pali)
+static void fill_clip_mask_region(uint sx, uint sy, uint ex, uint ey, u8 value)
 {
-    if (out_idx < 0 || out_idx >= SCREEN_WIDTH) return;
-    if (pali > 0) out[out_idx] = pal[pali];
+    for (uint y = sy; y < ey; ++y)
+        memset(s_clip_mask[y] + sx, value, ex - sx);
+}
+
+// note: y is used purely for clipping and does not affect pixel index
+// calculation. out should already be the row that the pixel is drawn in.
+static inline void blit_pixel(u32 *out, int x, int y, u32 *pal, uint pali)
+{
+    if (x < 0 || x >= SCREEN_WIDTH) return;
+    if (!(s_clip_mask[y][x] & s_cur_clip_mask)) return;
+
+    if (pali > 0) out[x] = pal[pali];
 }
 
 static void draw_tile(TILE *p_tile, int draw_x, int draw_y, u32 *pal,
@@ -66,28 +89,29 @@ static void draw_tile(TILE *p_tile, int draw_x, int draw_y, u32 *pal,
 
     for (int i = 0; i < 8; ++i)
     {
-        if (draw_y >= 0 && draw_y < SCREEN_HEIGHT)
+        if (draw_y < 0 || draw_y >= SCREEN_HEIGHT)
+            goto next_row;
+
+        u32 *ocol = DISPBUF + draw_y * SCREEN_WIDTH;
+        u32 row = *tile;
+
+        if (flip_x)
         {
-            u32 *ocol = DISPBUF + draw_y * SCREEN_WIDTH;
-            u32 row = *tile;
-
-            if (flip_x)
-            {
-                row = ((row & 0xFFFF0000) >> 16) | ((row & 0x0000FFFF) << 16);
-                row = ((row & 0xFF00FF00) >> 8) | ((row & 0x00FF00FF) << 8);
-                row = ((row & 0xF0F0F0F0) >> 4) | ((row & 0x0F0F0F0F) << 4);
-            }
-
-            blit_pixel(ocol, draw_x + 0, pal, (row >> 0 ) & 0xF);
-            blit_pixel(ocol, draw_x + 1, pal, (row >> 4 ) & 0xF);
-            blit_pixel(ocol, draw_x + 2, pal, (row >> 8 ) & 0xF);
-            blit_pixel(ocol, draw_x + 3, pal, (row >> 12) & 0xF);
-            blit_pixel(ocol, draw_x + 4, pal, (row >> 16) & 0xF);
-            blit_pixel(ocol, draw_x + 5, pal, (row >> 20) & 0xF);
-            blit_pixel(ocol, draw_x + 6, pal, (row >> 24) & 0xF);
-            blit_pixel(ocol, draw_x + 7, pal, (row >> 28) & 0xF);
+            row = ((row & 0xFFFF0000) >> 16) | ((row & 0x0000FFFF) << 16);
+            row = ((row & 0xFF00FF00) >> 8) | ((row & 0x00FF00FF) << 8);
+            row = ((row & 0xF0F0F0F0) >> 4) | ((row & 0x0F0F0F0F) << 4);
         }
 
+        blit_pixel(ocol, draw_x + 0, draw_y, pal, (row >> 0 ) & 0xF);
+        blit_pixel(ocol, draw_x + 1, draw_y, pal, (row >> 4 ) & 0xF);
+        blit_pixel(ocol, draw_x + 2, draw_y, pal, (row >> 8 ) & 0xF);
+        blit_pixel(ocol, draw_x + 3, draw_y, pal, (row >> 12) & 0xF);
+        blit_pixel(ocol, draw_x + 4, draw_y, pal, (row >> 16) & 0xF);
+        blit_pixel(ocol, draw_x + 5, draw_y, pal, (row >> 20) & 0xF);
+        blit_pixel(ocol, draw_x + 6, draw_y, pal, (row >> 24) & 0xF);
+        blit_pixel(ocol, draw_x + 7, draw_y, pal, (row >> 28) & 0xF);
+
+        next_row:;
         tile += tile_ptr_delta;
         ++draw_y;
     }
@@ -181,6 +205,38 @@ static void draw_obj(OBJ_ATTR *obj)
     }
 }
 
+static void draw_scene(bool bg_enabled[4], bool obj_enabled,
+                       object_bins_s *obj_bins)
+{
+    for (int prio = 3; prio >= 0; --prio)
+    {
+        if (bg_enabled[3]) draw_bg(3, prio);
+        if (bg_enabled[2]) draw_bg(2, prio);
+        if (bg_enabled[1]) draw_bg(1, prio);
+        if (bg_enabled[0]) draw_bg(0, prio);
+
+        if (obj_enabled)
+        {
+            int slsz = (int) obj_bins->bin_sz[prio];
+            for (int sli = 0; sli < slsz; ++sli)
+                draw_obj(oam_mem + obj_bins->bins[prio][sli]);
+        }
+    }
+}
+
+static void draw_window(uint ctl, bool bg_enabled[4], object_bins_s *obj_bins)
+{
+    bool bg_win_enabled[4];
+    bool obj_enabled;
+
+    bg_win_enabled[0] = bg_enabled[0] && (ctl & WIN_BG0);
+    bg_win_enabled[1] = bg_enabled[1] && (ctl & WIN_BG1);
+    bg_win_enabled[2] = bg_enabled[2] && (ctl & WIN_BG2);
+    bg_win_enabled[3] = bg_enabled[3] && (ctl & WIN_BG3);
+    obj_enabled = ctl & WIN_OBJ;
+    draw_scene(bg_win_enabled, obj_enabled, obj_bins);
+}
+
 void display_update(void)
 {
     if (DISPBUF == NULL) return;
@@ -202,9 +258,8 @@ void display_update(void)
     bg_enabled[2] = REG_DISPCNT & DCNT_BG2;
     bg_enabled[3] = REG_DISPCNT & DCNT_BG3;
 
-    // sprite list categorized by priority
-    u8 sprite_list[4][128];
-    u8 sprite_list_sz[4] = { 0, 0, 0, 0 };
+    // object list categorized by priority
+    object_bins_s obj_bins = (object_bins_s){0};
 
     for (int si = 127; si >= 0; --si)
     {
@@ -212,18 +267,52 @@ void display_update(void)
         if (obj->attr0 & ATTR0_HIDE) continue;
 
         int p = (obj->attr2 & ATTR2_PRIO_MASK) >> ATTR2_PRIO_SHIFT;
-        sprite_list[p][sprite_list_sz[p]++] = (u8) si;
+        obj_bins.bins[p][obj_bins.bin_sz[p]++] = (u8) si;
     }
 
-    for (int prio = 3; prio >= 0; --prio)
-    {
-        if (bg_enabled[3]) draw_bg(3, prio);
-        if (bg_enabled[2]) draw_bg(2, prio);
-        if (bg_enabled[1]) draw_bg(1, prio);
-        if (bg_enabled[0]) draw_bg(0, prio);
+    // REG_DISPCNT & DCNT_WIN0;
+    // REG_DISPCNT & DCNT_WIN1;
 
-        int slsz = (int) sprite_list_sz[prio];
-        for (int sli = 0; sli < slsz; ++sli)
-            draw_obj(oam_mem + sprite_list[prio][sli]);
+    bool enable_win0 = REG_DISPCNT & DCNT_WIN0;
+    bool enable_win1 = REG_DISPCNT & DCNT_WIN1;
+
+    if (enable_win0 || enable_win1)
+    {
+        memset(s_clip_mask, CLIP_MASK_WINOUT, SCREEN_WIDTH * SCREEN_HEIGHT);
+
+        int win0l = min(REG_WIN0L, SCREEN_WIDTH);
+        int win0r = min(REG_WIN0R, SCREEN_WIDTH);
+        int win0t = min(REG_WIN0T, SCREEN_HEIGHT);
+        int win0b = min(REG_WIN0B, SCREEN_HEIGHT);
+
+        int win1l = min(REG_WIN1L, SCREEN_WIDTH);
+        int win1r = min(REG_WIN1R, SCREEN_WIDTH);
+        int win1t = min(REG_WIN1T, SCREEN_HEIGHT);
+        int win1b = min(REG_WIN1B, SCREEN_HEIGHT);
+
+        fill_clip_mask_region(win1l, win1t, win1r, win1b, CLIP_MASK_WIN1);
+        fill_clip_mask_region(win0l, win0t, win0r, win0b, CLIP_MASK_WIN0);
+
+        uint win0_conf = REG_WININ & 0x0F;
+        uint win1_conf = (REG_WININ >> 8) & 0x0F;
+        uint winout_conf = REG_WINOUT & 0x0F;
+
+        // draw window out
+        s_cur_clip_mask = CLIP_MASK_WINOUT;
+        draw_window(winout_conf, bg_enabled, &obj_bins);
+
+        // draw window 1
+        s_cur_clip_mask = CLIP_MASK_WIN1;
+        draw_window(win1_conf, bg_enabled, &obj_bins);
+
+        // draw window 0
+        s_cur_clip_mask = CLIP_MASK_WIN0;
+        draw_window(win0_conf, bg_enabled, &obj_bins);
+    }
+    else
+    {
+        s_cur_clip_mask = 0xFF;
+        memset(s_clip_mask, 0xFF, SCREEN_WIDTH * SCREEN_HEIGHT);
+        draw_scene(bg_enabled, true, &obj_bins);
     }
 }
