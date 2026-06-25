@@ -253,8 +253,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 {
 #ifdef PLATFORM_WEB
     SDL_SetHint(SDL_HINT_EMSCRIPTEN_CANVAS_SELECTOR, "#gameCanvas");
-#else
-    // SDL_SetHint(SDL_HINT_VIDEO_FORCE_EGL, "1");
+#elif defined(_WIN32)
+    SDL_SetHint(SDL_HINT_VIDEO_FORCE_EGL, "1");
 #endif
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO))
@@ -273,7 +273,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     const int scr_w = SCREEN_WIDTH * WINDOW_SCALE;
     const int scr_h = SCREEN_HEIGHT * WINDOW_SCALE;
     const SDL_WindowFlags win_flags =
-        SDL_WINDOW_OPENGL;
+        SDL_WINDOW_OPENGL | SDL_WINDOW_HIGH_PIXEL_DENSITY;
     
     s_window = SDL_CreateWindow("Unyuland", scr_w, scr_h, win_flags);
     if (!s_window)
