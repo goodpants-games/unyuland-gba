@@ -20,8 +20,8 @@ SOURCES := src/gba
 #---------------------------------------------------------------------------------
 ARCH	:=	-mthumb -mthumb-interwork
 CFLAGS	:=	-DPLATFORM_GBA -mcpu=arm7tdmi -mtune=arm7tdmi -g -O2 $(ARCH)
-ASFLAGS	:=	-DPLATFORM_GBA $(ARCH)
-LDFLAGS	:=	$(ARCH) -Wl,-Map,$(notdir $*.map)
+ASFLAGS	:=	-DPLATFORM_GBA -g $(ARCH)
+LDFLAGS	:=	-g $(ARCH) -Wl,-Map,$(notdir $*.map)
 
 
 #---------------------------------------------------------------------------------

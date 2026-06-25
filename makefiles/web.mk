@@ -1,8 +1,7 @@
-PKGCONF ?= pkg-config
-CC ?= gcc
+CC := emcc
 
-TARGET := unyuland
-BUILD  := buildpc
+TARGET := web/game
+BUILD  := buildweb
 
 #---------------------------------------------------------------------------------
 # platform-specific sources
@@ -13,32 +12,28 @@ SOURCES := src/pc/tonc src/pc/maxmod src/pc
 #---------------------------------------------------------------------------------
 # any extra libraries we wish to link with the project
 #---------------------------------------------------------------------------------
-LIBNAMES := sdl3
-LIBS    := $(shell $(PKGCONF) --libs $(LIBNAMES))
+LIBS    := -sUSE_SDL=3
 
 
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
-CFLAGS  := -DPLATFORM_PC -gdwarf-4 -Og $(shell $(PKGCONF) --cflags $(LIBNAMES))
-ASFLAGS := -DPLATFORM_PC
-LDFLAGS := -gdwarf-4
-
-ifeq ($(OS), Windows_NT)
-  LIBS += -mconsole
-endif
+CFLAGS      := -DPLATFORM_PC -DPLATFORM_WEB -Og -g $(LIBS)
+ASFLAGS     := -DPLATFORM_PC -DPLATFORM_WEB
+LDFLAGS     := -sSTACK_SIZE=131072
+BIN2S_FLAGS += --arch wasm
 
 
 #---------------------------------------------------------------------------------
 # targets
 #---------------------------------------------------------------------------------
 define CLEAN =
-@rm -fr $(BUILD) $(OUTPUT)
+@rm -fr $(BUILD) $(OUTPUT).*
 endef
 
 define BUILD_TARGETS
-$(OUTPUT): $(OFILES)
-	$(SILENTCMD)$(CC) $(OFILES) $(LDFLAGS) $(CFLAGS) $(LIBS) -o $(OUTPUT)
+$(OUTPUT).js: $(OFILES)
+	$(SILENTCMD)$(CC) $(OFILES) $(LDFLAGS) $(CFLAGS) $(LIBS) -o $(OUTPUT).js
 endef
 
 #---------------------------------------------------------------------------------
@@ -54,5 +49,5 @@ endef
 
 
 #---------------------------------------------------------------------------------
-export PLATFORM_MAKEFILE := $(TOPLEVEL)/makefiles/pc.mk
+export PLATFORM_MAKEFILE := $(TOPLEVEL)/makefiles/web.mk
 include $(TOPLEVEL)/makefiles/common.mk

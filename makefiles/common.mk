@@ -46,8 +46,18 @@ endif
 
 CXXFLAGS := $(CFLAGS) -fno-rtti -fno-exceptions
 
-ASFLAGS += -g
-LDFLAGS += -g
+
+#---------------------------------------------------------------------------------
+# canned command sequence for binary data
+#---------------------------------------------------------------------------------
+ifeq ($(origin bin2o), undefined)
+  define bin2o
+    $(eval _tmpasm := $(shell mktemp))
+    $(SILENTCMD)$(PYTHON) $(TOPLEVEL)/tools/bin2s.py $(BIN2S_FLAGS) -a 4 -H `(echo $(<F) | tr . _)`.h "$<" > $(_tmpasm)
+    $(SILENTCMD)$(CC) -x assembler-with-cpp $(CPPFLAGS) $(ASFLAGS) -c $(_tmpasm) -o $(<F).o
+    @rm $(_tmpasm)
+  endef
+endif
 
 
 ifneq ($(BUILD),$(notdir $(CURDIR)))

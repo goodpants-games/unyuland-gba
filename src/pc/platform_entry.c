@@ -6,9 +6,18 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 
-#include <tonc_video.h>
-#include <glad/glad.h>
+#ifndef PLATFORM_WEB
+#define USE_GLAD
+#endif
 
+#ifdef USE_GLAD
+#include <glad/glad.h>
+// #define GL_DEBUG
+#else
+#include <SDL3/SDL_opengles2.h>
+#endif
+
+#include <tonc_video.h>
 #include "display.h"
 
 #define WINDOW_SCALE 3
@@ -57,6 +66,7 @@ static const char *FS_SOURCE =
     "   gl_FragColor = texture2D(u_texture, v_texcoord);\n"
     "}\n";
 
+#ifdef GL_DEBUG
 static void gl_debug_output(GLenum source, GLenum type, GLuint id,
                             GLenum severity, GLsizei length,
                             const GLchar *msg, const void *userdata)
@@ -98,6 +108,7 @@ static void gl_debug_output(GLenum source, GLenum type, GLuint id,
         case GL_DEBUG_SEVERITY_NOTIFICATION: fprintf(stderr, "Severity: notification"); break;
     } fprintf(stderr, "\n\n");
 }
+#endif
 
 static bool gfx_state_init(void)
 {
@@ -240,7 +251,11 @@ static void audio_update(void)
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 {
-    SDL_SetHint(SDL_HINT_VIDEO_FORCE_EGL, "1");
+#ifdef PLATFORM_WEB
+    SDL_SetHint(SDL_HINT_EMSCRIPTEN_CANVAS_SELECTOR, "#gameCanvas");
+#else
+    // SDL_SetHint(SDL_HINT_VIDEO_FORCE_EGL, "1");
+#endif
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO))
     {
@@ -251,7 +266,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
-#ifdef DEVDEBUG
+#ifdef GL_DEBUG
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
 #endif
 
@@ -274,11 +289,13 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         return SDL_APP_FAILURE;
     }
 
+#ifdef USE_GLAD
     if (!gladLoadGLES2Loader((void *)SDL_GL_GetProcAddress))
     {
         SDL_Log("OpenGL loader failed!");
         return SDL_APP_FAILURE;
     }
+#endif
 
     // set up audio
     SDL_AudioSpec spec = (SDL_AudioSpec)
@@ -300,12 +317,12 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     SDL_GL_MakeCurrent(s_window, s_gl);
     SDL_GL_SetSwapInterval(1);
     
-#ifdef DEVDEBUG
+#ifdef GL_DEBUG
     glEnable(GL_DEBUG_OUTPUT);
     glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
     glDebugMessageCallback(gl_debug_output, NULL);
     glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, NULL,
-                            GL_TRUE);
+                          GL_TRUE);
 #endif
 
     if (!gfx_state_init())
@@ -412,7 +429,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
     u64 frame_end_us = SDL_GetTicksNS() / 1000;
     u64 frame_len_us = frame_end_us - frame_start_us;
-    fprintf(stderr, "frame time: %.3f ms\n", (double)frame_len_us / 1000);
+    // fprintf(stderr, "frame time: %.3f ms\n", (double)frame_len_us / 1000);
 
     SDL_GL_SwapWindow(s_window);
 
