@@ -537,7 +537,7 @@ void gfx_free_scrblock_writer(uint id)
 #pragma region text engine
 
 EWRAM_BSS TILE gfx_text_bmp_buf[GFX_TEXT_BMP_SIZE];
-EWRAM_BSS bool gfx_text_bmp_dirty_rows[GFX_TEXT_BMP_ROWS];
+EWRAM_BSS bool gfx_text_bmp_dirty_rows[GFX_TEXT_BMP_ROWS + 2];
 
 ARM_FUNC void _gfx_text_blit_tile(uint x, uint y, const TILE4 *src_tile);
 

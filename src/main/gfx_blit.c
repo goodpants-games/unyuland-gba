@@ -46,7 +46,7 @@ void gfx_text_bmap_fill(uint oc, uint or, uint cols, uint rows, u32 data[8])
     if (cols == 0 || rows == 0) return;
 
     TILE *tile = gfx_text_bmp_buf + (GFX_TEXT_BMP_COLS * or + oc);
-    for (; rows != 0; --rows)
+    for (uint ri = 0; ri < rows; ++ri)
     {
         gfx_text_bmp_dirty_rows[or] = 1;
         

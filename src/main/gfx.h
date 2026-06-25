@@ -4,7 +4,9 @@
 #define GFX_TEXT_BMP_COLS  30  // tiles per column
 #define GFX_TEXT_BMP_ROWS  12 // in tiles; (12 * 8) / 8, where 12 is the size in
                               // pixels of each line
-#define GFX_TEXT_BMP_SIZE  (GFX_TEXT_BMP_COLS * GFX_TEXT_BMP_ROWS) // in tiles
+// in tiles. add two extra rows on the bottom in the case of out-of-bounds
+// writes.
+#define GFX_TEXT_BMP_SIZE  (GFX_TEXT_BMP_COLS * (GFX_TEXT_BMP_ROWS + 2))
 #define GFX_TEXT_BMP_BLOCK 2
 
 #ifdef __ASSEMBLER__
