@@ -10,11 +10,14 @@
 #define CLIP_MASK_WIN1   4
 #define CLIP_MASK_WININ  (CLIP_MASK_WIN0 | CLIP_MASK_WIN1)
 
-typedef struct sprite_shape
+typedef struct object_shape
 {
     u8 x, y;
-} sprite_shape_s;
+} object_shape_s;
 
+// for efficiency, objects are sorted into bins according to their priority
+// before rendering. similar to radix sort, i think. i'm certain that a naive
+// implementation would be fast enough, but like, why not.
 typedef struct object_bins
 {
     u8 bins[4][128];
@@ -37,7 +40,7 @@ static const u16 *s_bg_ctl_vofs[4] =
 static u8 s_cur_clip_mask = 0;
 static u8 s_clip_mask[SCREEN_HEIGHT][SCREEN_WIDTH];
 
-static const sprite_shape_s s_sprite_shape_desc[16] = {
+static const object_shape_s s_obj_shape_desc[16] = {
     // square
     { 1, 1 }, { 2, 2 }, { 4, 4 }, { 8, 8 },
     // horizontal
@@ -59,7 +62,8 @@ static inline u32 r5g5b5a1_to_rgba32(u16 color)
     return (r * 8) | ((g * 8) << 8) | ((b * 8) << 16) | (0xFF000000);
 }
 
-static void fill_clip_mask_region(uint sx, uint sy, uint ex, uint ey, u8 value)
+static inline void fill_clip_mask_region(uint sx, uint sy, uint ex, uint ey,
+                                         u8 value)
 {
     for (uint y = sy; y < ey; ++y)
         memset(s_clip_mask[y] + sx, value, ex - sx);
@@ -97,11 +101,14 @@ static void draw_tile(TILE *p_tile, int draw_x, int draw_y, u32 *pal,
 
         if (flip_x)
         {
+            // flips the order of each nibble in the u32
             row = ((row & 0xFFFF0000) >> 16) | ((row & 0x0000FFFF) << 16);
             row = ((row & 0xFF00FF00) >> 8) | ((row & 0x00FF00FF) << 8);
             row = ((row & 0xF0F0F0F0) >> 4) | ((row & 0x0F0F0F0F) << 4);
         }
 
+        // each u32 in the tile stores 8 horizontal pixels. each pixel is a
+        // four-bit index into a 16-color palette.
         blit_pixel(ocol, draw_x + 0, draw_y, pal, (row >> 0 ) & 0xF);
         blit_pixel(ocol, draw_x + 1, draw_y, pal, (row >> 4 ) & 0xF);
         blit_pixel(ocol, draw_x + 2, draw_y, pal, (row >> 8 ) & 0xF);
@@ -124,9 +131,13 @@ static void draw_bg(uint bg_idx, uint bg_prio)
     uint prio = (bg_ctl & BG_PRIO_MASK) >> BG_PRIO_SHIFT;
     if (prio != bg_prio) return;
 
+    // base block of character data
     uint cbb_idx = (bg_ctl & BG_CBB_MASK) >> BG_CBB_SHIFT;
+    // base block of screen-entry data
     uint sbb_idx = (bg_ctl & BG_SBB_MASK) >> BG_SBB_SHIFT;
 
+    // map scrolling: if a screen-entry to render is off-screen, it wraps
+    // around.
     uint hofs = (uint) *(s_bg_ctl_hofs[bg_idx]) & 0xFF;
     uint vofs = (uint) *(s_bg_ctl_vofs[bg_idx]) & 0xFF;
     uint hofs_frac = hofs & 7;
@@ -162,6 +173,7 @@ static void draw_bg(uint bg_idx, uint bg_prio)
     }
 }
 
+// takes a b-bit number and sign-extends it to 32 bits
 static inline int sextend32(uint num, uint b)
 {
     int m = 1U << (b - 1);
@@ -176,6 +188,7 @@ static void draw_obj(OBJ_ATTR *obj)
         spr_y -= 256;
 
     int spr_x = sextend32((obj->attr1 & ATTR1_X_MASK) >> ATTR1_X_SHIFT, 9);
+
     uint tid = (obj->attr2 & ATTR2_ID_MASK) >> ATTR2_ID_SHIFT;
     uint pal_id = (obj->attr2 & ATTR2_PALBANK_MASK) >> ATTR2_PALBANK_SHIFT;
     bool xflip = obj->attr1 & ATTR1_HFLIP;
@@ -187,7 +200,7 @@ static void draw_obj(OBJ_ATTR *obj)
     uint shape_lo = (obj->attr1 & ATTR1_SIZE_MASK) >> ATTR1_SIZE_SHIFT;
     uint shape_hi = (obj->attr0 & ATTR0_SHAPE_MASK) >> ATTR0_SHAPE_SHIFT;
 
-    sprite_shape_s shape = s_sprite_shape_desc[(shape_hi << 2) | shape_lo];
+    object_shape_s shape = s_obj_shape_desc[(shape_hi << 2) | shape_lo];
     int sx = xflip ? -1 : 1;
     int ox = xflip ? (shape.x - 1) * 8 : 0;
     int sy = yflip ? -1 : 1;
@@ -208,6 +221,10 @@ static void draw_obj(OBJ_ATTR *obj)
 static void draw_scene(bool bg_enabled[4], bool obj_enabled,
                        object_bins_s *obj_bins)
 {
+    // rules:
+    // 1. lower-priority backgrounds are drawn over higher-priority ones
+    // 2. sprites are drawn over the background with the same priority
+    // 3. when conflict arises, draw order of bg is BG3, BG2, BG1, then BG0.
     for (int prio = 3; prio >= 0; --prio)
     {
         if (bg_enabled[3]) draw_bg(3, prio);
@@ -241,13 +258,13 @@ void display_update(void)
 {
     if (DISPBUF == NULL) return;
 
+    // convert palette colors from r5g5b5 to r8g8b8a8
     for (int i = 0; i < 256; ++i)
         s_bg_palette[i] = r5g5b5a1_to_rgba32(pal_bg_mem[i]);
-
     for (int i = 0; i < 256; ++i)
         s_obj_palette[i] = r5g5b5a1_to_rgba32(pal_obj_mem[i]);
 
-    // clear display buffer with background color
+    // clear display buffer with background color (palette bank 0, index 0)
     const u32 bg_col = s_bg_palette[0];
     for (int i = 0; i < SCREEN_WIDTH * SCREEN_HEIGHT; ++i)
         DISPBUF[i] = bg_col;
@@ -261,6 +278,8 @@ void display_update(void)
     // object list categorized by priority
     object_bins_s obj_bins = (object_bins_s){0};
 
+    // iterate through the object list backwards, because objects of a lower
+    // index are drawn over objects of higher indices.
     for (int si = 127; si >= 0; --si)
     {
         OBJ_ATTR *obj = oam_mem + si;
@@ -270,21 +289,21 @@ void display_update(void)
         obj_bins.bins[p][obj_bins.bin_sz[p]++] = (u8) si;
     }
 
-    // REG_DISPCNT & DCNT_WIN0;
-    // REG_DISPCNT & DCNT_WIN1;
-
     bool enable_win0 = REG_DISPCNT & DCNT_WIN0;
     bool enable_win1 = REG_DISPCNT & DCNT_WIN1;
 
-    if (enable_win0 || enable_win1)
+    if (enable_win0 || enable_win1) // clipping windows
     {
+        // draw order: winout, win1, then win0
         memset(s_clip_mask, CLIP_MASK_WINOUT, SCREEN_WIDTH * SCREEN_HEIGHT);
 
+        // get window 0 bounds
         int win0l = min(REG_WIN0L, SCREEN_WIDTH);
         int win0r = min(REG_WIN0R, SCREEN_WIDTH);
         int win0t = min(REG_WIN0T, SCREEN_HEIGHT);
         int win0b = min(REG_WIN0B, SCREEN_HEIGHT);
 
+        // get window 1 bounds
         int win1l = min(REG_WIN1L, SCREEN_WIDTH);
         int win1r = min(REG_WIN1R, SCREEN_WIDTH);
         int win1t = min(REG_WIN1T, SCREEN_HEIGHT);

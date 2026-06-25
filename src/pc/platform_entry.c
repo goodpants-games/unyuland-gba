@@ -12,6 +12,7 @@
 
 #define WINDOW_SCALE 3
 
+// these functions are defined by src/main/main.c
 void platform_app_init(void);
 void platform_app_frame(void);
 
@@ -95,7 +96,7 @@ static bool gfx_state_init(void)
 {
     s_gfx_state = (struct gfx_state){0};
 
-    // create screen texture (will be cpu-rendered into)
+    // create screen texture (will be software-rendered into)
     glGenTextures(1, &s_gfx_state.screen_tex);
     glBindTexture(GL_TEXTURE_2D, s_gfx_state.screen_tex);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, SCREEN_WIDTH, SCREEN_HEIGHT, 0,
@@ -186,6 +187,24 @@ static bool gfx_state_init(void)
     return true;
 }
 
+static uint get_key_input_flag(SDL_Keycode key)
+{
+    switch (key)
+    {
+    case SDLK_Z:      return 0x001; // A
+    case SDLK_X:      return 0x002; // B
+    case SDLK_C:      return 0x200; // L
+    case SDLK_V:      return 0x100; // R
+    case SDLK_ESCAPE: return 0x008; // Start 
+    case SDLK_TAB:    return 0x004; // Select
+    case SDLK_RIGHT:  return 0x010; // Right
+    case SDLK_LEFT:   return 0x020; // Left
+    case SDLK_UP:     return 0x040; // Up
+    case SDLK_DOWN:   return 0x080; // Down
+    default:          return 0x000;
+    }
+}
+
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 {
     SDL_SetHint(SDL_HINT_VIDEO_FORCE_EGL, "1");
@@ -206,7 +225,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     const int scr_w = SCREEN_WIDTH * WINDOW_SCALE;
     const int scr_h = SCREEN_HEIGHT * WINDOW_SCALE;
     const SDL_WindowFlags win_flags =
-        SDL_WINDOW_OPENGL | SDL_WINDOW_HIGH_PIXEL_DENSITY;
+        SDL_WINDOW_OPENGL;
     
     s_window = SDL_CreateWindow("Unyuland", scr_w, scr_h, win_flags);
     if (!s_window)
@@ -228,17 +247,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         return SDL_APP_FAILURE;
     }
 
-    
     SDL_GL_MakeCurrent(s_window, s_gl);
     SDL_GL_SetSwapInterval(1);
-
-    {
-        // print supported exts
-        fprintf(stderr, "exts: %s\n", glGetString(GL_EXTENSIONS));
-    }
-
-    const GLubyte *str = glGetString(GL_VENDOR);
-    fprintf(stderr, "%s\n", str);
     
 #ifdef DEVDEBUG
     glEnable(GL_DEBUG_OUTPUT);
@@ -256,28 +266,9 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     
     platform_app_init();
 
-    return SDL_APP_CONTINUE;  /* carry on with the program! */
+    return SDL_APP_CONTINUE;
 }
 
-static uint get_key_input_flag(SDL_Keycode key)
-{
-    switch (key)
-    {
-    case SDLK_Z:      return 0x001; // A
-    case SDLK_X:      return 0x002; // B
-    case SDLK_C:      return 0x200; // L
-    case SDLK_V:      return 0x100; // R
-    case SDLK_ESCAPE: return 0x008; // Start 
-    case SDLK_TAB:    return 0x004; // Select
-    case SDLK_RIGHT:  return 0x010; // Right
-    case SDLK_LEFT:   return 0x020; // Left
-    case SDLK_UP:     return 0x040; // Up
-    case SDLK_DOWN:   return 0x080; // Down
-    default:          return 0x000;
-    }
-}
-
-/* This function runs when a new event (mouse input, keypresses, etc) occurs. */
 SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 {
     switch (event->type)
@@ -307,7 +298,6 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
     return SDL_APP_CONTINUE;  /* carry on with the program! */
 }
 
-/* This function runs once per frame, and is the heart of the program. */
 SDL_AppResult SDL_AppIterate(void *appstate)
 {
     u64 frame_start_us = SDL_GetTicksNS() / 1000;
@@ -327,8 +317,9 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
     glViewport(0, 0, win_sx, win_sy);
 
-    glClearColor(1.0f, 0.0f, 0.0f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
+    // not really any need to clear, so why not.
+    // glClearColor(1.0f, 0.0f, 0.0f, 1.0f);
+    // glClear(GL_COLOR_BUFFER_BIT);
     
     // activate shader
     glUseProgram(s_gfx_state.display_prog);
@@ -373,10 +364,9 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
     SDL_GL_SwapWindow(s_window);
 
-    return SDL_APP_CONTINUE;  /* carry on with the program! */
+    return SDL_APP_CONTINUE;
 }
 
-/* This function runs once at shutdown. */
 void SDL_AppQuit(void *appstate, SDL_AppResult result)
 {
     glDeleteTextures(1, &s_gfx_state.screen_tex);

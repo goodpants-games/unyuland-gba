@@ -12,5 +12,8 @@
 - Fix respawning when just started the game.
   that is, create a state snapshot on launch
 
+- pc port: make refreshrate-independent
+  (dt accumulator method with timestep snapping)
+
 b05: player scared to go down Hole.
 player should be able to do a jig when hold down (very important)
