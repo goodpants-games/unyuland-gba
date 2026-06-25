@@ -1,5 +1,6 @@
 #include <stdbool.h>
 #include <stdio.h>
+#include <math.h>
 
 #define SDL_MAIN_USE_CALLBACKS 1
 #include <SDL3/SDL.h>
@@ -11,14 +12,20 @@
 #include "display.h"
 
 #define WINDOW_SCALE 3
+#define SAMPLE_RATE 32768
+#define PI 3.14159265358979323846264338327950288419
 
 // these functions are defined by src/main/main.c
 void platform_app_init(void);
 void platform_app_frame(void);
 
 static SDL_Window *s_window = NULL;
+static SDL_AudioStream *s_astream = NULL;
 static SDL_GLContext s_gl = NULL;
+
 static uint s_key_input = 0x3FF;
+
+static float s_sine_phase = 0.0f;
 
 struct gfx_state
 {
@@ -205,11 +212,37 @@ static uint get_key_input_flag(SDL_Keycode key)
     }
 }
 
+static void audio_update(void)
+{
+    const int min_audio = (SAMPLE_RATE * sizeof(float)) / 4;
+    while (SDL_GetAudioStreamQueued(s_astream) < min_audio)
+    {
+        static s16 samples[512];
+
+        for (int i = 0; i < 512; i += 2)
+        {
+            float smp = sinf(s_sine_phase * (float)PI * 2) * 0.2f;
+            s_sine_phase += 440.0f / SAMPLE_RATE;
+            s_sine_phase = fmodf(s_sine_phase, 1.0f);
+
+            if      (smp < -1.0) smp = -1.0;
+            else if (smp > 1.0) smp = 1.0;
+            float smp01 = (smp + 1.f) / 2.f;
+            s16 smp_s16 = (s16)((INT16_MAX - INT16_MIN) * smp01 + INT16_MIN);
+
+            samples[i+0] = smp_s16;
+            samples[i+1] = smp_s16;
+        }
+
+        SDL_PutAudioStreamData(s_astream, samples, sizeof(samples));
+    }
+}
+
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 {
     SDL_SetHint(SDL_HINT_VIDEO_FORCE_EGL, "1");
 
-    if (!SDL_Init(SDL_INIT_VIDEO))
+    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO))
     {
         SDL_Log("Couldn't initialize SDL: %s", SDL_GetError());
         return SDL_APP_FAILURE;
@@ -246,6 +279,23 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         SDL_Log("OpenGL loader failed!");
         return SDL_APP_FAILURE;
     }
+
+    // set up audio
+    SDL_AudioSpec spec = (SDL_AudioSpec)
+    {
+        .channels = 2,
+        .format = SDL_AUDIO_S16,
+        .freq = SAMPLE_RATE
+    };
+    s_astream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK,
+                                          &spec, NULL, NULL);
+    if (!s_astream)
+    {
+        SDL_Log("Couldn't create audio stream: %s", SDL_GetError());
+        return SDL_APP_FAILURE;
+    }
+
+    SDL_ResumeAudioStreamDevice(s_astream);
 
     SDL_GL_MakeCurrent(s_window, s_gl);
     SDL_GL_SetSwapInterval(1);
@@ -304,6 +354,8 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
     REG_KEYINPUT = s_key_input;
     platform_app_frame();
+
+    audio_update();
 
     g_display_buffer = s_gfx_state.screen_pixels;
     display_update();
