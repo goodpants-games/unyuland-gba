@@ -18,9 +18,8 @@ LIBS    := -sUSE_SDL=3
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
-CFLAGS      := -DPLATFORM_PC -DPLATFORM_WEB -Og -g $(LIBS)
-ASFLAGS     := -DPLATFORM_PC -DPLATFORM_WEB
-LDFLAGS     := -sSTACK_SIZE=131072
+CFLAGS      := -DPLATFORM_PC -DPLATFORM_WEB -O2 $(LIBS) $(CFLAGS)
+ASFLAGS     := -DPLATFORM_PC -DPLATFORM_WEB $(ASFLAGS)
 BIN2S_FLAGS += --arch wasm
 
 

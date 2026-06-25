@@ -14,15 +14,16 @@ SOURCES := src/pc/tonc src/pc/maxmod src/pc
 # any extra libraries we wish to link with the project
 #---------------------------------------------------------------------------------
 LIBNAMES := sdl3
-LIBS    := $(shell $(PKGCONF) --libs $(LIBNAMES))
+LIBS     := $(shell $(PKGCONF) --libs $(LIBNAMES))
 
 
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
-CFLAGS  := -DPLATFORM_PC -gdwarf-4 -Og $(shell $(PKGCONF) --cflags $(LIBNAMES))
-ASFLAGS := -DPLATFORM_PC
-LDFLAGS := -gdwarf-4
+CFLAGS  := -DPLATFORM_PC -gdwarf-4 -Og \
+           $(shell $(PKGCONF) --cflags $(LIBNAMES)) $(CFLAGS)
+ASFLAGS := -DPLATFORM_PC $(ASFLAGS)
+LDFLAGS := -gdwarf-4 $(LDFLAGS)
 
 ifeq ($(OS), Windows_NT)
   LIBS += -mconsole
