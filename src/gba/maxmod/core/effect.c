@@ -411,7 +411,7 @@ void mmEffectCancelAll(void)
         mix_ch->tpan = 0;
 #endif
 #ifdef __GBA__
-        mix_ch->src = MIXCH_GBA_SRC_STOPPED;
+        mix_ch->src = 0;
 #endif
     }
 }
@@ -437,7 +437,7 @@ void mmUpdateEffects(void)
 
         mm_mixer_channel *mix_ch = &mm_mix_channels[mix_channel];
 #if defined(__GBA__)
-        if ((mix_ch->src & MIXCH_GBA_SRC_STOPPED) == 0)
+        if (mix_ch->src != 0)
 #elif defined(__NDS__)
         if (mix_ch->samp != 0)
 #endif

@@ -163,7 +163,7 @@ mmMixerMixAsm: // params = { samples_count }
 
     ldr     rsrc, [rchan, #CHN_SRC]
     cmp     rsrc, #0
-    bmi     .mpm_next           // EXIT if MSB is set ------------>
+    beq     .mpm_next           // EXIT if NULL ------------>
 
 // read frequency value
 
@@ -436,7 +436,7 @@ fooo:
 //----------------------------------------------------------------
 
 // *** END OF SAMPLE
-    mov     r1, #1 << 31                        // disable channel
+    mov     r1, #0                              // disable channel
     str     r1, [rchan, #CHN_SRC]
 
 // mix zero into the rest of the buffer

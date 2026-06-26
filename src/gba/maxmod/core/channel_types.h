@@ -194,7 +194,7 @@ typedef struct {
 // Fractionary part of the sample read offset
 #define MP_SAMPFRAC             12
 
-#define MIXCH_GBA_SRC_STOPPED   (1u << ((sizeof(uintptr_t) * 8) - 1))
+// #define MIXCH_GBA_SRC_STOPPED   (1u << ((sizeof(uintptr_t) * 8) - 1))
 
 // Make sure that the size matches the assembly code
 static_assert(sizeof(mm_mixer_channel) == 16);
