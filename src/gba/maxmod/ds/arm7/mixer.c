@@ -1,0 +1,819 @@
+// SPDX-License-Identifier: ISC
+//
+// Copyright (c) 2008, Mukunda Johnson (mukunda@maxmod.org)
+// Copyright (c) 2023, Lorenzooone (lollo.lollo.rbiz@gmail.com)
+// Copyright (c) 2025, Antonio Niño Díaz (antonio_nd@outlook.com)
+
+#include <stddef.h>
+#include <stdint.h>
+#include <string.h>
+
+#include <nds.h>
+
+#include <maxmod7.h>
+#include <mm_mas.h>
+#include <mm_msl.h>
+
+#include "core/effect.h"
+#include "core/mas.h"
+#include "core/mixer.h"
+#include "ds/arm7/main_ds7.h"
+#include "ds/arm7/mixer.h"
+
+#define SWM_CHANNEL_1 6
+#define SWM_CHANNEL_2 7
+
+#define MIX_TIMER_NUMBER LIBNDS_DEFAULT_TIMER_MUSIC
+
+mm_mixer_channel mm_mix_channels[NUM_CHANNELS];
+
+mm_mode_enum mm_mixing_mode = MM_MODE_A;
+
+// Reset all channels
+static void mm_reset_channels(void)
+{
+    // Clear active channel data
+    memset(mm_achannels, 0, sizeof(mm_active_channel) * NUM_CHANNELS);
+
+    mm_module_channel *channels = mm_pchannels;
+
+    // Reset channel allocation
+    for (int i = 0; i < NUM_CHANNELS; i++)
+        channels[i].alloc = NO_CHANNEL_AVAILABLE;
+
+    channels = mm_schannels;
+
+    // Reset channel allocation
+    for (int i = 0; i < MP_SCHANNELS; i++)
+        channels[i].alloc = NO_CHANNEL_AVAILABLE;
+
+    mmResetEffects();
+}
+
+static void EnableSound(void)
+{
+    // Enable sound and set the maximum value
+    REG_SOUNDCNT |= SOUNDCNT_ENABLE | SOUNDCNT_VOL(127);
+}
+
+static void ClearAllChannels(void)
+{
+    // reset hardware channels
+    mm_word bitmask = mm_ch_mask;
+    for (size_t i = 0; i < NUM_PHYS_CHANNELS; i++)
+    {
+        if (bitmask & (1 << i))
+        {
+            REG_SOUNDXCNT(i) = 0;
+            REG_SOUNDXSAD(i) = 0;
+            REG_SOUNDXTMR(i) = 0;
+            REG_SOUNDXPNT(i) = 0;
+            REG_SOUNDXLEN(i) = 0;
+        }
+    }
+}
+
+static void DisableSWM(void)
+{
+    // Lock Software channels
+    mmLockChannelsQuick(ALL_SOFT_CHANNELS_MASK);
+    // Restore Stream channels
+    mmUnlockChannelsQuick((1 << SWM_CHANNEL_1) | (1 << SWM_CHANNEL_2));
+}
+
+static void mmSetupModeB(void)
+{
+    // Disable timer
+    TIMER_CR(MIX_TIMER_NUMBER) = 0;
+
+    mmSetResolution(40960);
+
+    mm_word bitmask = mm_ch_mask;
+    for (int i = 0; i < NUM_PHYS_CHANNELS; i++)
+    {
+        if (bitmask & (1 << i))
+        {
+            REG_SOUNDXCNT(i) = 0xA8000000;
+            REG_SOUNDXSAD(i) = (uintptr_t)mm_mix_data.mix_data_b.output[i];
+            REG_SOUNDXTMR(i) = 0xFE00;
+            REG_SOUNDXPNT(i) = 0;
+            REG_SOUNDXLEN(i) = MM_MIX_B_NUM_SAMPLES;
+        }
+    }
+
+    // Reset output slice
+    mm_output_slice = 0;
+
+    EnableSound();
+
+    TIMER_DATA(MIX_TIMER_NUMBER) = 0xFF80;
+    TIMER_CR(MIX_TIMER_NUMBER) = 0x00C3;
+}
+
+static void SetupSWM(void)
+{
+    // Reset output slice
+    mm_output_slice = 0;
+
+    TIMER_CR(MIX_TIMER_NUMBER) = 0;
+
+    // Disable sound channel and clear loop points
+    REG_SOUNDXCNT(SWM_CHANNEL_1) = 0;
+    REG_SOUNDXCNT(SWM_CHANNEL_2) = 0;
+    REG_SOUNDXPNT(SWM_CHANNEL_1) = 0;
+    REG_SOUNDXPNT(SWM_CHANNEL_2) = 0;
+
+    // Setup sources
+    REG_SOUNDXSAD(SWM_CHANNEL_1) = (uintptr_t)mm_mix_data.mix_data_c.mix_output[0];
+    REG_SOUNDXSAD(SWM_CHANNEL_2) = (uintptr_t)mm_mix_data.mix_data_c.mix_output[1];
+
+    // Set sampling frequency
+    REG_SOUNDXTMR(SWM_CHANNEL_1) = -768;
+    REG_SOUNDXTMR(SWM_CHANNEL_2) = -768;
+
+    // Set source length
+    REG_SOUNDXLEN(SWM_CHANNEL_1) = MM_SW_BUFFERLEN / 2;
+    REG_SOUNDXLEN(SWM_CHANNEL_2) = MM_SW_BUFFERLEN / 2;
+
+    // Setup control
+    REG_SOUNDXCNT(SWM_CHANNEL_1) = SOUNDXCNT_VOL_MUL(0x7F) | SOUNDXCNT_PAN(0) |
+                                   SOUNDXCNT_REPEAT | SOUNDXCNT_FORMAT_16BIT |
+                                   SOUNDXCNT_ENABLE;
+    REG_SOUNDXCNT(SWM_CHANNEL_2) = SOUNDXCNT_VOL_MUL(0x7F) | SOUNDXCNT_PAN(0x7F) |
+                                   SOUNDXCNT_REPEAT | SOUNDXCNT_FORMAT_16BIT |
+                                   SOUNDXCNT_ENABLE;
+
+    TIMER_DATA(MIX_TIMER_NUMBER) = 0xFD60;
+    TIMER_CR(MIX_TIMER_NUMBER) = 0x00C2;
+
+    mmSetResolution(31170);
+
+    // Lock Stream channels
+    mmLockChannelsQuick((1 << SWM_CHANNEL_1) | (1 << SWM_CHANNEL_2));
+    // Unlock Software channels
+    mmUnlockChannelsQuick(ALL_SOFT_CHANNELS_MASK);
+}
+
+// Init mixer system & setup nds control
+void mmMixerInit(void)
+{
+    // Default to mode A
+    mmSelectMode(MM_MODE_A);
+}
+
+// Set channel volume
+void mmMixerSetVolume(int channel, mm_word volume)
+{
+    // At the moment this function is only used by mmEffectVolume().
+
+    // Update both the target and current volumes so that SlideMixingLevels()
+    // doesn't change it later.
+    mm_mix_channels[channel].vol = volume;
+    mm_mix_channels[channel].cvol = volume;
+}
+
+// Set channel panning
+void mmMixerSetPan(int channel, mm_byte panning)
+{
+    mm_mix_channels[channel].tpan = panning >> 1; // Discard one bit
+}
+
+// Set channel frequency
+// Rate is 3.10 fixed point (value of 2048 will raise original pitch by 1 octave)
+void mmMixerSetFreq(int channel, mm_word rate)
+{
+    mm_mas_ds_sample *sample = (mm_mas_ds_sample *)(mm_mix_channels[channel].samp + 0x2000000);
+    mm_word freq = (sample->default_frequency * rate) >> 10;
+
+    if (freq >= 0x1FFF)
+        freq = 0x1FFF;
+
+    mm_mix_channels[channel].freq = freq;
+}
+
+// Multiply channel frequency by a value
+void mmMixerMulFreq(int channel, mm_word factor)
+{
+    mm_word freq = ((mm_mix_channels[channel].freq * factor) + (255 * 2)) >> 10;
+
+    if (freq >= 0x1FFF)
+        freq = 0x1FFF;
+
+    mm_mix_channels[channel].freq = freq;
+}
+
+// Stop mixing channel
+void mmMixerStopChannel(int channel)
+{
+    mm_mix_channels[channel].key_on = 0;
+    mm_mix_channels[channel].samp = 0;
+    mm_mix_channels[channel].tpan = 0;
+}
+
+// Select audio mode
+void mmSelectMode(mm_mode_enum mode)
+{
+    int old_ime = enterCriticalSection();
+
+    // reset mixer channels
+    for (size_t i = 0; i < NUM_CHANNELS; i++)
+        mmMixerStopChannel(i);
+
+    ClearAllChannels();
+
+    mm_reset_channels();
+
+    // Clear volume and enable bit
+    REG_SOUNDCNT &= ~(SOUNDCNT_ENABLE | SOUNDCNT_VOL(0xFF));
+
+    memset(&mm_mix_data, 0, sizeof(mm_mix_data_ds));
+
+    mm_mixing_mode = mode;
+
+    switch (mode)
+    {
+        case MM_MODE_A: // Mode A: Hardware mixing
+            DisableSWM();
+            ClearAllChannels();
+            // 256hz resolution
+            mmSetResolution(40960);
+
+            TIMER_DATA(MIX_TIMER_NUMBER) = 0xFF80;
+            TIMER_CR(MIX_TIMER_NUMBER) = 0x00C3;
+
+            EnableSound();
+            break;
+
+        case MM_MODE_B: // Mode B: Interpolated mixing
+            DisableSWM();
+            ClearAllChannels();
+            mmSetupModeB();
+            break;
+
+        default:
+        case MM_MODE_C: // Mode C: Extended mixing
+            ClearAllChannels();
+            SetupSWM();
+            EnableSound();
+            break;
+    }
+
+    leaveCriticalSection(old_ime);
+}
+
+// Update hardware data
+//
+// NOTE: Keep this function as Thumb so that SlideMixingLevels() can jump to it
+// from Thumb mode in the ARM7.
+void mmMixerPre(void)
+{
+    if (mm_mixing_mode == MM_MODE_A) // Full-hardware mode
+    {
+        // Do nothing
+    }
+    else if (mm_mixing_mode == MM_MODE_B) // Interpolated mode
+    {
+        // Update volume + panning
+
+        mm_word channels = mm_ch_mask;
+
+        for (int i = 0; i < NUM_PHYS_CHANNELS; i++)
+        {
+            if (channels & 1)
+            {
+                // Read shadow SOUNDCNT
+                mm_word shadow = *(mm_word *)&(mm_mix_data.mix_data_b.shadow[i]);
+                REG_SOUNDXCNT(i) = SOUNDXCNT_ENABLE | shadow |
+                                   SOUNDXCNT_REPEAT | SOUNDXCNT_FORMAT_16BIT;
+            }
+
+            channels >>= 1;
+            if (channels == 0)
+                break;
+        }
+    }
+    else // if (mm_mixing_mode == MM_MODE_C) // Extended mode
+    {
+        // Update everything
+
+        mm_word channels = mm_ch_mask;
+
+        for (int i = 0; i < NUM_PHYS_CHANNELS; i++)
+        {
+            if (channels & 1)
+            {
+                mmshadow_c_ds *shadow = &(mm_mix_data.mix_data_c.shadow[0]);
+
+                if (shadow[i].src != 0)
+                {
+                    REG_SOUNDXCNT(i) = 0;
+
+                    REG_SOUNDXSAD(i) = shadow[i].src;
+                    REG_SOUNDXPNT(i) = shadow[i].pnt;
+                    REG_SOUNDXLEN(i) = shadow[i].len;
+
+                    REG_SOUNDXCNT(i) = shadow[i].cnt;
+
+                    shadow[i].src = 0;
+                }
+
+                REG_SOUNDXTMR(i) = shadow[i].tmr;
+
+                REG_SOUNDXPAN(i) = shadow[i].cnt >> 16;
+                // Use a mm_hword pointer so that we can update the volume
+                // multipler and divider fields.
+                *(mm_hword*)&(REG_SOUNDXVOL(i)) = shadow[i].cnt;
+            }
+
+            channels >>= 1;
+            if (channels == 0)
+                break;
+        }
+    }
+}
+
+// Slide volume and panning levels towards target levels for all channels.
+static ARM_CODE void SlideMixingLevels(mm_word throttle)
+{
+    mm_mixer_channel *mix_ch = &mm_mix_channels[0];
+
+    for (mm_word i = 0; i < NUM_CHANNELS; i++, mix_ch++)
+    {
+        // Slide volume
+
+        // volume += (target - volume) * throttle
+        mm_sword target_volume = mix_ch->vol;
+        mm_sword volume = mix_ch->cvol;
+
+        if (volume < target_volume)
+        {
+            // TODO: Is this ok? Shouldn't this check bounds as well?
+            volume += ((target_volume - volume) >> 2);
+
+            // volume += throttle
+            // if (volume > target_volume)
+            //     volume = target_volume;
+        }
+        else
+        {
+            volume -= throttle;
+            if (volume < target_volume)
+                volume = target_volume;
+        }
+
+        // volume += ((target_volume - volume) * throttle) >> 8;
+
+        mix_ch->cvol = volume;
+
+        // Slide panning
+
+        // pan += (target - pan) * throttle
+        mm_sword target_panning = mix_ch->tpan << 9;
+        mm_sword panning = mix_ch->cpan;
+
+        if (panning < target_panning)
+        {
+            panning += throttle;
+            if (panning > target_panning)
+                panning = target_panning;
+        }
+        else
+        {
+            panning -= throttle;
+            if (panning < target_panning)
+                panning = target_panning;
+        }
+
+        // panning += ((target_panning - panning) * throttle) >> 8;
+
+        mix_ch->cpan = panning;
+    }
+
+    mmMixerPre();
+}
+
+#define SLIDE_THROTTLE 6144 //45
+
+// LUTs containing values to help convert a certain value into value and shift
+// amount for the hardware channels.
+
+const mm_byte mmVolumeDivTable[] = { // divider values
+    3, 2, 2, 2, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0
+};
+
+const mm_byte mmVolumeShiftTable[] = { // shift values
+    0, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4
+};
+
+static ARM_CODE mm_word translateVolume(mm_word volume) // volume = 0..65535
+{
+    mm_word shift_data = mmVolumeDivTable[volume >> (7 + 5)];
+    mm_word shift_level = mmVolumeShiftTable[volume >> (7 + 5)];
+
+    shift_level += 5; // Add this to the table values instead
+
+    return (shift_data << 8) | (volume >> shift_level);
+}
+
+#define CLK_DIV 524288 // VALUE = 16777216 * CLK / 512 / 32
+
+static ARM_CODE void mmMixA(void)
+{
+    mm_word ch_mask = mm_ch_mask & 0xFFFF; // 16 channels only
+    mm_mixer_channel *mix_ch = &mm_mix_channels[0];
+
+    for (int channel = 0; channel < 16; channel++, mix_ch++)
+    {
+        if ((ch_mask & BIT(channel)) == 0)
+            continue;
+
+        if (mix_ch->samp == 0) // 0 = channel is disabled
+        {
+            REG_SOUNDXCNT(channel) = 0; // Clear channel and skip to next
+            continue;
+        }
+
+        // Get mainram address
+        mm_mas_ds_sample *sample = (mm_mas_ds_sample *)(mix_ch->samp + 0x2000000);
+
+        if (mix_ch->key_on) // If KEY-ON is cleared, continue activity
+        {
+            // start new note
+            //------------------------
+
+            mix_ch->key_on = 0; // Clear start bit
+
+            // When the note starts "mix_ch->read" contains the sample offset
+            // obtained from "mpp_vars.sampoff", which comes from the effects in
+            // the module. The module player doesn't know how many bytes to skip
+            // because the DS supports 8-bit and 16-bit samples, so we need to
+            // calculate it here when the note starts.
+            //
+            // Note: Only the least significant byte of "mix_ch->read" contains
+            // the offset, and the value read must be multiplied by 256 samples.
+            mm_word offset = (mm_byte)mix_ch->read;
+
+            if (offset != 0)
+            {
+                // Test sample format
+                if (sample->format == MM_SFORMAT_8BIT)
+                    offset = offset << (8 - 2); // 8-bit = LSL 0
+                if (sample->format == MM_SFORMAT_16BIT)
+                    offset = offset << (9 - 2); // 16-bit = LSL 1
+                else
+                    offset = 0; // ADPCM/other = invalid
+            }
+
+            mm_byte *sampledata = (mm_byte *)sample->point; // get sampledata pointer
+            if (sampledata == NULL)
+                sampledata = sample->data;
+
+            sampledata += (offset << 2); // add sample offset (in bytes)
+
+            mm_byte rep_mode = sample->repeat_mode; // check repeat mode
+
+            if (rep_mode == MM_SREPEAT_FORWARD) // mma_looping | forward loop
+            {
+                mm_sword lstart = sample->loop_start; // Get loopstart position
+
+                lstart -= offset; // Subtract sample offset
+
+                if (lstart < 0)
+                {
+                    sampledata += lstart << 2; // if result goes negative than clamp values
+                    lstart = 0;
+                }
+
+                // write CNT=0,SAD=SAD,TMR=0,PNT=PNT,LEN=LEN
+                REG_SOUNDXCNT(channel) = 0;
+                REG_SOUNDXSAD(channel) = (mm_word)sampledata;
+                REG_SOUNDXTMR(channel) = 0;
+                REG_SOUNDXPNT(channel) = lstart;
+                REG_SOUNDXLEN(channel) = sample->loop_length;
+            }
+            else // mma_notlooping
+            {
+                mm_word len = sample->length; // read length
+
+                mm_sword remaining_len = len - offset; // subtract sample offset
+
+                if (remaining_len < 0)
+                {
+                    sampledata -= offset << 2; // clamp negative results
+                    remaining_len = len;
+                }
+
+                // write CNT=0,SAD=SAD,TMR=0,PNT=0,LEN=LEN
+                REG_SOUNDXCNT(channel) = 0;
+                REG_SOUNDXSAD(channel) = (mm_word)sampledata;
+                REG_SOUNDXTMR(channel) = 0;
+                REG_SOUNDXPNT(channel) = 0;
+                REG_SOUNDXLEN(channel) = remaining_len;
+            }
+
+            // mma_copy_levels
+
+            // Set direct volume levels on key-on
+            mix_ch->cvol = mix_ch->vol;
+            mix_ch->cpan = mix_ch->tpan << 9;
+
+            REG_SOUNDXCNT(channel) = SOUNDXCNT_ENABLE |
+                (sample->repeat_mode | (sample->format << 2)) << 27;
+        }
+        else
+        {
+            // Continue channel
+            // ----------------
+
+            // Check if sound has ended
+            if ((REG_SOUNDXCNT(channel) & SOUNDXCNT_ENABLE) == 0)
+            {
+                mix_ch->samp = 0;
+                // TODO: The original code clears panning as well (32 bits at
+                // once). Is this a problem? Should we clear it or not?
+                mix_ch->tpan = 0;
+                mix_ch->key_on = 0;
+                continue;
+            }
+        }
+
+        // mma_started
+        // -----------
+
+        // Set timer
+        if (mix_ch->freq == 0)
+            REG_SOUNDXTMR(channel) = 0;
+        else
+            REG_SOUNDXTMR(channel) = -(CLK_DIV / mix_ch->freq);
+
+        // Set volume levels
+        *(mm_hword*)&REG_SOUNDXCNT(channel) = translateVolume(mix_ch->cvol);
+
+        // Set panning levels. Use top 7 bits.
+        REG_SOUNDXPAN(channel) = mix_ch->cpan >> 9;
+    }
+}
+
+void mmbZerofillBuffer(mm_addr buffer);
+void mmbResampleData(mm_addr dest, mm_word do_zero_padding, mm_word *shadow,
+                     mm_mixer_channel *mix_ch);
+
+static mm_addr mmb_getdest(mm_word channel)
+{
+    // Calc destination address...
+    mm_byte *dest = &(mm_mix_data.mix_data_b.output[0][0]) + (channel * 512);
+
+    mm_word slice = mm_output_slice;
+
+    return dest + (slice << 8); // add output slice offset
+}
+
+static void ARM_CODE mmMixB(void)
+{
+    mm_word ch_mask = mm_ch_mask & 0xFFFF; // Clear top 16 bits (only 16 channels)
+    mm_mixer_channel *mix_ch = &mm_mix_channels[0];
+
+    REG_DMA1_DEST = (mm_word)&(mm_mix_data.mix_data_b.fetch[0]);
+
+    // Get mode B shadow data (word pointer, don't access individual fields)
+    mm_word *shadow = (mm_word *)&(mm_mix_data.mix_data_b.shadow[0]);
+
+    for (int i = 0; i < 16; i++, shadow++, mix_ch++)
+    {
+        if ((ch_mask & BIT(i)) == 0)
+            continue;
+
+        if (mix_ch->samp == 0) // Check if channel is disabled
+        {
+            *shadow = SOUNDXCNT_PAN(64) | SOUNDXCNT_VOL_MUL(0); // pan=center, vol=silent
+            mmbZerofillBuffer(mmb_getdest(i)); // zero wavebuffer
+            continue;
+        }
+
+        // The channel is active
+
+        mm_byte do_zero_padding;
+
+        if (mix_ch->key_on == 1)
+        {
+            // New note
+            mix_ch->key_on = 0; // clear start bit
+
+            mm_word vol = mix_ch->vol;
+            mm_word pan = mix_ch->tpan;
+
+            mix_ch->cvol = vol | (pan << (16 + 9));
+
+            // When the note starts "mix_ch->read" contains the sample offset
+            // obtained from "mpp_vars.sampoff", which comes from the effects in
+            // the module. The module player doesn't know how many bytes to skip
+            // because the DS supports 8-bit and 16-bit samples, so we need to
+            // calculate it here when the note starts.
+            //
+            // Note: Only the least significant byte of "mix_ch->read" contains
+            // the offset, and the value read must be multiplied by 256 samples.
+            //
+            // TODO: Mode B doesn't support 16-bit samples, is that a bug?
+            mm_word offset = (mm_byte)mix_ch->read;
+            mix_ch->read = offset << (8 + MP_SAMPFRAC);
+
+            do_zero_padding = 1; // add zero padding
+        }
+        else
+        {
+            do_zero_padding = 0;
+        }
+
+        // Do volume ramping
+        {
+            // get volume+shift value
+            mm_word volume = translateVolume(mix_ch->cvol);
+
+            // assemble volume|shift|panning
+            mm_hword pan = mix_ch->cpan >> 9;
+
+            // -write to shadow
+            *shadow = volume | (pan << 16);
+        }
+
+        mm_addr dest = mmb_getdest(i); // fill wave buffer
+
+        mmbResampleData(dest, do_zero_padding, shadow, mix_ch);
+    }
+
+    // Swap mixing slice
+    mm_output_slice ^= 1;
+}
+
+void mmcMixChunk(void);
+
+static ARM_CODE void mmMixC(void)
+{
+    mm_word ch_mask = mm_ch_mask;
+    mm_mixer_channel *mix_ch = &mm_mix_channels[0];
+    mmshadow_c_ds *shadow = (mmshadow_c_ds *)&(mm_mix_data.mix_data_c.shadow[0]);
+
+    for (mm_word channel = 0; channel < 32; channel++, shadow++, mix_ch++)
+    {
+        // Test channel bit. Update the channel if it's set. Ignore it if not.
+        if ((ch_mask & BIT(channel)) == 0)
+            continue;
+
+        // Read sample address. If the address is 0, the channel is disabled.
+        if (mix_ch->samp == 0)
+        {
+            // Silence channel if it's a hardware channel
+            if (channel < 16)
+            {
+                shadow->cnt = 0;
+                mix_ch->samp = 0;
+                mix_ch->tpan = 0;
+                mix_ch->key_on = 0;
+            }
+            continue;
+        }
+
+        // Add main RAM offset to get the address of the sample data
+        mm_mas_ds_sample *sample = (mm_mas_ds_sample *)(mix_ch->samp + 0x2000000);
+
+        // Test and clear start bit
+        bool was_key_on = mix_ch->key_on;
+        mix_ch->key_on = 0;
+
+        if (was_key_on) // Continue channel / start new note
+        {
+            // shift sample offset (for swm only): offset / 256
+
+            // When the note starts "mix_ch->read" contains the sample offset
+            // obtained from "mpp_vars.sampoff", which comes from the effects in
+            // the module. The module player doesn't know how many bytes to skip
+            // because the DS supports 8-bit and 16-bit samples, so we need to
+            // calculate it here when the note starts.
+            //
+            // Note: Only the least significant byte of "mix_ch->read" contains
+            // the offset, and the value read must be multiplied by 256 samples.
+            mm_word sample_offset = (mm_byte)mix_ch->read;
+
+            mix_ch->read = sample_offset << (MP_SAMPFRAC + 8);
+
+            // set direct volume levels on key-on
+            mix_ch->cvol = mix_ch->vol;
+            mix_ch->cpan = mix_ch->tpan << 9;
+
+            if (channel >= 16) // skip the rest for software channels
+                continue;
+
+            mm_sword length = sample_offset;
+
+            if (sample_offset != 0) // convert sample offset into word count
+            {
+                if (sample->format == MM_SFORMAT_8BIT)
+                    length = length << (8 - 2); // 8-bit = lsl #0
+                else if (sample->format == MM_SFORMAT_16BIT)
+                    length = length << (9 - 2); // 16-bit = lsl #1
+                else
+                    length = 0; // ADPCM and others = 0
+            }
+
+            mm_word source_addr = sample->point;
+            if (source_addr == 0)
+                source_addr = (mm_word)&(sample->data[0]);
+
+            source_addr += length << 2;
+
+            mm_sword loop_start;
+
+            if (sample->repeat_mode == MM_SREPEAT_FORWARD) // Forward loop
+            {
+                loop_start = sample->loop_start - length;
+
+                if (loop_start < 0)
+                {
+                    // Truncate offsets that enter looped region
+                    source_addr += loop_start << 2;
+                    loop_start = 0;
+                }
+
+                shadow->len = sample->length; // write LEN to shadow
+            }
+            else // No loop
+            {
+                mm_sword new_length = sample->length - length;
+                if (new_length < 0)
+                {
+                    // Cancel sample offset if greater than length
+                    source_addr -= length << 2;
+                    new_length = sample->length;
+                }
+
+                loop_start = 0;
+
+                shadow->len = new_length; // write LEN to shadow
+            }
+
+            // write new source+loop point data to shadow buffer
+            shadow->src = source_addr;
+            shadow->pnt = loop_start;
+
+            // Combine and add start bit
+            shadow->cnt &= 0x00FFFFFF;
+            shadow->cnt |= (sample->repeat_mode << 27) | (sample->format << 29) |
+                           SOUNDXCNT_ENABLE;
+        }
+        else
+        {
+            // adjust pitch, volume, panning
+
+            if (channel >= 16)
+                continue;
+
+            if ((REG_SOUNDXCNT(channel) & SOUNDXCNT_ENABLE) == 0)
+            {
+                // Silence channel if it's a hardware channel
+                if (channel < 16)
+                {
+                    shadow->cnt = 0;
+                    mix_ch->samp = 0;
+                    mix_ch->tpan = 0;
+                    mix_ch->key_on = 0;
+                }
+                continue;
+            }
+        }
+
+        // calc & set timer
+        if (mix_ch->freq == 0)
+            shadow->tmr = 0;
+        else
+            shadow->tmr = -(CLK_DIV / mix_ch->freq);
+
+        shadow->cnt &= 0xFF000000;
+        shadow->cnt |= translateVolume(mix_ch->cvol);
+        shadow->cnt |= ((mm_word)mix_ch->cpan & 0xFE00) << (16 - 9);
+    }
+
+    // Setup DMA destination
+    REG_DMA1_DEST = (mm_word)&(mm_mix_data.mix_data_c.fetch[0]);
+
+    // Software mix extended channels into the streams.
+    mmcMixChunk();
+}
+
+ARM_CODE void mmMixerMix(void)
+{
+    // Do volume ramping
+    SlideMixingLevels(SLIDE_THROTTLE);
+
+    if (mm_mixing_mode == MM_MODE_A)
+    {
+        mmMixA();
+    }
+    else if (mm_mixing_mode == MM_MODE_B)
+    {
+        mmMixB();
+    }
+    else // if (mm_mixing_mode == MM_MODE_C)
+    {
+        mmMixC();
+    }
+}
