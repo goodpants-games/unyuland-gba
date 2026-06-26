@@ -98,6 +98,10 @@ void platform_app_frame(void)
     profile_start();
     #endif
 
+#ifndef PLATFORM_GBA
+    mmFrame();
+#endif
+
     gfx_new_frame();
     snd_frame();
 

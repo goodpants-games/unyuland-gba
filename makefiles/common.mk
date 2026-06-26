@@ -70,8 +70,8 @@ SPRFILES	:=	$(foreach dir,$(SPRITES),$(wildcard $(dir)/*.sprdb))
 BINFILES	:=	$(foreach dir,$(DATA),$(wildcard $(dir)/*.*))
 
 ifneq ($(strip $(MUSIC)),)
-	export AUDIOFILES := $(foreach dir,$(notdir $(wildcard $(MUSIC)/*.*)),$(CURDIR)/$(MUSIC)/$(dir))
-	BINFILES += data/soundbank.bin
+  export AUDIOFILES := $(foreach dir,$(notdir $(wildcard $(MUSIC)/*.*)),$(CURDIR)/$(MUSIC)/$(dir))
+  BINFILES += data/soundbank.bin
 endif
 
 BINFILES += data/sinelut.bin data/dlg.bin data/pitchlut.bin data/wave_tri.bin\
