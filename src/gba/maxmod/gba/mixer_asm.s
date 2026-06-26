@@ -13,8 +13,8 @@
 //                          GLOBAL SYMBOLS
 //==================================================================
 
-    .global     mmMixerMix
-    .type       mmMixerMix STT_FUNC
+    .global     mmMixerMixAsm
+    .type       mmMixerMixAsm STT_FUNC
 
 //===============================================
 // more definitions
@@ -78,7 +78,7 @@ mpm_nullsample:
 
     .balign 4
 //-------------------------------------------------------------------------
-mmMixerMix: // params = { samples_count }
+mmMixerMixAsm: // params = { samples_count }
 //-------------------------------------------------------------------------
 
 // exit function if samples == 0
