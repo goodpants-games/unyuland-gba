@@ -244,87 +244,165 @@ void mmMixerEnd(void)
 }
 
 ARM_CODE IWRAM_CODE __attribute__((noinline))
-void mmMixerMix(mm_word samples_count)
+void mmMixerMix(mm_word sample_count)
 {
-    // exit function if samples == 0
-    // it will malfunction.
-    if (samples_count == 0) return;
+    if (sample_count == 0)
 
-    // r0 = mixbuf
     {
+        // clear 32 bytes/write
         mm_word *mixbuf = (mm_word *)mm_mixbuffer;
-        for (mm_word i = samples_count>>3; i != 0; --i)
+        for (mm_word i = sample_count>>3; i !=0; --i)
         {
-            // clear 32 bytes/write
             memset(mixbuf, 0, 32);
             mixbuf += 8;
         }
 
         // clear remainder
-        for (mm_word i = samples_count & 7; i != 0; --i)
+        for (mm_word i = sample_count & 7; i != 0; --i)
             *(mixbuf++) = 0;
     }
 
-    // BEGIN MIXING ROUTINE
-
-    mm_mixer_channel *rchan = mm_mix_channels; // (r12)
-    mm_mas_gba_sample *rsrc = (mm_mas_gba_sample *)rchan->src; // (r10)
-    mm_word rfreq = rchan->freq; // (r9)
-
-    // r11 = 0 // volume addition
-    mm_word rVolA = 0; // volume addition
+    mm_mixer_channel *rchan = mm_mix_channels;
+    mm_mas_gba_sample *rsrc = (mm_mas_gba_sample *)rchan->src;
+    mm_word rfreq = rchan->freq;
 
     if (rsrc != 0 && rfreq != 0)
     {
-        // r0 = mm_ratescale
         rfreq = (rfreq * mm_ratescale) >> 14;
+        mm_word *rmixb = (mm_word *)mm_mixbuffer;
 
-        // load mixing buffers
-        mm_word *rmixb = (mm_word *)mm_mixbuffer; // (r8)
-
-        // get read position
         mm_word rread = rchan->read; // (r7)
 
         // calculate volume
-        mm_word rvolR = (mm_word) rchan->vol; // volume = 0-255
+        mm_word vol = (mm_word) rchan->vol; // volume = 0-255
         mm_word pan = (mm_word) rchan->pan; // pan = 0-255
-        pan = 256 - pan;
-        mm_word rvolL = (pan * rvolR) >> 8; // right volume
-        pan = 256 - pan;
-        rvolR = (pan * rvolR) >> 8; // calc left volume (256-pan)*vol
-        rVolA += rvolL + (rvolR << 16);
+        mm_word rvolL = (pan * vol) >> 8; // right volume
+        mm_word rvolR = ((256 - pan) * vol) >> 8; // calc left volume (256-pan)*vol
 
         // .mpm_remix_test:
 
+        // rread is sample offset (fixed-point 20.12)
+        // rfreq is increment
+        // it does some prefetching stuff first, i think, i've been told that's
+        // not necessary
+        // it writes it into rmixb. that is the buffer which contains the running mix
+        // of all channels.
+        // it writes N number of samples at a time. not sure how many yet.
+        // once it is done writing N number of samples, it checks if the sample
+        // (as in, the audio source) has ended or if it should loop.
+        // not entirely sure what post-processing does yet.
+
         // get number of samples that will be read
-        mm_word smpcnt = rfreq * samples_count; // (r1)
-        mm_bool bool1 = false; // (r2)
-        if (rfreq < FETCH_THRESHOLD)
-        {
-            // check if its > fetch size
-            // if so: clamp to fetch size and set flag
-            if (smpcnt > (FETCH_SIZE << MP_SAMPFRAC))
-            {
-                smpcnt = FETCH_SIZE << MP_SAMPFRAC;
-                bool1 = true;
-            }
+        // mm_word smpcnt = rfreq * sample_count; // (r1)
+        // mm_bool bool1 = false; // (r2)
+        // if (rfreq < FETCH_THRESHOLD)
+        // {
+        //     // check if its > fetch size
+        //     // if so: clamp to fetch size and set flag
+        //     if (smpcnt > (FETCH_SIZE << MP_SAMPFRAC))
+        //     {
+        //         smpcnt = FETCH_SIZE << MP_SAMPFRAC;
+        //         bool1 = true;
+        //     }
 
-            // now subtract length - read to get # samples remaining
-            mm_word smpRemain = (rsrc[-1].length << MP_SAMPFRAC) - rread;
+        //     // now subtract length - read to get # samples remaining
+        //     mm_word smpRemain = (rsrc[-1].length << MP_SAMPFRAC) - rread;
 
-            // clamp mix count
-            if (smpcnt > smpRemain)
-                smpcnt = smpRemain;
-            else if (!bool1)
-                goto mpm_mix_full;
+        //     // clamp mix count
+        //     if (smpcnt > smpRemain)
+        //         smpcnt = smpRemain;
+        //     else if (!bool1)
+        //         goto mpm_mix_full;
 
-            // .calc_mix
+        //     // .calc_mix
             
-            // divide samples / frequency (24bit/16bit)
-            // push r1(smpcnt) onto stack
-            // mov r0, r1(smpcnt)
-        }
+        //     // divide samples / frequency (24bit/16bit)
+        //     // push r1(smpcnt) onto stack
+        //     // mov r0, r1(smpcnt)
+        // }
     }
-
-    mpm_mix_full:;
 }
+// void mmMixerMix(mm_word samples_count)
+// {
+//     // exit function if samples == 0
+//     // it will malfunction.
+//     if (samples_count == 0) return;
+
+//     // r0 = mixbuf
+//     {
+//         mm_word *mixbuf = (mm_word *)mm_mixbuffer;
+//         for (mm_word i = samples_count>>3; i != 0; --i)
+//         {
+//             // clear 32 bytes/write
+//             memset(mixbuf, 0, 32);
+//             mixbuf += 8;
+//         }
+
+//         // clear remainder
+//         for (mm_word i = samples_count & 7; i != 0; --i)
+//             *(mixbuf++) = 0;
+//     }
+
+//     // BEGIN MIXING ROUTINE
+
+//     mm_mixer_channel *rchan = mm_mix_channels; // (r12)
+//     mm_mas_gba_sample *rsrc = (mm_mas_gba_sample *)rchan->src; // (r10)
+//     mm_word rfreq = rchan->freq; // (r9)
+
+//     // r11 = 0 // volume addition
+//     mm_word rVolA = 0; // volume addition
+
+//     if (rsrc != 0 && rfreq != 0)
+//     {
+//         // r0 = mm_ratescale
+//         rfreq = (rfreq * mm_ratescale) >> 14;
+
+//         // load mixing buffers
+//         mm_word *rmixb = (mm_word *)mm_mixbuffer; // (r8)
+
+//         // get read position
+//         mm_word rread = rchan->read; // (r7)
+
+//         // calculate volume
+//         mm_word rvolR = (mm_word) rchan->vol; // volume = 0-255
+//         mm_word pan = (mm_word) rchan->pan; // pan = 0-255
+//         pan = 256 - pan;
+//         mm_word rvolL = (pan * rvolR) >> 8; // right volume
+//         pan = 256 - pan;
+//         rvolR = (pan * rvolR) >> 8; // calc left volume (256-pan)*vol
+//         rVolA += rvolL + (rvolR << 16);
+
+//         // .mpm_remix_test:
+
+//         // get number of samples that will be read
+//         mm_word smpcnt = rfreq * samples_count; // (r1)
+//         mm_bool bool1 = false; // (r2)
+//         if (rfreq < FETCH_THRESHOLD)
+//         {
+//             // check if its > fetch size
+//             // if so: clamp to fetch size and set flag
+//             if (smpcnt > (FETCH_SIZE << MP_SAMPFRAC))
+//             {
+//                 smpcnt = FETCH_SIZE << MP_SAMPFRAC;
+//                 bool1 = true;
+//             }
+
+//             // now subtract length - read to get # samples remaining
+//             mm_word smpRemain = (rsrc[-1].length << MP_SAMPFRAC) - rread;
+
+//             // clamp mix count
+//             if (smpcnt > smpRemain)
+//                 smpcnt = smpRemain;
+//             else if (!bool1)
+//                 goto mpm_mix_full;
+
+//             // .calc_mix
+            
+//             // divide samples / frequency (24bit/16bit)
+//             // push r1(smpcnt) onto stack
+//             // mov r0, r1(smpcnt)
+//         }
+//     }
+
+//     mpm_mix_full:;
+// }

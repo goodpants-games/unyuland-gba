@@ -1,4 +1,8 @@
 #include <tonc.h>
+#include <maxmod.h>
+
+#include <data/soundbank.h>
+
 #include "scenes.h"
 #include "sound.h"
 #include "gfx.h"
@@ -41,11 +45,13 @@ static void scene_load(uintptr_t init_data)
     gfx_text_bmap_clear(0, 0, GFX_TEXT_BMP_COLS, 5);
 
     update_sound_name();
+
+    mmStart(MOD_UNTITLED, MM_PLAY_LOOP);
 }
 
 static void scene_unload(void)
 {
-    
+    mmStop();
 }
 
 static void scene_frame(void)
