@@ -7,7 +7,7 @@ BUILD  := buildpc
 #---------------------------------------------------------------------------------
 # platform-specific sources
 #---------------------------------------------------------------------------------
-SOURCES := src/pc/tonc src/pc/maxmod src/pc
+SOURCES := src/pc/tonc src/pc/maxmod/core src/pc/maxmod/gba src/pc
 INCLUDES := src/pc/include
 
 #---------------------------------------------------------------------------------
@@ -20,7 +20,7 @@ LIBS     := $(shell $(PKGCONF) --libs $(LIBNAMES))
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
-CFLAGS  := -DPLATFORM_PC -gdwarf-4 -Og \
+CFLAGS  := -DPLATFORM_PC -D__GBA__ -gdwarf-4 -Og \
            $(shell $(PKGCONF) --cflags $(LIBNAMES)) $(CFLAGS)
 ASFLAGS := -DPLATFORM_PC $(ASFLAGS)
 LDFLAGS := -gdwarf-4 $(LDFLAGS)
