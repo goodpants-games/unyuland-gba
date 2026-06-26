@@ -2,7 +2,7 @@
 #define MATH_UTIL_H
 
 #include <tonc_math.h>
-#include <sinelut_bin.h>
+#include <data/sinelut_bin.h>
 
 // x always has to be greater than y
 #define UPAIR2U(x, y) ((((x) * (x) + (x)) >> 1) + (y))

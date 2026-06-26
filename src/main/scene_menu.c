@@ -1,14 +1,13 @@
-#include <tonc_input.h>
-#include <tonc_video.h>
-#include <maxmod.h>
-#include <soundbank.h>
 #include <string.h>
+#include <tonc.h>
+#include <maxmod.h>
+
+#include <data/soundbank.h>
+#include <data/graphics/game_logo_gfx.h>
+
 #include "scenes.h"
 #include "menu.h"
 #include "gfx.h"
-#include "tonc_memdef.h"
-
-#include <game_logo_gfx.h>
 
 #define HUD_ROW_ORIGIN (GFX_TEXT_BMP_ROWS - 2)
 #define HUD_Y_ORIGIN   (HUD_ROW_ORIGIN * 8 + 6)

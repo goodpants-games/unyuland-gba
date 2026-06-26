@@ -1,13 +1,13 @@
 #include <tonc.h>
 #include <maxmod.h>
 #include <platutil.h>
-#include "sound.h"
-#include "soundbank.h"
-#include "soundbank_bin.h"
+#include <data/soundbank.h>
+#include <data/soundbank_bin.h>
 
 #include "gfx.h"
 #include "log.h"
 #include "scenes.h"
+#include "sound.h"
 
 // #define MAIN_PROFILE
 

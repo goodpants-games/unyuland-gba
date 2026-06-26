@@ -2,14 +2,13 @@
 #include <tonc.h>
 #include <dialogue.h>
 
-#include <intro1_gfx.h>
-#include <intro2_gfx.h>
-#include <intro3_gfx.h>
+#include <data/graphics/intro1_gfx.h>
+#include <data/graphics/intro2_gfx.h>
+#include <data/graphics/intro3_gfx.h>
 
 #include "gfx.h"
 #include "menu.h"
 #include "scenes.h"
-#include "tonc_memdef.h"
 
 #define TEXT_ROW_COUNT 9
 #define IMG_FADE_STAGE_LEN 15

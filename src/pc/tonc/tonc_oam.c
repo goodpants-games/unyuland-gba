@@ -7,9 +7,9 @@
 //
 // === NOTES ===
 
-#include "tonc_memmap.h"
-#include "tonc_memdef.h"
-#include "tonc_oam.h"
+#include <tonc_memmap.h>
+#include <tonc_memdef.h>
+#include <tonc_oam.h>
 
 
 // --------------------------------------------------------------------

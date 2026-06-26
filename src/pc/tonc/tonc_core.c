@@ -9,8 +9,8 @@
 
 #include <SDL3/SDL.h>
 
-#include "tonc_memmap.h"
-#include "tonc_core.h"
+#include <tonc_memmap.h>
+#include <tonc_core.h>
 
 
 // --------------------------------------------------------------------

@@ -1,15 +1,13 @@
 #include <stdlib.h>
-#include <tonc_memmap.h>
-#include <tonc_memdef.h>
-#include <tonc_math.h>
-#include <pitchlut_bin.h>
-#include <wave_tri_bin.h>
-#include <wave_noise_bin.h>
+#include <tonc.h>
+#include <platutil.h>
+
+#include <data/pitchlut_bin.h>
+#include <data/wave_tri_bin.h>
+#include <data/wave_noise_bin.h>
+
 #include "sound.h"
 #include "log.h"
-#include "tonc_core.h"
-#include "tonc_types.h"
-#include <platutil.h>
 #include "math_util.h"
 
 #define TICKS_PER_PART     8

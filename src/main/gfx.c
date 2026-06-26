@@ -1,11 +1,9 @@
-#include <tonc.h>
-#include <font_gfx.h>
-#include "gfx.h"
-#include <platutil.h>
-#include "tonc_memdef.h"
-#include "tonc_memmap.h"
 #include <string.h>
 #include <stdalign.h>
+#include <tonc.h>
+#include <platutil.h>
+#include <data/graphics/font_gfx.h>
+#include "gfx.h"
 
 
 

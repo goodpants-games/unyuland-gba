@@ -2,8 +2,10 @@
 #define GAME_H
 
 #include <tonc_types.h>
-#include <game_sprdb.h>
-#include <world.h>
+
+#include <data/sprites/game_sprdb.h>
+#include <data/world.h>
+
 #include "map_data.h"
 
 #define WORLD_SUBPX_SHIFT 4

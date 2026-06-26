@@ -3,10 +3,10 @@
 #include <tonc_video.h>
 #include <tonc_input.h>
 
-#include <automap_tiles_gfx.h>
-#include <automap_bin.h>
-#include <game_sprdb.h>
-#include <world.h>
+#include <data/graphics/automap_tiles_gfx.h>
+#include <data/automap_bin.h>
+#include <data/sprites/game_sprdb.h>
+#include <data/world.h>
 
 #include "automap.h"
 #include "tonc_math.h"

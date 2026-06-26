@@ -2,7 +2,7 @@
 #define DIALOGUE_H
 
 #include <tonc_types.h>
-#include <dlg_bin.h>
+#include <data/dlg_bin.h>
 
 typedef struct dlg_chat_header
 {

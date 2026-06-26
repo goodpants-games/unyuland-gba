@@ -3,6 +3,7 @@ $(error "Please set DEVKITARM in your environment. export DEVKITARM=<path to>dev
 endif
 
 include $(DEVKITARM)/gba_rules
+undefine bin2o
 
 #---------------------------------------------------------------------------------
 # the LIBGBA path is defined in gba_rules, but we have to define LIBTONC ourselves
@@ -13,6 +14,7 @@ LIBTONC := $(DEVKITPRO)/libtonc
 # platform-specific sources
 #---------------------------------------------------------------------------------
 SOURCES := src/gba
+INCLUDES := src/gba/include
 
 
 #---------------------------------------------------------------------------------
@@ -58,8 +60,8 @@ endef
 #---------------------------------------------------------------------------------
 %_gfx.s %_gfx.h: %.png %.grit
 #---------------------------------------------------------------------------------
-	@echo "grit $<"
-	@grit $< -fts -o$*_gfx
+	@mkdir -p $(dir $*)
+	$(SILENTCMD)grit $< -fts -o$*_gfx
 
 
 #---------------------------------------------------------------------------------

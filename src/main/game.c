@@ -1,16 +1,16 @@
 #include <stdlib.h>
 #include <tonc.h>
-#include <world.h>
 #include <string.h>
 #include <maxmod.h>
+#include <platutil.h>
+
+#include <data/world.h>
 
 #include "game.h"
 #include "game_physics.h"
 #include "log.h"
 #include "gfx.h"
 #include "math_util.h"
-#include <platutil.h>
-#include "tonc_video.h"
 
 #define MAX_RENDER_OBJS ((MAX_ENTITY_COUNT + MAX_PROJECTILE_COUNT))
 #define FREE_QUEUE_MAX_SIZE 32

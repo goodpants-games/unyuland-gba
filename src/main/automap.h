@@ -1,8 +1,9 @@
 #ifndef AUTOMAP_H
 #define AUTOMAP_H
 
+#include <data/world.h>
+
 #include "gfx.h"
-#include <world.h>
 
 #define MAP_SCREEN_WIDTH     (15 * 8)
 #define MAP_SCREEN_HEIGHT    (11 * 8)

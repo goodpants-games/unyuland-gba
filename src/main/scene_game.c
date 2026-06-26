@@ -1,23 +1,22 @@
 #include <limits.h>
 #include <tonc.h>
-#include <game_sprdb.h>
-#include <tileset_gfx.h>
-#include <automap_tiles_gfx.h>
 #include <maxmod.h>
-#include "math_util.h"
-#include "soundbank.h"
 
-#include <world.h>
+#include <data/sprites/game_sprdb.h>
+#include <data/graphics/tileset_gfx.h>
+#include <data/graphics/automap_tiles_gfx.h>
+#include <data/graphics/sky_bg1_gfx.h>
+#include <data/soundbank.h>
+#include <data/world.h>
+
 #include "game.h"
 #include "gfx.h"
 #include "log.h"
 #include "menu.h"
-#include "tonc_memmap.h"
-#include "tonc_video.h"
 #include "scenes.h"
 #include "automap.h"
+#include "math_util.h"
 
-#include <sky_bg1_gfx.h>
 
 #define HUD_ROW_ORIGIN (GFX_TEXT_BMP_ROWS - 2)
 #define HUD_Y_ORIGIN   (HUD_ROW_ORIGIN * 8 + 6)

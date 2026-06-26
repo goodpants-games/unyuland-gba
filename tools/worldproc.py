@@ -235,12 +235,12 @@ extern const u8 world_matrix[WORLD_MATRIX_HEIGHT][WORLD_MATRIX_WIDTH];
 #endif""")
     
     with open(fc_path, 'w') as fc:
-        fc.write("#include <soundbank.h>\n")
+        fc.write("#include <data/soundbank.h>\n")
         fc.write("#include \"world.h\"\n")
         fc.write("\n")
 
         for name in rooms:
-            fc.write("#include <")
+            fc.write("#include <data/maps/")
             fc.write(name)
             fc.write("_map.h>\n")
         
@@ -354,7 +354,7 @@ def calc_room_automap_occupancy(room_path: str) -> Array2D:
     cell_w = WORLD_GRID_WIDTH / MAP_SCREEN_SUBDIV / 8.0
     cell_h = WORLD_GRID_HEIGHT / MAP_SCREEN_SUBDIV / 8.0
 
-    with open(room_path + '.map', 'rb') as map_file:
+    with open('data/maps/' + room_path + '.map', 'rb') as map_file:
         map_data = map_file.read()
     
     (room_width, room_height, _, _, col_data_offset, _, _) = \

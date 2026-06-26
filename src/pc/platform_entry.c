@@ -11,7 +11,7 @@
 #endif
 
 #ifdef USE_GLAD
-#include <glad/glad.h>
+#include "glad/glad.h"
 // #define GL_DEBUG
 #else
 #include <SDL3/SDL_opengles2.h>

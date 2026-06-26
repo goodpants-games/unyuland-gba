@@ -7,7 +7,7 @@ BUILD  := buildweb
 # platform-specific sources
 #---------------------------------------------------------------------------------
 SOURCES := src/pc/tonc src/pc/maxmod src/pc
-
+INCLUDES := src/pc/include
 
 #---------------------------------------------------------------------------------
 # any extra libraries we wish to link with the project
@@ -43,7 +43,7 @@ endef
 #---------------------------------------------------------------------------------
 %_gfx.c %_gfx.h: %.png %.grit
 #---------------------------------------------------------------------------------
-	@echo "grit $<"
+	@mkdir -p $(dir $*)
 	@grit $< -ftc -o$*_gfx
 
 
