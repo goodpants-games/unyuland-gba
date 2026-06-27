@@ -3,15 +3,18 @@ CC := emcc
 TARGET := web/game
 BUILD  := buildweb
 
+LIBXMP := third_party/libxmp
+
 #---------------------------------------------------------------------------------
 # platform-specific sources
 #---------------------------------------------------------------------------------
 SOURCES := src/pc/tonc src/pc/maxmod src/pc
-INCLUDES := src/pc/include
+INCLUDES := src/pc/include $(LIBXMP)/include
 
 #---------------------------------------------------------------------------------
 # any extra libraries we wish to link with the project
 #---------------------------------------------------------------------------------
+SLIBS        := libxmp-lite.a
 LIBS         := -sUSE_SDL=3
 AUDIO_DRIVER := mpt
 
@@ -32,8 +35,11 @@ define CLEAN =
 endef
 
 define BUILD_TARGETS
-$(OUTPUT).js: $(OFILES)
-	$(SILENTCMD)$(CC) $(OFILES) $(LDFLAGS) $(CFLAGS) $(LIBS) -o $(OUTPUT).js
+$(OUTPUT).js: $(OFILES) $(SLIBS)
+	$(SILENTCMD)$(CC) $(OFILES) $(LDFLAGS) $(CFLAGS) $(LIBS) $(SLIBS) -o $(OUTPUT).js
+
+libxmp-lite.a:
+	cp $(TOPLEVEL)/$(LIBXMP)/lib/libxmp-lite.a $(CURDIR)
 endef
 
 #---------------------------------------------------------------------------------

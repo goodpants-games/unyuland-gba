@@ -29,7 +29,6 @@ make gba
 Additional prerequisites:
 - GCC/Clang (*only* works with these compilers. You can use MSYS2 on Windows.)
 - SDL3
-- libopenmpt
 - A `pkg-config` interface
 - OpenGL ES drivers
 - (And yes, you still need devkitPro, for grit.)
@@ -38,8 +37,15 @@ Additional prerequisites:
 # run this if you only have pkgconf installed, with no pkg-config symlink.
 export PKGCONF=pkgconf
 
+# compile libxmp
+cd third_party/libxmp
+./configure --disable-shared --disable-it --enable-static
+make
+
 mkdir buildpc
 
 # creates unyuland or unyuland.exe in the project directory.
+# SDL3 and libopenmpt dependencies will be located using pkg-config. If you are
+# on Windows, you can install them through the MSYS2 package manager.
 make pc
 ```

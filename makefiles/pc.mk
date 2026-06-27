@@ -4,17 +4,21 @@ CC ?= gcc
 TARGET := unyuland
 BUILD  := buildpc
 
+LIBXMP := third_party/libxmp
+
 #---------------------------------------------------------------------------------
 # platform-specific sources
 #---------------------------------------------------------------------------------
 SOURCES := src/pc/tonc src/pc/maxmod src/pc
-INCLUDES := src/pc/include
+INCLUDES := src/pc/include $(LIBXMP)/include
 
 #---------------------------------------------------------------------------------
 # any extra libraries we wish to link with the project
 #---------------------------------------------------------------------------------
-LIBNAMES     := sdl3 libopenmpt
-LIBS         := $(shell $(PKGCONF) --libs $(LIBNAMES))
+SLIBS        := libxmp-lite.a
+LIBNAMES     := sdl3
+LIBS         := $(shell $(PKGCONF) --libs $(LIBNAMES))\
+                $(SLIBS)
 AUDIO_DRIVER := mpt
 
 
@@ -39,8 +43,11 @@ define CLEAN =
 endef
 
 define BUILD_TARGETS
-$(OUTPUT): $(OFILES)
+$(OUTPUT): $(OFILES) $(SLIBS)
 	$(SILENTCMD)$(CC) $(OFILES) $(LDFLAGS) $(CFLAGS) $(LIBS) -o $(OUTPUT)
+
+libxmp-lite.a:
+	cp $(TOPLEVEL)/$(LIBXMP)/lib/libxmp-lite.a $(CURDIR)
 endef
 
 #---------------------------------------------------------------------------------
