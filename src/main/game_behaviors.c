@@ -2,7 +2,7 @@
 #include <tonc_input.h>
 #include <tonc_video.h>
 #include <assert.h>
-#include <maxmod.h>
+#include <modplay.h>
 #include <data/music.h>
 
 #include "dialogue.h"

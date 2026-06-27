@@ -1,6 +1,6 @@
 #include <string.h>
 #include <tonc.h>
-#include <maxmod.h>
+#include <modplay.h>
 
 #include <data/music.h>
 #include <data/graphics/game_logo_gfx.h>
@@ -172,13 +172,13 @@ static void scene_load(uintptr_t data)
         // }
     }
 
-    mmStart(MOD_SAC08, MM_PLAY_LOOP);
-    mmSetModuleVolume((int)(1024 * 0.3));
+    mplay_start(MOD_SAC08, true);
+    mplay_set_volume((int)(1024 * 0.3));
 }
 
 static void scene_unload(void)
 {
-    mmStop();
+    mplay_stop();
     gfx_text_bmap_clear(0, 0, GFX_TEXT_BMP_COLS, GFX_TEXT_BMP_ROWS);
     gfx_text_bmap_dst_clear(0, SCREEN_HEIGHT_T);
 }

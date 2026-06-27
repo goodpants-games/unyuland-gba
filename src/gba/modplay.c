@@ -24,6 +24,8 @@ struct
 __attribute((aligned(4)))
 static u8 mm_mixing_buf[MM_MIXLEN_16KHZ];
 
+static mplay_event_handler_f s_ev_handler = NULL;
+
 
 void mplay_init(void)
 {
@@ -65,7 +67,7 @@ ARM_FUNC void mplay_vblank_handler(void)
     mmFrame();
 }
 
-void mplay_start(uint module_id, bool loop)
+void mplay_start(mp_uint module_id, mp_bool loop)
 {
     mmStart(module_id, loop ? MM_PLAY_LOOP : MM_PLAY_ONCE);
 }
@@ -90,17 +92,39 @@ bool mplay_is_active(void)
     return mmActive();
 }
 
-void mplay_set_volume(uint volume)
+void mplay_set_volume(mp_uint volume)
 {
     mmSetModuleVolume(volume);
 }
 
-void mplay_sub_start(uint module_id)
+void mplay_sub_start(mp_uint module_id)
 {
     mmJingle(module_id);
 }
 
-void mplay_set_sub_volume(uint volume)
+void mplay_set_sub_volume(mp_uint volume)
 {
     mmSetJingleVolume(volume);
+}
+
+static mm_word mm_event_handler(mm_word msg, mm_word param)
+{
+    switch (msg)
+    {
+    case MMCB_SONGFINISHED:
+        s_ev_handler(MP_MSG_SONG_FINISHED, param);
+        break;
+    }
+
+    return 0;
+}
+
+void mplay_set_event_handler(mplay_event_handler_f handler)
+{
+    s_ev_handler = handler;
+
+    if (handler)
+        mmSetEventHandler(mm_event_handler);
+    else
+        mmSetEventHandler(NULL);
 }

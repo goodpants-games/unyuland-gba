@@ -1,6 +1,6 @@
 #include <limits.h>
 #include <tonc.h>
-#include <maxmod.h>
+#include <modplay.h>
 
 #include <data/sprites/game_sprdb.h>
 #include <data/graphics/tileset_gfx.h>
@@ -282,7 +282,7 @@ static void pause_game(void)
 {
     state.substate = SUBSTATE_PAUSED;
     open_pause_menu();
-    mmSetModuleVolume((int)(1024 * 0.1));
+    mplay_set_volume((int)(1024 * 0.1));
     gfx_set_palette_multiplied(PAUSE_PALETTE_MUL);
 }
 
@@ -290,7 +290,7 @@ static void unpause_game(void)
 {
     state.substate = SUBSTATE_NORMAL;
     close_pause_menu();
-    mmSetModuleVolume((int)(1024 * 0.3));
+    mplay_set_volume((int)(1024 * 0.3));
     gfx_set_palette_multiplied(FIX_ONE);
 }
 

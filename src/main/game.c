@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <tonc.h>
 #include <string.h>
-#include <maxmod.h>
+#include <modplay.h>
 #include <platutil.h>
 
 #include <data/world.h>
@@ -601,7 +601,7 @@ void game_init(void)
 
 void game_deinit()
 {
-    mmStop();
+    mplay_stop();
 }
 
 void game_update(void)
@@ -621,7 +621,7 @@ void game_update(void)
     if (g_game.did_jingle_finish)
     {
         g_game.did_jingle_finish = false;
-        mmResume();
+        mplay_resume();
     }
 
     entity_s *player = &g_game.entities[0];
@@ -788,9 +788,9 @@ void game_load_room(const world_room_s *room)
 
     if (g_game.cur_music != room->music)
     {
-        mmStop();
+        mplay_stop();
         g_game.cur_music = room->music;
-        mmStart(g_game.cur_music, MM_PLAY_LOOP);
+        mplay_start(g_game.cur_music, true);
     }
 }
 
@@ -1005,29 +1005,27 @@ void game_reset_player_pos(void)
     player->pos.y = g_game.room_player_y;
 }
 
-static mm_word mm_event_handler(mm_word msg, mm_word param)
+static void mplay_event_handler(mp_msg_e msg, mp_int param)
 {
     LOG_DBG("maxmod event: %i, %i", msg, param);
 
     switch (msg)
     {
-    case MMCB_SONGFINISHED:
+    case MP_MSG_SONG_FINISHED:
         if (param == 1)
         {
             g_game.did_jingle_finish = true;
-            mmSetEventHandler(NULL);
+            mplay_set_event_handler(NULL);
         }
         break;
     }
-
-    return 0;
 }
 
 void game_play_jingle(int module_idx)
 {
-    mmPause();
-    mmJingle(module_idx);
-    mmSetEventHandler(mm_event_handler);
+    mplay_pause();
+    mplay_sub_start(module_idx);
+    mplay_set_event_handler(mplay_event_handler);
 }
 
 static void change_room(const world_room_s *new_room)
