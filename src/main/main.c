@@ -1,5 +1,6 @@
 #include <tonc.h>
 #include <modplay.h>
+#include <psg_ctl.h>
 #include <platutil.h>
 
 #include "gfx.h"
@@ -16,7 +17,7 @@ void platform_app_init(void)
 #ifdef PLATFORM_GBA
     irq_init(NULL);
     irq_add(II_VBLANK, mplay_vblank_handler);
-    irq_add(II_HBLANK, snd_irq_hblank);
+    irq_add(II_HBLANK, psg_irq_hblank);
 #endif
 
     gfx_init();

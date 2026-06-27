@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <tonc.h>
 #include <platutil.h>
+#include <psg_ctl.h>
 
 #include <data/pitchlut_bin.h>
 #include <data/wave_tri_bin.h>
@@ -40,12 +41,10 @@ static u16 reg_ctl_vals[4][TICKS_PER_FRAME];
 static u16 reg_freq_vals[4][TICKS_PER_FRAME];
 static u16 reg_dmgctl_vals[TICKS_PER_FRAME];
 static u16 reg_wav_sel_vals[TICKS_PER_FRAME];
-static uint frame_tick_idx = 0;
-static uint scanline_wait = 0;
-
-#define SCANLINE_WAIT_RESET (228 / TICKS_PER_FRAME)
 
 #define pitch_lut ((const FIXED *)pitchlut_bin)
+
+ARM_FUNC static void tick_callback(int frame_tick_idx);
 
 void snd_init(void)
 {
@@ -69,6 +68,8 @@ void snd_init(void)
     REG_SND3SEL = SWAV_SEL_BANK(1) | SWAV_SEL_DIM(0);
     memcpy32((void *)REG_WAVE_RAM, wave_tri_bin, 4);
     REG_SND3SEL = SWAV_SEL_BANK(0) | SWAV_SEL_DIM(0);
+
+    psg_init(TICKS_PER_FRAME, tick_callback);
 }
 
 static bool proc_snd_slot(snd_slot_s *slot)
@@ -343,10 +344,7 @@ void snd_frame(void)
     for (uint i = 0; i < TICKS_PER_FRAME; ++i)
         snd_tick(i);
 
-    scanline_wait = 0;
-    frame_tick_idx = 0;
-    snd_irq_hblank();
-    // snd_timer_irq();
+    psg_frame();
 }
 
 void snd_play(snd_id_e id)
@@ -394,11 +392,8 @@ void snd_play_no_overlap(snd_id_e id)
 }
 
 ARM_FUNC
-void snd_irq_hblank(void)
-{    
-    if (frame_tick_idx == TICKS_PER_FRAME) return;
-    if (scanline_wait-- != 0) return;
-
+static void tick_callback(int frame_tick_idx)
+{
     REG_SNDDMGCNT = reg_dmgctl_vals[frame_tick_idx];
     REG_SND1CNT   = reg_ctl_vals[0][frame_tick_idx];
     REG_SND1FREQ  = reg_freq_vals[0][frame_tick_idx];
@@ -409,7 +404,4 @@ void snd_irq_hblank(void)
     REG_SND3FREQ  = reg_freq_vals[2][frame_tick_idx];
     REG_SND4CNT   = reg_ctl_vals[3][frame_tick_idx];
     REG_SND4FREQ  = reg_freq_vals[3][frame_tick_idx];
-
-    ++frame_tick_idx;
-    scanline_wait = SCANLINE_WAIT_RESET;
 }
