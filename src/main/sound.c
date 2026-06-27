@@ -44,7 +44,8 @@ static u16 reg_wav_sel_vals[TICKS_PER_FRAME];
 
 #define pitch_lut ((const FIXED *)pitchlut_bin)
 
-ARM_FUNC static void tick_callback(int frame_tick_idx);
+static void calc_tick(uint tick_idx);
+ARM_FUNC static void apply_tick(uint frame_tick_idx);
 
 void snd_init(void)
 {
@@ -69,7 +70,12 @@ void snd_init(void)
     memcpy32((void *)REG_WAVE_RAM, wave_tri_bin, 4);
     REG_SND3SEL = SWAV_SEL_BANK(0) | SWAV_SEL_DIM(0);
 
-    psg_init(TICKS_PER_FRAME, tick_callback);
+    psg_init(&(psg_init_params_s)
+    {
+        .ticks_per_frame = TICKS_PER_FRAME,
+        .tick_calc = calc_tick,
+        .tick_apply = apply_tick,
+    });
 }
 
 static bool proc_snd_slot(snd_slot_s *slot)
@@ -226,7 +232,51 @@ static void stop_sound(snd_slot_s *slot)
     --next_snd_slot;
 }
 
-static void snd_tick(uint tick_idx)
+void snd_play(snd_id_e id)
+{
+    if (!snd_sounds[id]) return;
+    if (next_snd_slot == MAX_ACTIVE_SOUNDS) return;
+    
+    snd_slot_s *slot = snd_slots + next_snd_slot++;
+    *slot = (snd_slot_s)
+    {
+        .flags = SND_SLOT_FLAG_ACTIVE,
+        .sound_id = id,
+        .ip = snd_sounds[id]
+    };
+    
+    if (!proc_snd_slot(slot))
+        stop_sound(slot);
+}
+
+void snd_play_no_overlap(snd_id_e id)
+{
+    // don't play sound if an active sound slot using the same ID was found
+    const uint e = next_snd_slot;
+    snd_slot_s *slot_cut;
+    for (uint i = 0; i < e; ++i)
+    {
+        slot_cut = snd_slots + i;
+        if (slot_cut->sound_id == id)
+        {
+            *slot_cut = (snd_slot_s)
+            {
+                .flags = SND_SLOT_FLAG_ACTIVE,
+                .sound_id = id,
+                .ip = snd_sounds[id]
+            };
+            
+            if (!proc_snd_slot(slot_cut))
+                stop_sound(slot_cut);
+
+            return;
+        }
+    }
+
+    snd_play(id);
+}
+
+static void calc_tick(uint tick_idx)
 {
     static snd_slot_s *last_channel_slot[4] = { NULL, NULL, NULL, NULL };
     static u8 last_channel_vol[4] = { 0, 0, 0, 0 };
@@ -339,60 +389,8 @@ static void snd_tick(uint tick_idx)
     }
 }
 
-void snd_frame(void)
-{
-    for (uint i = 0; i < TICKS_PER_FRAME; ++i)
-        snd_tick(i);
-
-    psg_frame();
-}
-
-void snd_play(snd_id_e id)
-{
-    if (!snd_sounds[id]) return;
-    if (next_snd_slot == MAX_ACTIVE_SOUNDS) return;
-    
-    snd_slot_s *slot = snd_slots + next_snd_slot++;
-    *slot = (snd_slot_s)
-    {
-        .flags = SND_SLOT_FLAG_ACTIVE,
-        .sound_id = id,
-        .ip = snd_sounds[id]
-    };
-    
-    if (!proc_snd_slot(slot))
-        stop_sound(slot);
-}
-
-void snd_play_no_overlap(snd_id_e id)
-{
-    // don't play sound if an active sound slot using the same ID was found
-    const uint e = next_snd_slot;
-    snd_slot_s *slot_cut;
-    for (uint i = 0; i < e; ++i)
-    {
-        slot_cut = snd_slots + i;
-        if (slot_cut->sound_id == id)
-        {
-            *slot_cut = (snd_slot_s)
-            {
-                .flags = SND_SLOT_FLAG_ACTIVE,
-                .sound_id = id,
-                .ip = snd_sounds[id]
-            };
-            
-            if (!proc_snd_slot(slot_cut))
-                stop_sound(slot_cut);
-
-            return;
-        }
-    }
-
-    snd_play(id);
-}
-
 ARM_FUNC
-static void tick_callback(int frame_tick_idx)
+static void apply_tick(uint frame_tick_idx)
 {
     REG_SNDDMGCNT = reg_dmgctl_vals[frame_tick_idx];
     REG_SND1CNT   = reg_ctl_vals[0][frame_tick_idx];

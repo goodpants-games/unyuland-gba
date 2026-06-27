@@ -105,10 +105,8 @@ typedef enum snd_id
 } snd_id_e;
 
 void snd_init(void);
-void snd_frame(void);
 void snd_play(snd_id_e id);
 void snd_play_no_overlap(snd_id_e id);
-ARM_FUNC void snd_irq_hblank(void);
 
 //
 // 0110xxxxxx------

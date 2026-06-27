@@ -42,7 +42,6 @@ void platform_app_frame(void)
     #endif
 
     gfx_new_frame();
-    snd_frame();
 
     key_poll();
     scenemgr_frame();

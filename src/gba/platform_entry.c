@@ -1,4 +1,5 @@
-#include <tonc_bios.h>
+#include <tonc.h>
+#include <psg_ctl.h>
 
 void platform_app_init(void);
 void platform_app_frame(void);
@@ -10,6 +11,7 @@ int main()
     while (true)
     {
         VBlankIntrWait();
+        psg_frame_start();
         platform_app_frame();
     }
 
