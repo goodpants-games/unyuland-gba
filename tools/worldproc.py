@@ -235,7 +235,7 @@ extern const u8 world_matrix[WORLD_MATRIX_HEIGHT][WORLD_MATRIX_WIDTH];
 #endif""")
     
     with open(fc_path, 'w') as fc:
-        fc.write("#include <data/soundbank.h>\n")
+        fc.write("#include <data/music.h>\n")
         fc.write("#include \"world.h\"\n")
         fc.write("\n")
 

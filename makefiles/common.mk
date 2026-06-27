@@ -27,7 +27,7 @@ ifeq ($(origin BUILD), undefined)
 endif
 
 SOURCES		:= $(SOURCES) src/main
-INCLUDES	:= $(INCLUDES) src/main
+INCLUDES	:= $(INCLUDES) src/main src/include
 DATA		:= data/bin
 MUSIC		:= data/music
 GRAPHICS	:= data/graphics
@@ -70,8 +70,19 @@ SPRFILES	:=	$(foreach dir,$(SPRITES),$(wildcard $(dir)/*.sprdb))
 BINFILES	:=	$(foreach dir,$(DATA),$(wildcard $(dir)/*.*))
 
 ifneq ($(strip $(MUSIC)),)
-	export AUDIOFILES := $(foreach dir,$(notdir $(wildcard $(MUSIC)/*.*)),$(CURDIR)/$(MUSIC)/$(dir))
-	BINFILES += data/soundbank.bin
+  MODEXTS := .mod .xm
+  export AUDIOFILES := $(foreach dir,$(MUSIC),\
+                         $(foreach ext,$(MODEXTS),\
+				           $(wildcard $(dir)/*$(ext))))
+
+  ifeq ($(AUDIO_DRIVER),mm)
+    SOUNDBANK := data/mm_soundbank.bin.o
+  endif
+
+  ifeq ($(AUDIO_DRIVER),mpt)
+    BINFILES  += $(addsuffix .bin,$(basename $(AUDIOFILES)))
+	SOUNDBANK := data/mpt_data.o
+  endif
 endif
 
 BINFILES += data/sinelut.bin data/dlg.bin data/pitchlut.bin data/wave_tri.bin\
@@ -106,8 +117,9 @@ export OFILES_SPRITES := $(addsuffix _sprdb.bin.o,$(SPRFILES:.sprdb=))\
 
 export OFILES_INTERMEDIATE :=
 
-export OFILES := $(OFILES_BIN) $(OFILES_GRAPHICS) $(OFILES_INTERMEDIATE)\
-                 $(OFILES_MAPS) $(OFILES_SPRITES) $(OFILES_SOURCES)
+export OFILES := $(OFILES_BIN) $(SOUNDBANK) $(OFILES_GRAPHICS)\
+                 $(OFILES_INTERMEDIATE) $(OFILES_MAPS) $(OFILES_SPRITES)\
+				 $(OFILES_SOURCES)
 
 export INCLUDE	:=	$(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
 					$(foreach dir,$(LIBDIRS),-I$(dir)/include) \
@@ -197,13 +209,41 @@ ifeq ($(origin bin2o), undefined)
   endef
 endif
 
+
+ifeq ($(AUDIO_DRIVER),mm)
 #---------------------------------------------------------------------------------
 # rule to build soundbank from music files
 #---------------------------------------------------------------------------------
-data/soundbank.bin data/soundbank.h : $(AUDIOFILES)
+data/mm_soundbank.bin data/mm_soundbank.h data/music.h : $(AUDIOFILES)
 #---------------------------------------------------------------------------------
 	@mkdir -p $(dir $@)
-	$(SILENTCMD)mmutil $^ -odata/soundbank.bin -hdata/soundbank.h
+	$(SILENTCMD)mmutil $^ -odata/mm_soundbank.bin -hdata/mm_soundbank.h
+	$(SILENTCMD)$(PYTHON) $(TOPLEVEL)/tools/modidx.py\
+	  -t mm $(AUDIOFILES) -o data/music.h
+
+endif
+
+ifeq ($(AUDIO_DRIVER),mpt)
+#---------------------------------------------------------------------------------
+data/mpt_data.c data/music.h : $(AUDIOFILES)
+#---------------------------------------------------------------------------------
+	@mkdir -p $(dir $@)
+	$(SILENTCMD)$(PYTHON) $(TOPLEVEL)/tools/modidx.py\
+	  -t mpt --mpt-bank data/mpt_data.c $(AUDIOFILES) -o data/music.h
+
+endif
+
+#---------------------------------------------------------------------------------
+# rules to copy music files to the build directory with the .bin extension
+#---------------------------------------------------------------------------------
+%.bin: %.xm
+	@mkdir -p $(dir $@)
+	$(SILENTCMD)cp $< $@
+
+#---------------------------------------------------------------------------------
+%.bin: %.mod
+	@mkdir -p $(dir $@)
+	$(SILENTCMD)cp $< $@
 
 #---------------------------------------------------------------------------------
 # This rule links in binary data with the .bin extension
@@ -267,6 +307,7 @@ data/world.json data/world.c data/world.h data/automap.bin: $(MAPFILES) $(TOPLEV
 #---------------------------------------------------------------------------------
 data/sinelut.bin:
 #---------------------------------------------------------------------------------
+	@mkdir -p $(dir $@)
 	$(SILENTCMD)$(PYTHON) $(TOPLEVEL)/tools/sinelut.py $@
 
 #---------------------------------------------------------------------------------
@@ -274,6 +315,7 @@ data/sinelut.bin:
 #---------------------------------------------------------------------------------
 data/dlg.bin: $(TOPLEVEL)/data/dialogue.json $(TOPLEVEL)/tools/dlgc.py
 #---------------------------------------------------------------------------------
+	@mkdir -p $(dir $@)
 	$(SILENTCMD)$(PYTHON) $(TOPLEVEL)/tools/dlgc.py $< $@
 
 #---------------------------------------------------------------------------------
@@ -281,6 +323,7 @@ data/dlg.bin: $(TOPLEVEL)/data/dialogue.json $(TOPLEVEL)/tools/dlgc.py
 #---------------------------------------------------------------------------------
 data/pitchlut.bin: $(TOPLEVEL)/tools/pitchlut.py
 #---------------------------------------------------------------------------------
+	@mkdir -p $(dir $@)
 	$(SILENTCMD)$(PYTHON) $(TOPLEVEL)/tools/pitchlut.py $@
 
 #---------------------------------------------------------------------------------
@@ -288,6 +331,7 @@ data/pitchlut.bin: $(TOPLEVEL)/tools/pitchlut.py
 #---------------------------------------------------------------------------------
 data/wave_tri.bin: $(TOPLEVEL)/tools/wavetable.py
 #---------------------------------------------------------------------------------
+	@mkdir -p $(dir $@)
 	$(SILENTCMD)$(PYTHON) $(TOPLEVEL)/tools/wavetable.py -w triangle $@
 
 #---------------------------------------------------------------------------------
@@ -295,6 +339,7 @@ data/wave_tri.bin: $(TOPLEVEL)/tools/wavetable.py
 #---------------------------------------------------------------------------------
 data/wave_noise.bin: $(TOPLEVEL)/tools/wavetable.py
 #---------------------------------------------------------------------------------
+	@mkdir -p $(dir $@)
 	$(SILENTCMD)$(PYTHON) $(TOPLEVEL)/tools/wavetable.py -w noise $@
 
 # make likes to delete intermediate files. This prevents it from deleting the

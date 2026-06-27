@@ -3,7 +3,7 @@
 #include <tonc_video.h>
 #include <assert.h>
 #include <maxmod.h>
-#include <data/soundbank.h>
+#include <data/music.h>
 
 #include "dialogue.h"
 #include "game.h"

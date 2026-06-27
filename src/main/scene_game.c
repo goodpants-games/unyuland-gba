@@ -6,7 +6,7 @@
 #include <data/graphics/tileset_gfx.h>
 #include <data/graphics/automap_tiles_gfx.h>
 #include <data/graphics/sky_bg1_gfx.h>
-#include <data/soundbank.h>
+#include <data/music.h>
 #include <data/world.h>
 
 #include "game.h"

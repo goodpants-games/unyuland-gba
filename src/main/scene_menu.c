@@ -2,7 +2,7 @@
 #include <tonc.h>
 #include <maxmod.h>
 
-#include <data/soundbank.h>
+#include <data/music.h>
 #include <data/graphics/game_logo_gfx.h>
 
 #include "scenes.h"
