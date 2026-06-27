@@ -2,10 +2,17 @@
 #define MODPLAY_H
 
 #include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 
-typedef unsigned int mp_uint;
 typedef int          mp_int;
+typedef unsigned int mp_uint;
+typedef uint32_t     mp_u32;
+typedef int32_t      mp_s32;
+typedef uint16_t     mp_u16;
+typedef int16_t      mp_s16;
 typedef bool         mp_bool;
+typedef size_t       mp_size;
 
 typedef enum
 {
@@ -19,6 +26,12 @@ void mplay_init(void);
 #ifdef PLATFORM_GBA
 __attribute__((section(".iwram"), long_call, target("arm")))
 void mplay_vblank_handler(void);
+#endif
+
+#ifdef PLATFORM_PC
+void mplay_set_sample_rate(mp_uint sample_rate);
+void mplay_render(mp_s16 *data, mp_size frame_count);
+void mplay_deinit(void);
 #endif
 
 void mplay_start(mp_uint module_id, mp_bool loop);

@@ -32,13 +32,16 @@ def gen_libopenmpt(out, paths: list[str], mpt_c_path: str):
             symbol_name = mod_name,
             bin_include = f"#include <{dirname}/{mod_name}_bin.h>",
         ))
+
+    mod_count = len(mod_data)
     
     # write public header containing module identifiers
     out.write("#pragma once\n\n")
     out.write("typedef enum {\n")
     for data in mod_data:
         out.write(f"    MOD_{data.symbol_name.upper()},\n")
-    out.write("} module_id_e;\n")
+    out.write("} module_id_e;\n\n")
+    out.write(f"#define MODDAT_NSONGS {mod_count}\n")
 
     # write source file defining the module list 
     with ioutil.open_output(mpt_c_path) as mpt_out_c:
@@ -48,8 +51,6 @@ def gen_libopenmpt(out, paths: list[str], mpt_c_path: str):
             mpt_out_c.write(data.bin_include)
             mpt_out_c.write("\n")
         mpt_out_c.write("\n")
-
-        mod_count = len(mod_data)
 
         mpt_out_c.write(f"const void *const mpt_module_banks[{mod_count}] = {{\n")
         for data in mod_data:
@@ -65,7 +66,9 @@ def gen_libopenmpt(out, paths: list[str], mpt_c_path: str):
 
 
 def gen_maxmod(out, paths: list[str]):
+    out.write("#pragma once\n")
     out.write("#include <data/mm_soundbank.h>\n")
+    out.write("#define MODDAT_NSONGS MSL_NSONGS\n")
 
 def main() -> None:
     parser = argparse.ArgumentParser('modidx')

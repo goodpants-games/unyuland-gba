@@ -18,6 +18,7 @@
 #endif
 
 #include <tonc_video.h>
+#include <modplay.h>
 #include "display.h"
 
 #define WINDOW_SCALE 3
@@ -33,8 +34,6 @@ static SDL_AudioStream *s_astream = NULL;
 static SDL_GLContext s_gl = NULL;
 
 static uint s_key_input = 0x3FF;
-
-static float s_sine_phase = 0.0f;
 
 struct gfx_state
 {
@@ -225,26 +224,11 @@ static uint get_key_input_flag(SDL_Keycode key)
 
 static void audio_update(void)
 {
-    const int min_audio = (SAMPLE_RATE * sizeof(float)) / 4;
+    const int min_audio = (SAMPLE_RATE * sizeof(float)) * 0.1;
     while (SDL_GetAudioStreamQueued(s_astream) < min_audio)
     {
-        static s16 samples[512];
-
-        for (int i = 0; i < 512; i += 2)
-        {
-            float smp = sinf(s_sine_phase * (float)PI * 2) * 0.2f;
-            s_sine_phase += 440.0f / SAMPLE_RATE;
-            s_sine_phase = fmodf(s_sine_phase, 1.0f);
-
-            if      (smp < -1.0) smp = -1.0;
-            else if (smp > 1.0) smp = 1.0;
-            float smp01 = (smp + 1.f) / 2.f;
-            s16 smp_s16 = (s16)((INT16_MAX - INT16_MIN) * smp01 + INT16_MIN);
-
-            samples[i+0] = smp_s16;
-            samples[i+1] = smp_s16;
-        }
-
+        static s16 samples[64 * 2];
+        mplay_render(samples, 64);
         SDL_PutAudioStreamData(s_astream, samples, sizeof(samples));
     }
 }
@@ -313,6 +297,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     }
 
     SDL_ResumeAudioStreamDevice(s_astream);
+
+    mplay_set_sample_rate(SAMPLE_RATE);
 
     SDL_GL_MakeCurrent(s_window, s_gl);
     SDL_GL_SetSwapInterval(1);
@@ -442,4 +428,6 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
     glDeleteBuffers(1, &s_gfx_state.display_quad);
     glDeleteBuffers(1, &s_gfx_state.display_quad);
     glDeleteProgram(s_gfx_state.display_prog);
+
+    mplay_deinit();
 }

@@ -13,7 +13,7 @@ INCLUDES := src/pc/include
 #---------------------------------------------------------------------------------
 # any extra libraries we wish to link with the project
 #---------------------------------------------------------------------------------
-LIBNAMES     := sdl3
+LIBNAMES     := sdl3 libopenmpt
 LIBS         := $(shell $(PKGCONF) --libs $(LIBNAMES))
 AUDIO_DRIVER := mpt
 
