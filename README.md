@@ -38,9 +38,11 @@ Additional prerequisites:
 export PKGCONF=pkgconf
 
 # compile libxmp
+# only needs to be run once (or if you modify libxmp)
 cd third_party/libxmp
 ./configure --disable-shared --disable-it --enable-static
 make
+cd ../..
 
 mkdir buildpc
 
@@ -48,4 +50,29 @@ mkdir buildpc
 # SDL3 and libopenmpt dependencies will be located using pkg-config. If you are
 # on Windows, you can install them through the MSYS2 package manager.
 make pc
+```
+
+### WebAssembly
+Additional prerequisities:
+- Emscripten
+- (Still need devkitPro)
+
+```bash
+# i don't think libxmp's configure script will work properly without setting
+# these
+export CC=emcc
+export CXX=em++
+export AR=emar
+
+# compile libxmp
+# only needs to be run once (or if you modify libxmp)
+cd third_party/libxmp
+./configure --disable-shared --disable-it --enable-static
+make
+cd ../..
+
+mkdir buildweb
+
+# creates web/game.js and web/game.html, relative to the project directory.
+make web
 ```
