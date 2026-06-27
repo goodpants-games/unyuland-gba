@@ -38,8 +38,8 @@ define BUILD_TARGETS
 $(OUTPUT).js: $(OFILES) $(SLIBS)
 	$(SILENTCMD)$(CC) $(OFILES) $(LDFLAGS) $(CFLAGS) $(LIBS) $(SLIBS) -o $(OUTPUT).js
 
-libxmp-lite.a:
-	cp $(TOPLEVEL)/$(LIBXMP)/lib/libxmp-lite.a $(CURDIR)
+libxmp-lite.a: $(TOPLEVEL)/$(LIBXMP)/lib/libxmp-lite.a
+	$(SILENTCMD)cp $(TOPLEVEL)/$(LIBXMP)/lib/libxmp-lite.a $(CURDIR)
 endef
 
 #---------------------------------------------------------------------------------
