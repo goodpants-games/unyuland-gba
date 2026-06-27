@@ -161,15 +161,15 @@ void mplay_render(mp_s16 *data, mp_size frame_count)
     }
 
     // post-process: "convert" to 9-bit audio
-    mp_s16 *p = data;
-    for (mp_size i = 0; i < frame_count; ++i, p += 2)
-    {
-        p[0] = (p[0] - 64) / 128;
-        p[1] = (p[1] - 64) / 128;
+    // mp_s16 *p = data;
+    // for (mp_size i = 0; i < frame_count; ++i, p += 2)
+    // {
+    //     p[0] = (p[0] - 64) / 128;
+    //     p[1] = (p[1] - 64) / 128;
 
-        p[0] = CLAMP(p[0], INT8_MIN, INT8_MAX+1) * 128;
-        p[1] = CLAMP(p[1], INT8_MIN, INT8_MAX+1) * 128;
-    }
+    //     p[0] = CLAMP(p[0], INT8_MIN, INT8_MAX+1) * 128;
+    //     p[1] = CLAMP(p[1], INT8_MIN, INT8_MAX+1) * 128;
+    // }
 }
 
 void mplay_pause(void)

@@ -18,12 +18,14 @@
 #endif
 
 #include <tonc_video.h>
+#include <tonc_math.h>
 #include <modplay.h>
+#include <psg_ctl.h>
 #include "display.h"
+#include "audioutil.h"
 
 #define WINDOW_SCALE 3
-#define SAMPLE_RATE 32768
-#define PI 3.14159265358979323846264338327950288419
+#define SAMPLE_RATE 48000//32768
 
 // these functions are defined by src/main/main.c
 void platform_app_init(void);
@@ -32,6 +34,7 @@ void platform_app_frame(void);
 static SDL_Window *s_window = NULL;
 static SDL_AudioStream *s_astream = NULL;
 static SDL_GLContext s_gl = NULL;
+static double s_asamp_accum[2] = { 0.0, 0.0 };
 
 static uint s_key_input = 0x3FF;
 
@@ -224,13 +227,47 @@ static uint get_key_input_flag(SDL_Keycode key)
 
 static void audio_update(void)
 {
+    #define FRAME_COUNT 64
+    #define NCHANNELS 2
     const int min_audio = (SAMPLE_RATE * sizeof(float)) * 0.1;
     while (SDL_GetAudioStreamQueued(s_astream) < min_audio)
     {
-        static s16 samples[64 * 2];
-        mplay_render(samples, 64);
+        static s16 samples[FRAME_COUNT * NCHANNELS];
+        static s16 mplay_samples[FRAME_COUNT * NCHANNELS];
+        static s16 psg_samples[FRAME_COUNT * NCHANNELS];
+
+        mplay_render(mplay_samples, FRAME_COUNT);
+        psg_render(psg_samples, FRAME_COUNT);
+
+        const double sample_len = 1.0 / SAMPLE_RATE;
+
+        for (size_t i = 0; i < FRAME_COUNT * NCHANNELS; i += 2)
+        {
+            samples[i+0] = mplay_samples[i+0] + psg_samples[i+0];
+            samples[i+1] = mplay_samples[i+1] + psg_samples[i+1];
+
+            // post-process: "convert" to 9-bit audio
+            samples[i+0] = (samples[i+0] - 64) / 128;
+            samples[i+0] = CLAMP(samples[i+0], INT8_MIN, INT8_MAX+1) * 128;
+            samples[i+1] = (samples[i+1] - 64) / 128;
+            samples[i+1] = CLAMP(samples[i+1], INT8_MIN, INT8_MAX+1) * 128;
+
+            // dc offset normlization
+            double sf0 = smpconv_s16_f64(samples[i+0]);
+            double sf1 = smpconv_s16_f64(samples[i+1]);
+
+            s_asamp_accum[0] += (-0.99 * s_asamp_accum[0] + sf0) * sample_len * 20.0;
+            s_asamp_accum[1] += (-0.99 * s_asamp_accum[1] + sf1) * sample_len * 20.0;
+
+            samples[i+0] -= smpconv_f64_s16(s_asamp_accum[0]);
+            samples[i+1] -= smpconv_f64_s16(s_asamp_accum[1]);
+        }
+
         SDL_PutAudioStreamData(s_astream, samples, sizeof(samples));
     }
+
+    #undef FRAME_COUNT
+    #undef NCHANNELS
 }
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
@@ -299,6 +336,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     SDL_ResumeAudioStreamDevice(s_astream);
 
     mplay_set_sample_rate(SAMPLE_RATE);
+    psg_set_sample_rate(SAMPLE_RATE);
 
     SDL_GL_MakeCurrent(s_window, s_gl);
     SDL_GL_SetSwapInterval(1);
