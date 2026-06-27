@@ -15,6 +15,7 @@
 
 - pc port: make refreshrate-independent
   (dt accumulator method with timestep snapping)
+- pc port: add frame time display
 
 b05: player scared to go down Hole.
 player should be able to do a jig when hold down (very important)
