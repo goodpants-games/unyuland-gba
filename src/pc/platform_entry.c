@@ -298,11 +298,9 @@ static void audio_update(void)
         {
             // 8-bit samples are converted to clamped 10-bit samples. also,
             // apply REG_SNDDSCNT volume control
-            // also apply an additional multiplication by two, because I swear
-            // the libxmp module output is too quiet compared to maxmod.
-            int dsa = mplay_samples[i+1] << (2 + dsa_mix);
+            int dsa = mplay_samples[i+1] << (1 + dsa_mix);
             dsa = CLAMP(dsa, -0x200, 0x1FF);
-            int dsb = mplay_samples[i+0] << (2 + dsb_mix);
+            int dsb = mplay_samples[i+0] << (1 + dsb_mix);
             dsb = CLAMP(dsb, -0x200, 0x1FF);
 
             s16 psg0 = psg_samples[i+0];

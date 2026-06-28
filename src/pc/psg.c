@@ -5,6 +5,7 @@
 #include "psg_ctl.h"
 #include <log.h>
 #include "audioutil.h"
+#include "tonc_memdef.h"
 #include "tonc_memmap.h"
 
 
@@ -89,13 +90,13 @@ void psg_render(int16_t *out, size_t frame_count)
             0.125, 0.25, 0.50, 0.75
         };
 
-        bool    sqr_l   [2];
-        bool    sqr_r   [2];
-        bool    sqr_on  [2];
-        int16_t sqr_vol [2][2];
-        double  sqr_duty[2];
-        double  sqr_freq[2];
-        double  sqr_phdt[2];
+        bool     sqr_l   [2];
+        bool     sqr_r   [2];
+        bool     sqr_on  [2];
+        uint16_t sqr_vol [2][2];
+        double   sqr_duty[2];
+        double   sqr_freq[2];
+        double   sqr_phdt[2];
 
         for (int i = 0; i < 2; ++i)
         {
@@ -107,21 +108,22 @@ void psg_render(int16_t *out, size_t frame_count)
             bool enable_l = REG_SNDDMGCNT & (SDMG_LSQR1 << i);
             bool enable_r = REG_SNDDMGCNT & (SDMG_RSQR1 << i);
 
-            sqr_duty[i] = pulse_duties[(*reg_snd_cnt[i] & SSQR_DUTY_MASK) >> SSQR_DUTY_SHIFT];
-            uint rate = (*reg_snd_freq[i] & SFREQ_RATE_MASK) >> SFREQ_RATE_SHIFT;
-            sqr_freq[i] = 131072.0 / (2048 - rate);
-            sqr_phdt[i] = sqr_freq[i] * s_dt_per_sample;
-
             if (*reg_snd_freq[i] & SFREQ_RESET)
             {
                 // s_ch_phase[0] = 0.0;
                 *reg_snd_freq[i] &= ~SFREQ_RESET;
             }
+
+            sqr_duty[i] = pulse_duties[(*reg_snd_cnt[i] & SSQR_DUTY_MASK) >> SSQR_DUTY_SHIFT];
+            uint rate = (*reg_snd_freq[i] & SFREQ_RATE_MASK) >> SFREQ_RATE_SHIFT;
+            sqr_freq[i] = 131072.0 / (2048 - rate);
+            sqr_phdt[i] = sqr_freq[i] * s_dt_per_sample;
+            uint16_t vol = (*reg_snd_cnt[i] & SSQR_IVOL_MASK) >> SSQR_IVOL_SHIFT;
             
             sqr_l[i] = enable_l;
             sqr_r[i] = enable_r;
-            sqr_vol[i][0] = enable_l ? 15 : 0;
-            sqr_vol[i][1] = enable_r ? 15 : 0;
+            sqr_vol[i][0] = enable_l ? vol : 0;
+            sqr_vol[i][1] = enable_r ? vol : 0;
         }
 
         uint lvol = (REG_SNDDMGCNT & SDMG_LVOL_MASK) >> SDMG_LVOL_SHIFT;

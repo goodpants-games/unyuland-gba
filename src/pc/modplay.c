@@ -57,9 +57,9 @@ static int process_module(xmp_context c, mp_uint volume, mp_bool loop,
                           mp_s8 *output, mp_uint frame_count)
 {
     // i think maxmod outputs audio at a higher amplitude, because the kick
-    // sounds more accurate to maxmod playback when 200 is the max volume factor
-    // instead of 100.
-    xmp_set_player(c, XMP_PLAYER_VOLUME, 200 * volume / VOLUME_SCALE);
+    // sounds more accurate to maxmod playback when the reference volume is
+    // higher than 100
+    xmp_set_player(c, XMP_PLAYER_VOLUME, 150 * volume / VOLUME_SCALE);
     int stat = xmp_play_buffer(c, output, frame_count * sizeof(*output) * 2,
                                loop ? 0 : 1);
 
