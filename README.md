@@ -30,7 +30,6 @@ Additional prerequisites:
 - GCC/Clang (*only* works with these compilers. You can use MSYS2 on Windows.)
 - SDL3
 - A `pkg-config` interface
-- OpenGL ES drivers
 - (And yes, you still need devkitPro, for grit.)
 
 ```bash
@@ -47,8 +46,8 @@ cd ../..
 mkdir buildpc
 
 # creates unyuland or unyuland.exe in the project directory.
-# SDL3 and libopenmpt dependencies will be located using pkg-config. If you are
-# on Windows, you can install them through the MSYS2 package manager.
+# SDL3 dependency will be located using pkg-config. If you are on Windows, you
+# can install it through the MSYS2 package manager.
 make pc
 ```
 
@@ -58,16 +57,11 @@ Additional prerequisities:
 - (Still need devkitPro)
 
 ```bash
-# i don't think libxmp's configure script will work properly without setting
-# these
-export CC=emcc
-export CXX=em++
-export AR=emar
-
 # compile libxmp
 # only needs to be run once (or if you modify libxmp)
 cd third_party/libxmp
-./configure --disable-shared --disable-it --enable-static
+./configure --disable-shared --disable-it --enable-static\
+            CC=emcc CXX=em++ AR=emar
 make
 cd ../..
 
