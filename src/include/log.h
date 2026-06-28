@@ -3,7 +3,7 @@
 
 #ifdef DEVDEBUG
 
-#include "mgba.h"
+#include <mgba.h>
 
 #define LOG_INIT() mgba_console_open()
 

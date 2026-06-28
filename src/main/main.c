@@ -2,9 +2,9 @@
 #include <modplay.h>
 #include <psg_ctl.h>
 #include <platutil.h>
+#include <log.h>
 
 #include "gfx.h"
-#include "log.h"
 #include "scenes.h"
 #include "sound.h"
 

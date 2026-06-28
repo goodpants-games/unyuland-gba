@@ -1,5 +1,5 @@
+#include <log.h>
 #include "datastruct.h"
-#include "log.h"
 
 bool pqueue_enqueue(pqueue_entry_s *queue, size_t *queue_size,
                     size_t queue_capacity, void *data, int priority)

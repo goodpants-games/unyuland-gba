@@ -3,12 +3,12 @@
 #include <string.h>
 #include <modplay.h>
 #include <platutil.h>
+#include <log.h>
 
 #include <data/world.h>
 
 #include "game.h"
 #include "game_physics.h"
-#include "log.h"
 #include "gfx.h"
 #include "math_util.h"
 

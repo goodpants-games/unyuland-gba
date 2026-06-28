@@ -9,7 +9,7 @@
 #include <libxmp-lite/xmp.h>
 
 #include <data/music.h>
-#include "../main/log.h"
+#include <log.h>
 
 extern const void *const mpt_module_banks[MODDAT_NSONGS];
 extern const size_t mpt_module_sizes[MODDAT_NSONGS];
@@ -113,7 +113,7 @@ void mplay_render(mp_s16 *data, mp_size frame_count)
 
     if (s_alloc_size != buffer_size)
     {
-        fprintf(stderr, "REALLOC MODPLAY BUFFER\n");
+        LOG_DBG("REALLOC MODPLAY BUFFER");
 
         free(s_alloc);
         s_alloc_size = buffer_size;

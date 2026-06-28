@@ -4,10 +4,10 @@
 #include <assert.h>
 #include <modplay.h>
 #include <data/music.h>
+#include <log.h>
 
 #include "dialogue.h"
 #include "game.h"
-#include "log.h"
 #include "math_util.h"
 #include "scenes.h"
 #include "sound.h"

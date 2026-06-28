@@ -2,12 +2,12 @@
 #include <tonc.h>
 #include <platutil.h>
 #include <psg_ctl.h>
+#include <log.h>
 
 #include <data/pitchlut_bin.h>
 #include <data/wave_tri_bin.h>
 #include <data/wave_noise_bin.h>
 
-#include "log.h"
 #include "math_util.h"
 #include "sound.h"
 #include "sound_table.h"

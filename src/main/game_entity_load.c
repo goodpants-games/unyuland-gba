@@ -1,7 +1,7 @@
 #include <string.h>
+#include <log.h>
 #include "game.h"
 #include "dialogue.h"
-#include "log.h"
 
 #define STR_CASE(case) else if (!strcmp(__match, (case)))
 #define STR_CASE_START(match) { const char *__match = (match); if (false) {}

@@ -1,6 +1,6 @@
 #include <tonc.h>
 #include <platutil.h>
-#include "../main/log.h"
+#include <log.h>
 
 #include "psg_ctl.h"
 

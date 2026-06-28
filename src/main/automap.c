@@ -2,6 +2,7 @@
 #include <string.h>
 #include <tonc_video.h>
 #include <tonc_input.h>
+#include <log.h>
 
 #include <data/graphics/automap_tiles_gfx.h>
 #include <data/automap_bin.h>
@@ -10,7 +11,6 @@
 
 #include "automap.h"
 #include "tonc_math.h"
-#include "log.h"
 #include "gfx.h"
 
 #define TILE_STRIDE 100

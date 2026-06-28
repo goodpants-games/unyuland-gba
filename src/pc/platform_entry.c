@@ -1,7 +1,6 @@
-#include "log.h"
 #include <stdbool.h>
 #include <stdio.h>
-#include <math.h>
+#include <log.h>
 
 #define SDL_MAIN_USE_CALLBACKS 1
 #include <SDL3/SDL.h>

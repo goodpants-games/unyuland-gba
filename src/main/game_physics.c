@@ -1,13 +1,13 @@
 #include <stdlib.h>
 #include <tonc_math.h>
 #include <tonc_types.h>
+#include <log.h>
 
 #include "game.h"
 #include "game_physics.h"
 #include "datastruct.h"
 #include "math_util.h"
 #include <platutil.h>
-#include "log.h"
 
 //------------------------------------------------------------------------------
 // declarations

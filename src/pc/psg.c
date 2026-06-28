@@ -3,7 +3,7 @@
 #include <math.h>
 
 #include "psg_ctl.h"
-#include "../main/log.h"
+#include <log.h>
 #include "audioutil.h"
 #include "tonc_memmap.h"
 

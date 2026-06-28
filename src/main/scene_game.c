@@ -1,6 +1,7 @@
 #include <limits.h>
 #include <tonc.h>
 #include <modplay.h>
+#include <log.h>
 
 #include <data/sprites/game_sprdb.h>
 #include <data/graphics/tileset_gfx.h>
@@ -11,7 +12,6 @@
 
 #include "game.h"
 #include "gfx.h"
-#include "log.h"
 #include "menu.h"
 #include "scenes.h"
 #include "automap.h"
