@@ -17,17 +17,6 @@
 #define ARPEGGIO_TICK      (2 * TICKS_PER_FRAME)
 #define MAX_ACTIVE_SOUNDS  8
 
-#define SWAV_SEL_DIM(n)    (((n) & 1) << 5)
-#define SWAV_SEL_BANK(n)   (((n) & 1) << 6)
-#define SWAV_SEL_ENABLE(n) (((n) & 1) << 7)
-#define SWAV_SEL_ON        SWAV_SEL_ENABLE(1)
-#define SWAV_SEL_OFF       SWAV_SEL_ENABLE(0)
-#define SWAV_VOL(n)        (((n) & 3) << 13)
-
-#define SLFSR_SHIFT(n) (((n) & 15) << 4)
-#define SLFSR_DIV(n)   ((n) & 7)
-#define SLFSR_WIDTH(n) (((n) & 1) << 3)
-
 EWRAM_BSS static snd_slot_s snd_slots[MAX_ACTIVE_SOUNDS];
 EWRAM_DATA static u16 next_snd_slot = 0;
 const snd_cmd *snd_sounds[SND_SOUND_COUNT];
@@ -49,6 +38,13 @@ ARM_FUNC static void apply_tick(uint frame_tick_idx);
 
 void snd_init(void)
 {
+    psg_init(&(psg_init_params_s)
+    {
+        .ticks_per_frame = TICKS_PER_FRAME,
+        .tick_calc = calc_tick,
+        .tick_apply = apply_tick,
+    });
+    
     snd_init_table();
 
     // turn sound on
@@ -60,22 +56,15 @@ void snd_init(void)
     // no sweep
     REG_SND1SWEEP = SSW_OFF;
 
-    REG_SND3SEL = SWAV_SEL_BANK(0) | SWAV_SEL_DIM(0);
+    psg_set_wavsel( SWSEL_BANK(0) | SWSEL_DIM(0) );
     // size of memcpy *should* be 4 words, but this is a remnant of a bug caused
     // by misunderstanding of the specs, and the platform place sound honestly
     // sounds better like this than when it actually works as intended.
     // it's just like the smoke graphic in mario 64...
     memcpy32((void *)REG_WAVE_RAM, wave_noise_bin, 2);
-    REG_SND3SEL = SWAV_SEL_BANK(1) | SWAV_SEL_DIM(0);
+    psg_set_wavsel( SWSEL_BANK(1) | SWSEL_DIM(0) );
     memcpy32((void *)REG_WAVE_RAM, wave_tri_bin, 4);
-    REG_SND3SEL = SWAV_SEL_BANK(0) | SWAV_SEL_DIM(0);
-
-    psg_init(&(psg_init_params_s)
-    {
-        .ticks_per_frame = TICKS_PER_FRAME,
-        .tick_calc = calc_tick,
-        .tick_apply = apply_tick,
-    });
+    psg_set_wavsel( SWSEL_BANK(0) | SWSEL_DIM(0) );
 }
 
 static bool proc_snd_slot(snd_slot_s *slot)
@@ -353,8 +342,8 @@ static void calc_tick(uint tick_idx)
         if (ch == 2)
         {
             uint bank = slot->channel_config;
-            *reg_wavsel = SWAV_SEL_ON | SWAV_SEL_BANK(bank) | SWAV_SEL_DIM(0);
-            *reg_ctl = SWAV_VOL(1);
+            *reg_wavsel = SWSEL_ON | SWSEL_BANK(bank) | SWSEL_DIM(0);
+            *reg_ctl = SWAV_IVOL(1);
             pitch0 += TO_FIXED(0.5 + 12);
         }
         else if (ch == 3)
@@ -397,7 +386,7 @@ static void apply_tick(uint frame_tick_idx)
     REG_SND1FREQ  = reg_freq_vals[0][frame_tick_idx];
     REG_SND2CNT   = reg_ctl_vals[1][frame_tick_idx];
     REG_SND2FREQ  = reg_freq_vals[1][frame_tick_idx];
-    REG_SND3SEL   = reg_wav_sel_vals[frame_tick_idx];
+    psg_set_wavsel( reg_wav_sel_vals[frame_tick_idx]);
     REG_SND3CNT   = reg_ctl_vals[2][frame_tick_idx];
     REG_SND3FREQ  = reg_freq_vals[2][frame_tick_idx];
     REG_SND4CNT   = reg_ctl_vals[3][frame_tick_idx];

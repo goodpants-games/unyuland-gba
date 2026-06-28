@@ -368,7 +368,7 @@ extern u8 tonc__mem_oam[OAM_SIZE];
 
 //! \name Channel 3: Wave player
 //\{
-#define REG_SND3SEL			*(u16*)(REG_BASE+0x0070)	//!< Channel 3 wave select
+// #define REG_SND3SEL			*(u16*)(REG_BASE+0x0070)	//!< Channel 3 wave select
 #define REG_SND3CNT			*(u16*)(REG_BASE+0x0072)	//!< Channel 3 control
 #define REG_SND3FREQ		*(u16*)(REG_BASE+0x0074)	//!< Channel 3 frequency
 //\}
