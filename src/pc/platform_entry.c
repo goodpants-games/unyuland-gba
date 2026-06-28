@@ -6,15 +6,23 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 
-#ifndef PLATFORM_WEB
-#define USE_GLAD
+// if GL_ES or GL_DESKTOP was not already defined by the build system, then
+// define it based off the given platform. although, currently, the makefile
+// does not support defining these, so the condition will always evaluate to
+// true.
+#if !(defined(GL_ES) || defined(GL_DESKTOP))
+#   ifdef PLATFORM_WEB
+#       define GL_ES
+#   else
+#       define GL_DESKTOP
+#   endif
 #endif
 
-#ifdef USE_GLAD
-#include "glad/glad.h"
-// #define GL_DEBUG
-#else
-#include <SDL3/SDL_opengles2.h>
+#if defined(GL_ES)
+#   include <SDL3/SDL_opengles2.h>
+#elif defined(GL_DESKTOP)
+#   include "glad/glad.h"
+//# define GL_DEBUG
 #endif
 
 #include <tonc_video.h>
@@ -44,11 +52,15 @@ struct gfx_state
     GLuint display_prog;
     GLuint display_quad;
     GLuint display_quad_idx;
+#ifdef GL_DESKTOP
+    GLuint vao;
+#endif
 
     u32 screen_pixels[SCREEN_WIDTH * SCREEN_HEIGHT];
 }
 static s_gfx_state;
 
+#if defined(GL_ES)
 static const char *VS_SOURCE =
     "precision mediump float;\n"
     "attribute vec2 a_position;\n"
@@ -67,6 +79,27 @@ static const char *FS_SOURCE =
     "void main() {\n"
     "   gl_FragColor = texture2D(u_texture, v_texcoord);\n"
     "}\n";
+#elif defined(GL_DESKTOP)
+static const char *VS_SOURCE =
+    "#version 330 core\n"
+    "in vec2 a_position;\n"
+    "in vec2 a_texcoord;\n"
+    "out vec2 v_texcoord;\n"
+    "uniform mat4 u_matrix;\n"
+    "void main() {\n"
+    "   v_texcoord = a_texcoord;\n"
+    "   gl_Position = u_matrix * vec4(a_position, 0.0, 1.0);\n"
+    "}\n";
+
+static const char *FS_SOURCE =
+    "#version 330 core\n"
+    "in vec2 v_texcoord;\n"
+    "out vec4 o_color;\n"
+    "uniform sampler2D u_texture;\n"
+    "void main() {\n"
+    "   o_color = texture(u_texture, v_texcoord);\n"
+    "}\n";
+#endif
 
 #ifdef GL_DEBUG
 static void gl_debug_output(GLenum source, GLenum type, GLuint id,
@@ -115,6 +148,13 @@ static void gl_debug_output(GLenum source, GLenum type, GLuint id,
 static bool gfx_state_init(void)
 {
     s_gfx_state = (struct gfx_state){0};
+
+#ifdef GL_DESKTOP
+    // OpenGL 3.3 Core requires use of a VAO, so just generate and bind a
+    // default one.
+    glGenVertexArrays(1, &s_gfx_state.vao);
+    glBindVertexArray(s_gfx_state.vao);
+#endif
 
     // create screen texture (will be software-rendered into)
     glGenTextures(1, &s_gfx_state.screen_tex);
@@ -294,7 +334,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 {
 #ifdef PLATFORM_WEB
     SDL_SetHint(SDL_HINT_EMSCRIPTEN_CANVAS_SELECTOR, "#gameCanvas");
-#elif defined(_WIN32)
+#elif defined(_WIN32) && defined(GL_ES)
     SDL_SetHint(SDL_HINT_VIDEO_FORCE_EGL, "1");
 #endif
 
@@ -304,11 +344,17 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         return SDL_APP_FAILURE;
     }
 
+#if defined(GL_ES)
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
-#ifdef GL_DEBUG
+#elif defined(GL_DESKTOP)
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+#   ifdef GL_DEBUG
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
+#   endif
 #endif
 
     const int scr_w = SCREEN_WIDTH * WINDOW_SCALE;
@@ -330,8 +376,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         return SDL_APP_FAILURE;
     }
 
-#ifdef USE_GLAD
-    if (!gladLoadGLES2Loader((void *)SDL_GL_GetProcAddress))
+#ifdef GL_DESKTOP
+    if (!gladLoadGLLoader((void *)SDL_GL_GetProcAddress))
     {
         SDL_Log("OpenGL loader failed!");
         return SDL_APP_FAILURE;
@@ -486,6 +532,9 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
     glDeleteBuffers(1, &s_gfx_state.display_quad);
     glDeleteBuffers(1, &s_gfx_state.display_quad);
     glDeleteProgram(s_gfx_state.display_prog);
+#ifdef GL_DESKTOP
+    glDeleteVertexArrays(1, &s_gfx_state.vao);
+#endif
 
     mplay_deinit();
 }
