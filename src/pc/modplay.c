@@ -93,7 +93,7 @@ void mplay_start(mp_uint module_id, mp_bool loop)
     
     if (!s_main_xmpc)
     {
-        fprintf(stderr, "mplay_start: could not start module!\n");
+        LOG_ERR("mplay_start: could not start module!");
         return;
     }
 
@@ -202,7 +202,7 @@ void mplay_sub_start(mp_uint module_id)
     
     if (!s_sub_xmpc)
     {
-        fprintf(stderr, "mplay_sub_start: could not start module!\n");
+        LOG_ERR("mplay_sub_start: could not start module!");
         return;
     }
 
