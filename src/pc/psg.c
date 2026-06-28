@@ -129,6 +129,12 @@ void psg_render(int16_t *out, size_t frame_count)
             }
         }
 
+        uint lvol = (REG_SNDDMGCNT & SDMG_LVOL_MASK) >> SDMG_LVOL_SHIFT;
+        uint rvol = (REG_SNDDMGCNT & SDMG_LVOL_MASK) >> SDMG_LVOL_SHIFT;
+
+        double lvol_f = lvol / 7.0;
+        double rvol_f = rvol / 7.0;
+
         // sqr0_l = true;
         // sqr0_r = true;
         // sqr0_freq = 440.0 * 2;
@@ -141,7 +147,7 @@ void psg_render(int16_t *out, size_t frame_count)
             outf[0] = 0.0;
             outf[1] = 0.0;
 
-            const double amp = 0.05;
+            const double amp = 0.1;
 
             for (int c = 0; c < 2; ++c)
             {
@@ -152,8 +158,8 @@ void psg_render(int16_t *out, size_t frame_count)
 
                 s_ch_phase[c] = fmod(s_ch_phase[c] + sqr_phdt[c], 1.0);
 
-                outf[0] += sqr_l[c] ? smp : 0.0;
-                outf[1] += sqr_r[c] ? smp : 0.0;
+                outf[0] += (sqr_l[c] ? smp : 0.0) * lvol_f;
+                outf[1] += (sqr_r[c] ? smp : 0.0) * rvol_f;
             }
 
             out[0] = smpconv_f64_s16(outf[0]);

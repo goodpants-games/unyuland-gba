@@ -241,10 +241,29 @@ static void audio_update(void)
 
         const double sample_len = 1.0 / SAMPLE_RATE;
 
+        // these registers should be read at the start of every sound engine
+        // audio tick, not at the start of the audio frame. but I'm lazy and the
+        // game literally only modifies these registers once, at boot.
+        uint psg_mix_i  = REG_SNDDSCNT & 3;
+        uint dsa_mix_i = REG_SNDDSCNT & SDS_A100;
+        uint dsb_mix_i = REG_SNDDSCNT & SDS_B100;
+
+        // a psg mix value of 3 is prohibited, but for convenience I 
+        // interpret it as 125% so that I can use simple arithmetic to calculate
+        // the mix percetange.
+        // also, i think the program can choose which channels DSA or DSB emit
+        // to. I'm just going to assume A is on channe L and B is on channel R.
+        // Dunno if this is what maxmod does actually does, but sure.
+        double psg_mix = (psg_mix_i / 3.0) + 0.25;
+        double dsa_mix = (double) dsa_mix_i * 0.5 + 0.5;
+        double dsb_mix = (double) dsb_mix_i * 0.5 + 0.5;
+
         for (size_t i = 0; i < FRAME_COUNT * NCHANNELS; i += 2)
         {
-            samples[i+0] = mplay_samples[i+0] + psg_samples[i+0];
-            samples[i+1] = mplay_samples[i+1] + psg_samples[i+1];
+            samples[i+0] = mplay_samples[i+0] * dsa_mix +
+                           psg_samples[i+0] * psg_mix;
+            samples[i+1] = mplay_samples[i+1] * dsb_mix +
+                           psg_samples[i+1] * psg_mix; 
 
             // post-process: "convert" to 9-bit audio
             samples[i+0] = (samples[i+0] - 64) / 128;
@@ -252,7 +271,8 @@ static void audio_update(void)
             samples[i+1] = (samples[i+1] - 64) / 128;
             samples[i+1] = CLAMP(samples[i+1], INT8_MIN, INT8_MAX+1) * 128;
 
-            // dc offset normlization
+            // dc offset normlization. this subtracts the voltage level by
+            // a leaky integration of it
             double sf0 = smpconv_s16_f64(samples[i+0]);
             double sf1 = smpconv_s16_f64(samples[i+1]);
 
