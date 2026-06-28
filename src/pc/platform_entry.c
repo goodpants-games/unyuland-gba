@@ -1,3 +1,4 @@
+#include "log.h"
 #include <stdbool.h>
 #include <stdio.h>
 #include <math.h>
@@ -282,34 +283,46 @@ static void audio_update(void)
         const double sample_len = 1.0 / SAMPLE_RATE;
 
         // these registers should be read at the start of every sound engine
-        // audio tick, not at the start of the audio frame. but I'm lazy and the
-        // game literally only modifies these registers once, at boot.
-        uint psg_mix_i  = REG_SNDDSCNT & 3;
-        uint dsa_mix_i = REG_SNDDSCNT & SDS_A100;
-        uint dsb_mix_i = REG_SNDDSCNT & SDS_B100;
-
-        // a psg mix value of 3 is prohibited, but for convenience I 
-        // interpret it as 125% so that I can use simple arithmetic to calculate
-        // the mix percetange.
+        // audio tick, not at the start of the audio frame. but I'm lazy; that
+        // would require me to rework the ticking system to occur here rather
+        // than in the psg playback "module". and besides, the game literally
+        // only modifies these registers once, at boot.
         // also, i think the program can choose which channels DSA or DSB emit
-        // to. I'm just going to assume A is on channe L and B is on channel R.
+        // to. I'm just going to assume B is on channel L and A is on channel R.
         // Dunno if this is what maxmod does actually does, but sure.
-        double psg_mix = (psg_mix_i / 3.0) + 0.25;
-        double dsa_mix = (double) dsa_mix_i * 0.5 + 0.5;
-        double dsb_mix = (double) dsb_mix_i * 0.5 + 0.5;
+        uint psg_mix = REG_SNDDSCNT & 3;
+        uint dsa_mix = REG_SNDDSCNT & SDS_A100;
+        uint dsb_mix = REG_SNDDSCNT & SDS_B100;
 
+        // https://jsgroth.dev/blog/posts/gba-audio/
         for (size_t i = 0; i < FRAME_COUNT * NCHANNELS; i += 2)
         {
-            samples[i+0] = mplay_samples[i+0] * dsa_mix +
-                           psg_samples[i+0] * psg_mix;
-            samples[i+1] = mplay_samples[i+1] * dsb_mix +
-                           psg_samples[i+1] * psg_mix; 
+            // 8-bit samples are converted to clamped 10-bit samples. also,
+            // apply REG_SNDDSCNT volume control
+            // also apply an additional multiplication by two, because I swear
+            // the libxmp module output is too quiet compared to maxmod.
+            int dsa = mplay_samples[i+1] << (2 + dsa_mix);
+            dsa = CLAMP(dsa, -0x200, 0x1FF);
+            int dsb = mplay_samples[i+0] << (2 + dsb_mix);
+            dsb = CLAMP(dsb, -0x200, 0x1FF);
 
-            // post-process: "convert" to 9-bit audio
-            samples[i+0] = (samples[i+0] - 64) / 128;
-            samples[i+0] = CLAMP(samples[i+0], INT8_MIN, INT8_MAX+1) * 128;
-            samples[i+1] = (samples[i+1] - 64) / 128;
-            samples[i+1] = CLAMP(samples[i+1], INT8_MIN, INT8_MAX+1) * 128;
+            s16 psg0 = psg_samples[i+0];
+            s16 psg1 = psg_samples[i+1];
+
+            psg0 >>= 2 - (psg_mix % 3);
+            psg1 >>= 2 - (psg_mix % 3);
+
+            samples[i+0] = CLAMP(dsb + psg0, -0x200, 0x1FF);
+            samples[i+1] = CLAMP(dsa + psg1, -0x200, 0x1FF);
+
+            // convert 10-bit range to ~16-bit range. not actually full-range,
+            // but close enough.
+            samples[i+0] *= 0x40;
+            samples[i+1] *= 0x40;
+
+            // final post-processing volume reduction
+            samples[i+0] /= 2;
+            samples[i+1] /= 2;
 
             // dc offset normlization. this subtracts the voltage level by
             // a leaky integration of it

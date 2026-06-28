@@ -5,6 +5,7 @@
 #include "psg_ctl.h"
 #include "../main/log.h"
 #include "audioutil.h"
+#include "tonc_memmap.h"
 
 
 // amount of seconds between each (hypothethical) hblank
@@ -50,23 +51,6 @@ static void hblank(void)
     s_scanline_wait = s_scanline_wait_reset;
 }
 
-// https://www.martin-finke.de/articles/audio-plugins-018-polyblep-oscillator/
-static double poly_blep(double phase_inc, double t)
-{
-    double dt = phase_inc;
-    if (t < dt)
-    {
-        t /= dt;
-        return t + t - t * t - 1.0;
-    }
-    else if (t > 1.0 - dt)
-    {
-        t = (t - 1.0) / dt;
-        return t * t + t + t + 1.0;
-    }
-    else return 0.0;
-}
-
 void psg_init(const psg_init_params_s *params)
 {
     s_ticks_per_frame = params->ticks_per_frame;
@@ -105,21 +89,27 @@ void psg_render(int16_t *out, size_t frame_count)
             0.125, 0.25, 0.50, 0.75
         };
 
-        bool sqr_l[2];
-        bool sqr_r[2];
-        int sqr_rate[2];
-        double sqr_duty[2];
-        double sqr_freq[2];
-        double sqr_phdt[2];
+        bool    sqr_l   [2];
+        bool    sqr_r   [2];
+        bool    sqr_on  [2];
+        int16_t sqr_vol [2][2];
+        double  sqr_duty[2];
+        double  sqr_freq[2];
+        double  sqr_phdt[2];
 
         for (int i = 0; i < 2; ++i)
         {
-            sqr_l[i] = REG_SNDDMGCNT & (SDMG_LSQR1 << i);
-            sqr_r[i] = REG_SNDDMGCNT & (SDMG_RSQR1 << i);
+            // sqr_on[i] = REG_SNDSTAT & (1 << i);
+            // if (!sqr_on[i])
+            //     continue;
+            sqr_on[i] = true;
+
+            bool enable_l = REG_SNDDMGCNT & (SDMG_LSQR1 << i);
+            bool enable_r = REG_SNDDMGCNT & (SDMG_RSQR1 << i);
 
             sqr_duty[i] = pulse_duties[(*reg_snd_cnt[i] & SSQR_DUTY_MASK) >> SSQR_DUTY_SHIFT];
-            sqr_rate[i] = (*reg_snd_freq[i] & SFREQ_RATE_MASK) >> SFREQ_RATE_SHIFT;
-            sqr_freq[i] = 131072.0 / (2048 - sqr_rate[i]);
+            uint rate = (*reg_snd_freq[i] & SFREQ_RATE_MASK) >> SFREQ_RATE_SHIFT;
+            sqr_freq[i] = 131072.0 / (2048 - rate);
             sqr_phdt[i] = sqr_freq[i] * s_dt_per_sample;
 
             if (*reg_snd_freq[i] & SFREQ_RESET)
@@ -127,43 +117,36 @@ void psg_render(int16_t *out, size_t frame_count)
                 // s_ch_phase[0] = 0.0;
                 *reg_snd_freq[i] &= ~SFREQ_RESET;
             }
+            
+            sqr_l[i] = enable_l;
+            sqr_r[i] = enable_r;
+            sqr_vol[i][0] = enable_l ? 15 : 0;
+            sqr_vol[i][1] = enable_r ? 15 : 0;
         }
 
         uint lvol = (REG_SNDDMGCNT & SDMG_LVOL_MASK) >> SDMG_LVOL_SHIFT;
         uint rvol = (REG_SNDDMGCNT & SDMG_LVOL_MASK) >> SDMG_LVOL_SHIFT;
 
-        double lvol_f = lvol / 7.0;
-        double rvol_f = rvol / 7.0;
-
-        // sqr0_l = true;
-        // sqr0_r = true;
-        // sqr0_freq = 440.0 * 2;
-        // sqr0_duty = 0.25;
-
         for (; frames_to_proc != 0; --frames_to_proc, out += 2)
         {
-            double smp;
-            double outf[2];
-            outf[0] = 0.0;
-            outf[1] = 0.0;
-
-            const double amp = 0.1;
+            out[0] = 0;
+            out[1] = 0;
 
             for (int c = 0; c < 2; ++c)
             {
-                smp = s_ch_phase[c] < sqr_duty[c] ? 1.0 : 0.0;
-                smp += poly_blep(sqr_phdt[c], s_ch_phase[c]);
-                smp -= poly_blep(sqr_phdt[c], fmod(s_ch_phase[c] + 1.0 - sqr_duty[c], 1.0));
-                smp *= amp;
+                if (!sqr_on[c]) continue;
 
+                int16_t smp = s_ch_phase[c] < sqr_duty[c] ? 1 : 0;
                 s_ch_phase[c] = fmod(s_ch_phase[c] + sqr_phdt[c], 1.0);
 
-                outf[0] += (sqr_l[c] ? smp : 0.0) * lvol_f;
-                outf[1] += (sqr_r[c] ? smp : 0.0) * rvol_f;
+                uint16_t smp_l = sqr_l[c] ? (smp * sqr_vol[c][0]) : 0;
+                uint16_t smp_r = sqr_r[c] ? (smp * sqr_vol[c][1]) : 0;
+                out[0] += (int16_t)(smp_l << 1) - (sqr_vol[c][0]);
+                out[1] += (int16_t)(smp_r << 1) - (sqr_vol[c][1]);
             }
 
-            out[0] = smpconv_f64_s16(outf[0]);
-            out[1] = smpconv_f64_s16(outf[1]);
+            out[0] *= lvol;
+            out[1] *= rvol;
         }
 
         if (frames_to_next_hbl == 0)

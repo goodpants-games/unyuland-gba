@@ -5,12 +5,15 @@
 #include <stddef.h>
 #include <stdint.h>
 
+// evil unnecessary library-specific typedefs
 typedef int          mp_int;
 typedef unsigned int mp_uint;
 typedef uint32_t     mp_u32;
 typedef int32_t      mp_s32;
 typedef uint16_t     mp_u16;
 typedef int16_t      mp_s16;
+typedef uint8_t      mp_u8;
+typedef int8_t       mp_s8;
 typedef bool         mp_bool;
 typedef size_t       mp_size;
 
@@ -29,9 +32,11 @@ void mplay_vblank_handler(void);
 #endif
 
 #ifdef PLATFORM_PC
-void mplay_set_sample_rate(mp_uint sample_rate);
-void mplay_render(mp_s16 *data, mp_size frame_count);
 void mplay_deinit(void);
+void mplay_set_sample_rate(mp_uint sample_rate);
+
+// audio is rendered as 8-bit into the space of a 16-bit integer
+void mplay_render(mp_s16 *data, mp_size frame_count);
 #endif
 
 void mplay_start(mp_uint module_id, mp_bool loop);

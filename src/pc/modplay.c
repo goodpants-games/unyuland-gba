@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -8,6 +9,7 @@
 #include <libxmp-lite/xmp.h>
 
 #include <data/music.h>
+#include "../main/log.h"
 
 extern const void *const mpt_module_banks[MODDAT_NSONGS];
 extern const size_t mpt_module_sizes[MODDAT_NSONGS];
@@ -24,7 +26,7 @@ static mp_bool s_sub_paused;
 static mp_bool s_main_loop;
 static mp_uint s_sample_rate = 48000;
 static mp_size s_alloc_size = 0;
-static mp_s16 *s_alloc = NULL;
+static mp_s8 *s_alloc = NULL;
 
 
 static xmp_context load_module(mp_uint module_id)
@@ -39,7 +41,7 @@ static xmp_context load_module(mp_uint module_id)
         return NULL;
     }
 
-    if (xmp_start_player(c, s_sample_rate, 0) != 0)
+    if (xmp_start_player(c, s_sample_rate, XMP_FORMAT_8BIT) != 0)
     {
         xmp_free_context(c);
         return NULL;
@@ -52,22 +54,14 @@ static xmp_context load_module(mp_uint module_id)
 }
 
 static int process_module(xmp_context c, mp_uint volume, mp_bool loop,
-                          mp_s16 *output, mp_uint frame_count)
+                          mp_s8 *output, mp_uint frame_count)
 {
-    int stat = xmp_play_buffer(c, output, frame_count * sizeof(s16) * 2,
+    // i think maxmod outputs audio at a higher amplitude, because the kick
+    // sounds more accurate to maxmod playback when 200 is the max volume factor
+    // instead of 100.
+    xmp_set_player(c, XMP_PLAYER_VOLUME, 200 * volume / VOLUME_SCALE);
+    int stat = xmp_play_buffer(c, output, frame_count * sizeof(*output) * 2,
                                loop ? 0 : 1);
-    
-    mp_s16 *p = output;
-    for (mp_size i = 0; i < frame_count; ++i)
-    {
-        // apply volume scale
-        p[0] = (s16)(((s32)p[0]) * volume / VOLUME_SCALE);
-        p[1] = (s16)(((s32)p[1]) * volume / VOLUME_SCALE);
-        p += 2;
-    }
-
-    // fill the remaining samples with zeroes
-    // memset(output, 0, (frame_count - rframes) * sizeof(s16) * 2);
 
     return stat;
 }
@@ -114,12 +108,12 @@ void mplay_set_sample_rate(mp_uint sample_rate)
 
 void mplay_render(mp_s16 *data, mp_size frame_count)
 {
-    mp_size buffer_size = frame_count * sizeof(mp_s16) * 2;
+    mp_size buffer_size = frame_count * sizeof(*data) * 2;
     memset(data, 0, buffer_size);
 
     if (s_alloc_size != buffer_size)
     {
-        fprintf(stderr, "REALLOC MODPLAY BUFFER");
+        fprintf(stderr, "REALLOC MODPLAY BUFFER\n");
 
         free(s_alloc);
         s_alloc_size = buffer_size;
