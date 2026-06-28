@@ -51,7 +51,7 @@ compile_commands.json
 *.amf
 *.umx
 *.gtk
-mod.*
+# mod.* you're kidding.
 AS.*
 *.xz
 
@@ -78,7 +78,8 @@ autom4te.cache
 depend
 players/xmp/Makefile
 libxmp.pc
-Makefile
+libxmp-lite.pc
+/Makefile
 !cmake/Makefile
 test/.test
 test/libxmp-covertest
