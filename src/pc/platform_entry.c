@@ -478,7 +478,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     psg_set_sample_rate(SAMPLE_RATE);
 
     SDL_GL_MakeCurrent(s_window, s_gl);
-    // SDL_GL_SetSwapInterval(1);
+    SDL_GL_SetSwapInterval(1);
 
     // glDisable(GL_FRAMEBUFFER_SRGB);
     
