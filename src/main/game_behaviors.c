@@ -1059,6 +1059,13 @@ void entity_ice_block_init(entity_s *self, FIXED px, FIXED py)
 ////////////
 #pragma region spring
 
+typedef struct spring_data
+{
+    FIXED launch_vel;
+}
+spring_data_s;
+EDATA_SIZE_CHECK(spring_data_s)
+
 const behavior_def_s behavior_spring;
 
 static void behavior_spring_ent_touch(entity_s *self, entity_s *other, int nx,
@@ -1066,16 +1073,20 @@ static void behavior_spring_ent_touch(entity_s *self, entity_s *other, int nx,
 {
     if (!(other->flags & ENTITY_FLAG_MOVING))
         return;
+
+    spring_data_s *data = (spring_data_s *)self->userdata;
     
     if (ny == -1)
     {
-        other->vel.y = self->userdata[0] / (other->mass * 2) * 4;
+        other->vel.y = data->launch_vel / (other->mass * 2) * 4;
         snd_play_no_overlap(SND_ID_SPRING);
     }
 }
 
 void entity_spring_init(entity_s *self, FIXED px, FIXED py, bool super)
 {
+    spring_data_s *data = (spring_data_s *)self->userdata;
+
     self->flags |= ENTITY_FLAG_COLLIDE | ENTITY_FLAG_MOVING
                    | ENTITY_FLAG_DAMPING;
     self->pos.x = px;
@@ -1086,7 +1097,7 @@ void entity_spring_init(entity_s *self, FIXED px, FIXED py, bool super)
     self->damp = DEFAULT_DAMP;
     self->sprite.graphic_id = super ? SPRID_GAME_SUPER_SPRING : SPRID_GAME_SPRING;
     self->behavior = &behavior_spring;
-    self->userdata[0] = super ? TO_FIXED(-6.0) : TO_FIXED(-3.0);
+    data->launch_vel = super ? TO_FIXED(-6.0) : TO_FIXED(-3.0);
 }
 
 const behavior_def_s behavior_spring = {
