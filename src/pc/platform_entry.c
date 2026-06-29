@@ -75,6 +75,20 @@ struct gfx_state
 }
 static s_gfx_state;
 
+
+
+
+
+
+
+
+
+
+//------------------------------------------------------------------------------
+// graphics
+//------------------------------------------------------------------------------
+#pragma region graphics
+
 #if defined(GL_ES)
 static const char *VS_SOURCE =
     "precision mediump float;\n"
@@ -262,23 +276,70 @@ static bool gfx_state_init(void)
     return true;
 }
 
-static uint get_key_input_flag(SDL_Keycode key)
+static void gfx_update(void)
 {
-    switch (key)
+    int win_sx, win_sy;
+    SDL_GetWindowSizeInPixels(s_window, &win_sx, &win_sy);
+
+    glViewport(0, 0, win_sx, win_sy);
+
+    // not really any need to clear, so why not.
+    // glClearColor(1.0f, 0.0f, 0.0f, 1.0f);
+    // glClear(GL_COLOR_BUFFER_BIT);
+    
+    // activate shader
+    glUseProgram(s_gfx_state.display_prog);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, s_gfx_state.screen_tex);
+
     {
-    case SDLK_Z:      return 0x001; // A
-    case SDLK_X:      return 0x002; // B
-    case SDLK_C:      return 0x200; // L
-    case SDLK_V:      return 0x100; // R
-    case SDLK_ESCAPE: return 0x008; // Start 
-    case SDLK_TAB:    return 0x004; // Select
-    case SDLK_RIGHT:  return 0x010; // Right
-    case SDLK_LEFT:   return 0x020; // Left
-    case SDLK_UP:     return 0x040; // Up
-    case SDLK_DOWN:   return 0x080; // Down
-    default:          return 0x000;
+        GLint loc = glGetUniformLocation(s_gfx_state.display_prog, "u_matrix");
+        float mat[16] = {
+            1, 0, 0, 0,
+            0, 1, 0, 0,
+            0, 0, 1, 0,
+            0, 0, 0, 1
+        };
+
+        glUniformMatrix4fv(loc, 1, GL_FALSE, mat);
     }
+
+    // bind geometry and attributes
+    typedef struct
+    {
+        float position[2];
+        float texcoord[2];
+    } vertex_s;
+
+    glBindBuffer(GL_ARRAY_BUFFER, s_gfx_state.display_quad);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, s_gfx_state.display_quad_idx);
+
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(vertex_s),
+                          (void*)offsetof(vertex_s, position));
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(vertex_s),
+                          (void*)offsetof(vertex_s, texcoord));
+    glEnableVertexAttribArray(1);
+
+    // draw the fucking quad
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, NULL);
 }
+
+#pragma endregion graphics
+
+
+
+
+
+
+
+
+
+
+//------------------------------------------------------------------------------
+// audio
+//------------------------------------------------------------------------------
+#pragma region audio
 
 static void audio_update(void)
 {
@@ -355,53 +416,38 @@ static void audio_update(void)
     #undef NCHANNELS
 }
 
-static void gfx_update(void)
+#pragma endregion audio
+
+
+
+
+
+
+
+
+
+
+//------------------------------------------------------------------------------
+// lifecycle
+//------------------------------------------------------------------------------
+#pragma region lifecycle
+
+static uint get_key_input_flag(SDL_Keycode key)
 {
-    int win_sx, win_sy;
-    SDL_GetWindowSizeInPixels(s_window, &win_sx, &win_sy);
-
-    glViewport(0, 0, win_sx, win_sy);
-
-    // not really any need to clear, so why not.
-    // glClearColor(1.0f, 0.0f, 0.0f, 1.0f);
-    // glClear(GL_COLOR_BUFFER_BIT);
-    
-    // activate shader
-    glUseProgram(s_gfx_state.display_prog);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, s_gfx_state.screen_tex);
-
+    switch (key)
     {
-        GLint loc = glGetUniformLocation(s_gfx_state.display_prog, "u_matrix");
-        float mat[16] = {
-            1, 0, 0, 0,
-            0, 1, 0, 0,
-            0, 0, 1, 0,
-            0, 0, 0, 1
-        };
-
-        glUniformMatrix4fv(loc, 1, GL_FALSE, mat);
+    case SDLK_Z:      return 0x001; // A
+    case SDLK_X:      return 0x002; // B
+    case SDLK_C:      return 0x200; // L
+    case SDLK_V:      return 0x100; // R
+    case SDLK_ESCAPE: return 0x008; // Start 
+    case SDLK_TAB:    return 0x004; // Select
+    case SDLK_RIGHT:  return 0x010; // Right
+    case SDLK_LEFT:   return 0x020; // Left
+    case SDLK_UP:     return 0x040; // Up
+    case SDLK_DOWN:   return 0x080; // Down
+    default:          return 0x000;
     }
-
-    // bind geometry and attributes
-    typedef struct
-    {
-        float position[2];
-        float texcoord[2];
-    } vertex_s;
-
-    glBindBuffer(GL_ARRAY_BUFFER, s_gfx_state.display_quad);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, s_gfx_state.display_quad_idx);
-
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(vertex_s),
-                          (void*)offsetof(vertex_s, position));
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(vertex_s),
-                          (void*)offsetof(vertex_s, texcoord));
-    glEnableVertexAttribArray(1);
-
-    // draw the fucking quad
-    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, NULL);
 }
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
@@ -532,22 +578,25 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
     return SDL_APP_CONTINUE;  /* carry on with the program! */
 }
 
+static void game_update(void)
+{
+    REG_KEYINPUT = s_key_input;
+    platform_app_frame();
+
+    g_display_buffer = s_gfx_state.screen_pixels;
+    display_update();
+
+    glBindTexture(GL_TEXTURE_2D, s_gfx_state.screen_tex);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT,
+                    GL_RGBA, GL_UNSIGNED_BYTE, s_gfx_state.screen_pixels);     
+}
+
 SDL_AppResult SDL_AppIterate(void *appstate)
 {
     u64 frame_start_ns = SDL_GetTicksNS();
 
     if (s_frame_wait == 0)
-    {
-        REG_KEYINPUT = s_key_input;
-        platform_app_frame();
-
-        g_display_buffer = s_gfx_state.screen_pixels;
-        display_update();
-
-        glBindTexture(GL_TEXTURE_2D, s_gfx_state.screen_tex);
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT,
-                        GL_RGBA, GL_UNSIGNED_BYTE, s_gfx_state.screen_pixels);        
-    }
+        game_update();
 
     audio_update();
     gfx_update();
@@ -608,3 +657,5 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
 
     mplay_deinit();
 }
+
+#pragma endregion lifecycle
