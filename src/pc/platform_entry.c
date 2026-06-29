@@ -1,10 +1,15 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <log.h>
+#include <stdlib.h>
 
 #define SDL_MAIN_USE_CALLBACKS 1
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
+
+// TODO: frame-rate locking doesn't really work on Web, because you are not
+// allowed to sleep on Web. Use the dt-accumulator method instead of sleeping
+// on that platform.
 
 // if GL_ES or GL_DESKTOP was not already defined by the build system, then
 // define it based off the given platform. although, currently, the makefile
@@ -32,8 +37,10 @@
 #include "display.h"
 #include "audioutil.h"
 
-#define WINDOW_SCALE 3
-#define SAMPLE_RATE 48000//32768
+#define WINDOW_SCALE    3
+#define SAMPLE_RATE     32768
+#define FRAME_LENGTH_NS ((s64)((1.0 / 60.0) * 1000000000.0))
+#define DT_SNAP_THRESH  ((s64)(0.002 * 1000000000.0))
 
 // these functions are defined by src/main/main.c
 void platform_app_init(void);
@@ -42,7 +49,13 @@ void platform_app_frame(void);
 static SDL_Window *s_window = NULL;
 static SDL_AudioStream *s_astream = NULL;
 static SDL_GLContext s_gl = NULL;
+
+// leaky integrator for dc offset removal
 static double s_asamp_accum[2] = { 0.0, 0.0 };
+
+// frame wait counter for dt snapping. this is to make the game tick every 60 Hz
+// if the user has a 120 Hz monitor or 240 Hz monitor.
+static int s_frame_wait = 0;
 
 static uint s_key_input = 0x3FF;
 
@@ -321,7 +334,7 @@ static void audio_update(void)
             samples[i+0] /= 2;
             samples[i+1] /= 2;
 
-            // dc offset normlization. this subtracts the voltage level by
+            // dc offset removal. this subtracts the voltage level by
             // a leaky integration of it
             double sf0 = smpconv_s16_f64(samples[i+0]);
             double sf1 = smpconv_s16_f64(samples[i+1]);
@@ -338,6 +351,55 @@ static void audio_update(void)
 
     #undef FRAME_COUNT
     #undef NCHANNELS
+}
+
+static void gfx_update(void)
+{
+    int win_sx, win_sy;
+    SDL_GetWindowSizeInPixels(s_window, &win_sx, &win_sy);
+
+    glViewport(0, 0, win_sx, win_sy);
+
+    // not really any need to clear, so why not.
+    // glClearColor(1.0f, 0.0f, 0.0f, 1.0f);
+    // glClear(GL_COLOR_BUFFER_BIT);
+    
+    // activate shader
+    glUseProgram(s_gfx_state.display_prog);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, s_gfx_state.screen_tex);
+
+    {
+        GLint loc = glGetUniformLocation(s_gfx_state.display_prog, "u_matrix");
+        float mat[16] = {
+            1, 0, 0, 0,
+            0, 1, 0, 0,
+            0, 0, 1, 0,
+            0, 0, 0, 1
+        };
+
+        glUniformMatrix4fv(loc, 1, GL_FALSE, mat);
+    }
+
+    // bind geometry and attributes
+    typedef struct
+    {
+        float position[2];
+        float texcoord[2];
+    } vertex_s;
+
+    glBindBuffer(GL_ARRAY_BUFFER, s_gfx_state.display_quad);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, s_gfx_state.display_quad_idx);
+
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(vertex_s),
+                          (void*)offsetof(vertex_s, position));
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(vertex_s),
+                          (void*)offsetof(vertex_s, texcoord));
+    glEnableVertexAttribArray(1);
+
+    // draw the fucking quad
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, NULL);
 }
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
@@ -416,7 +478,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     psg_set_sample_rate(SAMPLE_RATE);
 
     SDL_GL_MakeCurrent(s_window, s_gl);
-    SDL_GL_SetSwapInterval(1);
+    // SDL_GL_SetSwapInterval(1);
 
     // glDisable(GL_FRAMEBUFFER_SRGB);
     
@@ -470,71 +532,64 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 
 SDL_AppResult SDL_AppIterate(void *appstate)
 {
-    u64 frame_start_us = SDL_GetTicksNS() / 1000;
+    u64 frame_start_ns = SDL_GetTicksNS();
 
-    REG_KEYINPUT = s_key_input;
-    platform_app_frame();
-
-    audio_update();
-
-    g_display_buffer = s_gfx_state.screen_pixels;
-    display_update();
-
-    glBindTexture(GL_TEXTURE_2D, s_gfx_state.screen_tex);
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT,
-                    GL_RGBA, GL_UNSIGNED_BYTE, s_gfx_state.screen_pixels);
-
-    int win_sx, win_sy;
-    SDL_GetWindowSizeInPixels(s_window, &win_sx, &win_sy);
-
-    glViewport(0, 0, win_sx, win_sy);
-
-    // not really any need to clear, so why not.
-    // glClearColor(1.0f, 0.0f, 0.0f, 1.0f);
-    // glClear(GL_COLOR_BUFFER_BIT);
-    
-    // activate shader
-    glUseProgram(s_gfx_state.display_prog);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, s_gfx_state.screen_tex);
-
+    if (s_frame_wait == 0)
     {
-        GLint loc = glGetUniformLocation(s_gfx_state.display_prog, "u_matrix");
-        float mat[16] = {
-            1, 0, 0, 0,
-            0, 1, 0, 0,
-            0, 0, 1, 0,
-            0, 0, 0, 1
-        };
+        REG_KEYINPUT = s_key_input;
+        platform_app_frame();
 
-        glUniformMatrix4fv(loc, 1, GL_FALSE, mat);
+        g_display_buffer = s_gfx_state.screen_pixels;
+        display_update();
+
+        glBindTexture(GL_TEXTURE_2D, s_gfx_state.screen_tex);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT,
+                        GL_RGBA, GL_UNSIGNED_BYTE, s_gfx_state.screen_pixels);        
     }
 
-    // bind geometry and attributes
-    typedef struct
-    {
-        float position[2];
-        float texcoord[2];
-    } vertex_s;
-
-    glBindBuffer(GL_ARRAY_BUFFER, s_gfx_state.display_quad);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, s_gfx_state.display_quad_idx);
-
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(vertex_s),
-                          (void*)offsetof(vertex_s, position));
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(vertex_s),
-                          (void*)offsetof(vertex_s, texcoord));
-    glEnableVertexAttribArray(1);
-
-    // draw the fucking quad
-    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, NULL);
-
-    u64 frame_end_us = SDL_GetTicksNS() / 1000;
-    u64 frame_len_us = frame_end_us - frame_start_us;
-    // fprintf(stderr, "frame time: %.3f ms\n", (double)frame_len_us / 1000);
-
+    audio_update();
+    gfx_update();
     SDL_GL_SwapWindow(s_window);
+
+    if (s_frame_wait != 0)
+    {
+        --s_frame_wait;
+    }
+    else
+    {
+        u64 frame_end_ns = SDL_GetTicksNS();
+        s64 frame_len_ns = frame_end_ns - frame_start_ns;
+
+        // if the measured frame length is already reasonably close to 60 Hz
+        // assume this is due to VSync, and don't do anything to prevent potential
+        // stuttering
+        if (llabs(frame_len_ns - FRAME_LENGTH_NS) < DT_SNAP_THRESH) {
+            goto skip_sleep;
+        }
+
+        // ...120 Hz
+        if (llabs(frame_len_ns - FRAME_LENGTH_NS / 2) < DT_SNAP_THRESH) {
+            s_frame_wait = 1;
+            goto skip_sleep;
+        }
+
+        // // ...240 Hz
+        // if (llabs(frame_len_ns - FRAME_LENGTH_NS / 4) < DT_SNAP_THRESH) {
+        //     LOG_DBG("240hz delta-time snap!!!");
+        //     s_frame_wait = 3;
+        //     goto skip_sleep;
+        // }
+
+        // LOG_DBG("Try sleep");
+        if (frame_len_ns < FRAME_LENGTH_NS)
+            SDL_DelayPrecise(FRAME_LENGTH_NS - frame_len_ns);
+
+        skip_sleep:;
+
+        // frame_end_ns = SDL_GetTicksNS();
+        // frame_len_ns = frame_end_ns - frame_start_ns;
+        // fprintf(stderr, "frame time: %.3f ms\n", (double)(frame_len_ns / 1000) / 1000);
+    }
 
     return SDL_APP_CONTINUE;
 }
