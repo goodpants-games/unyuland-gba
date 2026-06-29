@@ -41,8 +41,10 @@
 
 #define WINDOW_SCALE    3
 #define SAMPLE_RATE     32768
-#define FRAME_LENGTH_NS ((s64)((1.0 / 60.0) * 1000000000.0))
-#define DT_SNAP_THRESH  ((s64)(0.002 * 1000000000.0))
+
+#define SECS(x) (s64)((x) * 1000000000)
+#define FRAME_LENGTH_NS SECS(1.0 / 60.0)
+#define DT_SNAP_THRESH  SECS(0.002)
 
 // these functions are defined by src/main/main.c
 void platform_app_init(void);
@@ -54,10 +56,6 @@ static SDL_GLContext s_gl = NULL;
 
 // leaky integrator for dc offset removal
 static double s_asamp_accum[2] = { 0.0, 0.0 };
-
-// frame wait counter for dt snapping. this is to make the game tick every 60 Hz
-// if the user has a 120 Hz monitor or 240 Hz monitor.
-static int s_frame_wait = 0;
 
 static uint s_key_input = 0x3FF;
 
@@ -432,6 +430,10 @@ static void audio_update(void)
 //------------------------------------------------------------------------------
 #pragma region lifecycle
 
+// time accumulator for framerate locking
+static u64 s_time_accum = 0;
+static u64 s_last_frame_time = 0;
+
 static uint get_key_input_flag(SDL_Keycode key)
 {
     switch (key)
@@ -546,6 +548,75 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     
     platform_app_init();
 
+    s_last_frame_time = SDL_GetTicksNS();
+
+    return SDL_APP_CONTINUE;
+}
+
+SDL_AppResult SDL_AppIterate(void *appstate)
+{
+    u64 cur_time = SDL_GetTicksNS();
+    s64 dt_ns = cur_time - s_last_frame_time;
+    s_last_frame_time = cur_time;
+
+    // if the measured frame length is already reasonably close to 60 Hz
+    // assume this is due to VSync, and don't do anything to prevent potential
+    // stuttering
+    if (llabs(dt_ns - FRAME_LENGTH_NS) < DT_SNAP_THRESH) {
+        dt_ns = FRAME_LENGTH_NS;
+    }
+
+    // ...120 Hz
+    else if (llabs(dt_ns - FRAME_LENGTH_NS / 2) < DT_SNAP_THRESH) {
+        dt_ns = FRAME_LENGTH_NS / 2;
+    }
+
+    // ...240 Hz? maybe?
+
+    s_time_accum += dt_ns;
+
+    bool did_update = false;
+    for (int iter = 0; iter < 8; ++iter)
+    {
+        if (s_time_accum < FRAME_LENGTH_NS) break;
+
+        REG_KEYINPUT = s_key_input;
+        platform_app_frame();
+    
+        did_update = true;
+        s_time_accum -= FRAME_LENGTH_NS;
+    }
+
+    s_time_accum %= FRAME_LENGTH_NS;
+
+    if (did_update)
+    {
+        g_display_buffer = s_gfx_state.screen_pixels;
+        display_update();
+
+        glBindTexture(GL_TEXTURE_2D, s_gfx_state.screen_tex);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT,
+                        GL_RGBA, GL_UNSIGNED_BYTE, s_gfx_state.screen_pixels);    
+    }
+                    
+    audio_update();
+    gfx_update();
+    SDL_GL_SwapWindow(s_window);
+
+#ifndef PLATFORM_WEB
+    // if the frame finished quicker than expected, sleep for the remainder of
+    // the frame. sleep for a bit less than the desired time, to account for
+    // error in OS timing.
+    u64 end_time = SDL_GetTicksNS();
+    s64 frame_len = (s64)(end_time - cur_time);
+    if (frame_len < FRAME_LENGTH_NS - DT_SNAP_THRESH)
+    {
+        s64 sleep_time = FRAME_LENGTH_NS - frame_len;
+        if (sleep_time > SECS(0.003))
+            SDL_DelayNS(sleep_time - SECS(0.003));
+    }
+#endif
+
     return SDL_APP_CONTINUE;
 }
 
@@ -576,73 +647,6 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
     }
     
     return SDL_APP_CONTINUE;  /* carry on with the program! */
-}
-
-static void game_update(void)
-{
-    REG_KEYINPUT = s_key_input;
-    platform_app_frame();
-
-    g_display_buffer = s_gfx_state.screen_pixels;
-    display_update();
-
-    glBindTexture(GL_TEXTURE_2D, s_gfx_state.screen_tex);
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT,
-                    GL_RGBA, GL_UNSIGNED_BYTE, s_gfx_state.screen_pixels);     
-}
-
-SDL_AppResult SDL_AppIterate(void *appstate)
-{
-    u64 frame_start_ns = SDL_GetTicksNS();
-
-    if (s_frame_wait == 0)
-        game_update();
-
-    audio_update();
-    gfx_update();
-    SDL_GL_SwapWindow(s_window);
-
-    if (s_frame_wait != 0)
-    {
-        --s_frame_wait;
-    }
-    else
-    {
-        u64 frame_end_ns = SDL_GetTicksNS();
-        s64 frame_len_ns = frame_end_ns - frame_start_ns;
-
-        // if the measured frame length is already reasonably close to 60 Hz
-        // assume this is due to VSync, and don't do anything to prevent potential
-        // stuttering
-        if (llabs(frame_len_ns - FRAME_LENGTH_NS) < DT_SNAP_THRESH) {
-            goto skip_sleep;
-        }
-
-        // ...120 Hz
-        if (llabs(frame_len_ns - FRAME_LENGTH_NS / 2) < DT_SNAP_THRESH) {
-            s_frame_wait = 1;
-            goto skip_sleep;
-        }
-
-        // // ...240 Hz
-        // if (llabs(frame_len_ns - FRAME_LENGTH_NS / 4) < DT_SNAP_THRESH) {
-        //     LOG_DBG("240hz delta-time snap!!!");
-        //     s_frame_wait = 3;
-        //     goto skip_sleep;
-        // }
-
-        // LOG_DBG("Try sleep");
-        if (frame_len_ns < FRAME_LENGTH_NS)
-            SDL_DelayPrecise(FRAME_LENGTH_NS - frame_len_ns);
-
-        skip_sleep:;
-
-        // frame_end_ns = SDL_GetTicksNS();
-        // frame_len_ns = frame_end_ns - frame_start_ns;
-        // fprintf(stderr, "frame time: %.3f ms\n", (double)(frame_len_ns / 1000) / 1000);
-    }
-
-    return SDL_APP_CONTINUE;
 }
 
 void SDL_AppQuit(void *appstate, SDL_AppResult result)
