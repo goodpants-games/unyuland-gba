@@ -11,6 +11,8 @@
 // allowed to sleep on Web. Use the dt-accumulator method instead of sleeping
 // on that platform.
 
+// make output louder (needs to be loduer than 100% too i think)
+
 // if GL_ES or GL_DESKTOP was not already defined by the build system, then
 // define it based off the given platform. although, currently, the makefile
 // does not support defining these, so the condition will always evaluate to
