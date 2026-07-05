@@ -174,7 +174,7 @@ static void open_map(void)
 
     // change bottom bar to say controls
     clear_game_hud();
-    gfx_text_bmap_print(0, HUD_Y_ORIGIN, "B: BACK", TEXT_COLOR_WHITE);
+    gfx_text_bmap_print(0, HUD_Y_ORIGIN, "B:BACK", TEXT_COLOR_WHITE);
 
     // hide all ui sprites
     OBJ_ATTR *obj;
