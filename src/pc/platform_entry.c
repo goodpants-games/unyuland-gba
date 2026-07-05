@@ -35,6 +35,7 @@
 #include <tonc_video.h>
 #include <tonc_math.h>
 #include <modplay.h>
+#include <platctl.h>
 #include <psg_ctl.h>
 #include "display.h"
 #include "audioutil.h"
@@ -339,6 +340,8 @@ static void gfx_update(void)
 //------------------------------------------------------------------------------
 #pragma region audio
 
+static unsigned int s_audio_volume = PLATCTL_VOLUME_MAX;
+
 static void audio_update(void)
 {
     #define FRAME_COUNT 64
@@ -395,14 +398,16 @@ static void audio_update(void)
             samples[i+0] /= 2;
             samples[i+1] /= 2;
 
+            // apply speaker volume
+            samples[i+0] = (s16)(((s32)samples[i+0] * s_audio_volume) / PLATCTL_VOLUME_MAX);
+            samples[i+1] = (s16)(((s32)samples[i+1] * s_audio_volume) / PLATCTL_VOLUME_MAX);
+
             // dc offset removal. this subtracts the voltage level by
             // a leaky integration of it
             double sf0 = smpconv_s16_f64(samples[i+0]);
             double sf1 = smpconv_s16_f64(samples[i+1]);
-
             s_asamp_accum[0] += (-0.99 * s_asamp_accum[0] + sf0) * sample_len * 20.0;
             s_asamp_accum[1] += (-0.99 * s_asamp_accum[1] + sf1) * sample_len * 20.0;
-
             samples[i+0] -= smpconv_f64_s16(s_asamp_accum[0]);
             samples[i+1] -= smpconv_f64_s16(s_asamp_accum[1]);
         }
@@ -412,6 +417,11 @@ static void audio_update(void)
 
     #undef FRAME_COUNT
     #undef NCHANNELS
+}
+
+void platctl_set_volume(unsigned int volume)
+{
+    s_audio_volume = volume;
 }
 
 #pragma endregion audio
