@@ -11,6 +11,7 @@
 #define TEXT_CENTER_X(str, ofs) TEXT_CENTER_X_OFS(str, ofs)
 #define MENU_CENTER_Y(sel_count) \
     (SCREEN_HEIGHT / 2 - 12 * (sel_count)) / 2
+#define MENU_DOT_ADVANCE_X 8 // origin_x is location of dot
 
 typedef enum menu_status
 {
@@ -36,6 +37,8 @@ typedef struct menu
 menu_s;
 
 int menu_calc_max_width(const char *const items[], uint item_count);
+int menu_calc_draw_x(const menu_s *menu, const char *text);
+int menu_calc_draw_y(const menu_s *menu, uint item_index);
 void menu_show(menu_s *menu);
 menu_status_e menu_update(menu_s *menu, int *result);
 void menu_render_page(const char *header, const char *lines[], uint line_count,
