@@ -7,14 +7,15 @@
 - update camera tracking:
   - stop x scroll when player changed direction while scrolling
 - Add saving. it saves which orbs you collected. Duh.
+  (may also need to show on the automap where the orbs you have already
+   collected are... a pin for a *negative* is a bit strange, but i think it'll
+   work best that way...)
 - add enemy hurt sfx
 - Add final boss and beginning area depicting unyu villag.
 - Fix respawning when just started the game.
   that is, create a state snapshot on launch
-- WHY CAN'T I PLACE THE SPRING ON TOP OF THE SUPERSPRING???
 
-- pc port: make refreshrate-independent
-  (dt accumulator method with timestep snapping)
+- pc port: out-of-source builds for libxmp
 - pc port: add frame time display
 
 b05: player scared to go down Hole.
