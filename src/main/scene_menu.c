@@ -5,6 +5,7 @@
 #include <data/music.h>
 #include <data/graphics/game_logo_gfx.h>
 
+#include "platctl.h"
 #include "scenes.h"
 #include "menu.h"
 #include "gfx.h"
@@ -13,20 +14,38 @@
 #define HUD_Y_ORIGIN   (HUD_ROW_ORIGIN * 8 + 6)
 #define ARRLEN(arr) (sizeof(arr) / sizeof(*arr))
 
+#ifdef PLATFORM_PC
+#define EXTRA_OPTIONS // i.e. volume, fulscr, shader(?)
+#endif
+
 static const char *const main_menu_options[] =
     {"START", "CONTROLS", "OPTIONS", "CREDITS"};
 
 static const char *const page_menu_options[] =
     {"BACK"};
 
-static const char *options_options[] =
-    {"LCD Color: Off", "Back"};
+static const char *options_options[] = {
+    "GBA COLOR:Off",
+#ifdef EXTRA_OPTIONS
+    "VOLUME:00000",
+#endif
+    "BACK"
+};
 
 enum
 {
     MENU_MODE_MAIN,
     MENU_MODE_PAGE,
     MENU_MODE_OPTIONS,
+};
+
+enum
+{
+    OPTION_MENU_LCD_COLOR,
+#ifdef EXTRA_OPTIONS
+    OPTION_MENU_VOLUME,
+#endif
+    OPTION_MENU_BACK,
 };
 
 struct
@@ -90,23 +109,39 @@ static void options_menu_update(void)
     case MENU_STATUS_SELECT:
         switch (res)
         {
-        case 0:
+        case OPTION_MENU_LCD_COLOR:
             if ((option_lcd_color = !option_lcd_color))
             {
-                options_options[0] = "LCD Color: On";
+                options_options[0] = "GBA Color:On";
                 gfx_set_palette_mode(GFX_PAL_MODE_LCD_CORRECTED);
             }
             else
             {
-                options_options[0] = "LCD Color: Off";
+                options_options[0] = "GBA Color:Off";
                 gfx_set_palette_mode(GFX_PAL_MODE_NORMAL);
             }
             
             open_options_menu(false);
 
             break;
+        
+#ifdef EXTRA_OPTIONS
+        case OPTION_MENU_VOLUME:
+        {
+            // TODO: make a full-block character for erasure purposes. (or, does
+            //       one already exist?) then, make a new block character for
+            //       printing bars. it's width should span slightly less than a
+            //       full block.
+            int draw_x = menu_calc_draw_x(&state.page_menu, "VOLUME:00000");
+            int draw_y = menu_calc_draw_y(&state.page_menu, 1);
+            gfx_text_bmap_print(draw_x + MENU_DOT_ADVANCE_X + 12 * 7, draw_y, "5", TEXT_COLOR_WHITE);
+            platctl_set_volume((uint)(PLATCTL_VOLUME_MAX * 0.2));
+            break;
+        }
+#endif
 
-        case 1:
+        // back button
+        case OPTION_MENU_BACK:
             goto exit;
         }
 
