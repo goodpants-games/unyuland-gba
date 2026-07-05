@@ -33,6 +33,8 @@ static xmp_context load_module(mp_uint module_id)
 {
     xmp_context c = xmp_create_context();
 
+    xmp_set_player(c, XMP_PLAYER_DEFPAN, 50);
+
     int s =  xmp_load_module_from_memory(c, mpt_module_banks[module_id],
                                          mpt_module_sizes[module_id]);
     if (s) // error!
