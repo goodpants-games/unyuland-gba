@@ -3,6 +3,7 @@
 #include "menu.h"
 #include "gfx.h"
 #include "options_menu.h"
+#include "sound.h"
 
 //------------------------------------------------------------------------------
 // declarations
@@ -10,6 +11,7 @@
 #pragma region declarations
 
 #define ARRLEN(arr) (sizeof(arr) / sizeof(*arr))
+#define MAX_CHARACTERS 13
 
 enum
 {
@@ -39,12 +41,6 @@ static const char *const fulscr_off_string = "FULSCR:OFF";
 static const char *const fulscr_on_string = "FULSCR:ON";
 #endif
 
-static const char *const main_menu_options[] =
-    {"START", "CONTROLS", "OPTIONS", "CREDITS"};
-
-static const char *const page_menu_options[] =
-    {"BACK"};
-
 static const char *options_options[] = {
     "GBA COLOR:Off",
 #ifdef PLATFORM_PC
@@ -54,21 +50,34 @@ static const char *options_options[] = {
     "BACK"
 };
 
-static EWRAM_BSS bool option_lcd_color = false;
+static char clear_string[MAX_CHARACTERS + 1];
+
+static EWRAM_DATA bool option_lcd_color = false;
 
 #ifdef PLATFORM_PC
-static EWRAM_BSS u8 option_volume = 4; // no more than 5
-static EWRAM_BSS bool option_mute = false;
-static EWRAM_BSS bool option_fulscr = false;
+static EWRAM_DATA u8 option_volume = 4; // no more than 5
+static EWRAM_DATA bool option_mute = false;
+static EWRAM_DATA bool option_fulscr = false;
 #endif
 
-EWRAM_BSS optmenu_config_s optmenu_config;
-EWRAM_BSS menu_s page_menu;
-
-static void open_options_menu(bool clean);
+static EWRAM_BSS menu_s page_menu;
 
 #pragma endregion declarations
 //------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+//------------------------------------------------------------------------------
+// functions
+//------------------------------------------------------------------------------
+#pragma region functions
 
 #ifdef PLATFORM_PC
 static void update_volume_text(void)
@@ -94,54 +103,82 @@ static inline void update_fulscr_text(void)
 static void fulscr_change_watcher(bool fulscr)
 {
     option_fulscr = fulscr;
+
+    menu_draw_item(&page_menu, OPTION_MENU_FULSCR, true);
     update_fulscr_text();
-    open_options_menu(false);
+    menu_draw_item(&page_menu, OPTION_MENU_FULSCR, false);
 }
 #endif
 
-static void open_options_menu(bool clean)
+#pragma endregion functions
+//------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+//------------------------------------------------------------------------------
+// public
+//------------------------------------------------------------------------------
+#pragma region public
+
+void optmenu_open(const optmenu_config_s *config)
 {
 #ifdef PLATFORM_PC
-    if (clean)
-    {
-        option_fulscr = platctl_get_fullscreen();
-        update_fulscr_text();
-        platctl_set_fullscreen_change_watcher(fulscr_change_watcher);
-    }
+    option_fulscr = platctl_get_fullscreen();
+    platctl_set_fullscreen_change_watcher(fulscr_change_watcher);
+    
+    update_fulscr_text();
+    update_volume_text();
 #endif
 
-    gfx_text_bmap_clear(0, 0, GFX_TEXT_BMP_COLS, GFX_TEXT_BMP_ROWS);
+    memset(clear_string, '\x7F', sizeof(clear_string));
+    clear_string[sizeof(clear_string) - 1] = 0;
 
-    int yp = MENU_CENTER_Y(1 + ARRLEN(options_options));
-    gfx_text_bmap_print(text_center_x("Options"), yp,
-                        "Options", TEXT_COLOR_BLUE);
-    yp += 12;
+    int xpos = config->x;
+    int ypos = config->y;
+
+    if (config->center_y)
+        ypos -= (int)(1 + ARRLEN(options_options)) * 12 / 2;
+
+    int header_xpos = xpos;
+    if (config->center_x)
+        header_xpos -= strlen("Options") * 12 / 2;
+
+    gfx_text_bmap_print(header_xpos, ypos, "Options", TEXT_COLOR_BLUE);
+    ypos += 12;
 
     page_menu = (menu_s)
     {
-        .selected = clean ? 0 : page_menu.selected,
+        .selected = 0,
         .selection_count = ARRLEN(options_options),
         .selection_labels = options_options,
 
-        .origin_x = SCREEN_WIDTH / 2,
-        .centered = true,
-        .origin_y = yp
+        .centered = config->center_x,
+        .origin_x = xpos,
+        .origin_y = ypos,
     };
 
     menu_show(&page_menu);
 }
 
-static void options_menu_update(void)
+bool optmenu_update(void)
 {
     // beware evil gotos. because i'm lazy as fuck.
 
     int res;
-    switch (menu_update(&state.page_menu, &res))
+    switch (menu_update(&page_menu, &res))
     {
     case MENU_STATUS_SELECT:
         switch (res)
         {
         case OPTION_MENU_LCD_COLOR:
+            menu_draw_item(&page_menu, OPTION_MENU_LCD_COLOR, true);
+
             if ((option_lcd_color = !option_lcd_color))
             {
                 options_options[OPTION_MENU_LCD_COLOR] = "GBA Color:On";
@@ -153,7 +190,7 @@ static void options_menu_update(void)
                 gfx_set_palette_mode(GFX_PAL_MODE_NORMAL);
             }
             
-            open_options_menu(false);
+            menu_draw_item(&page_menu, OPTION_MENU_LCD_COLOR, false);
 
             break;
         
@@ -182,7 +219,7 @@ static void options_menu_update(void)
 
     default:
 #ifdef PLATFORM_PC
-        if (state.page_menu.selected == OPTION_MENU_VOLUME)
+        if (page_menu.selected == OPTION_MENU_VOLUME)
         {
             if (key_hit(KEY_RIGHT))
             {
@@ -213,23 +250,25 @@ static void options_menu_update(void)
         break;
     }
 
-    return;
+    return true;
 
     exit:
 #ifdef PLATFORM_PC
         platctl_set_fullscreen_change_watcher(NULL);
 #endif
-        gfx_ctl.bg[1].enabled = true;
-        state.mode = MENU_MODE_MAIN;
-        gfx_text_bmap_clear(0, 0, GFX_TEXT_BMP_COLS, GFX_TEXT_BMP_ROWS);
-        menu_show(&state.menu);
-        return;
+        return false;
 
 #ifdef PLATFORM_PC
     update_volume:
         platctl_set_volume(option_mute ? 0 : volume_levels[option_volume]);
+
+        menu_draw_item(&page_menu, OPTION_MENU_VOLUME, true);
         update_volume_text();
-        open_options_menu(false);
-        return;
+        menu_draw_item(&page_menu, OPTION_MENU_VOLUME, false);
+
+        return true;
 #endif
 }
+
+#pragma endregion public
+//------------------------------------------------------------------------------

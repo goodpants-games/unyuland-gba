@@ -23,6 +23,33 @@ void menu_show(menu_s *menu)
     menu->timer = 0;
 }
 
+void menu_draw_item(menu_s *menu, uint item_index, bool clear)
+{
+    int draw_x = menu_calc_draw_x(menu, menu->selection_labels[item_index]);
+    int draw_y = menu->origin_y + item_index * 12;
+
+    if (clear)
+    {
+        gfx_text_bmap_print(draw_x + MENU_DOT_ADVANCE_X, draw_y,
+                            menu->selection_labels[item_index],
+                            TEXT_COLOR_BLACK);    
+        gfx_text_bmap_print(draw_x, draw_y, "*", TEXT_COLOR_BLACK);
+    }
+    else
+    {
+        bool sel = item_index == menu->selected;
+        text_color_e col = sel ? TEXT_COLOR_YELLOW : TEXT_COLOR_WHITE;
+        gfx_text_bmap_print(draw_x + MENU_DOT_ADVANCE_X, draw_y,
+                            menu->selection_labels[item_index], col);
+        
+        if (sel)
+        {
+            col = menu->timer < 20 ? TEXT_COLOR_YELLOW : TEXT_COLOR_BLACK;
+            gfx_text_bmap_print(draw_x, draw_y, "*", col);
+        }
+    }
+}
+
 menu_status_e menu_update(menu_s *menu, int *result)
 {
     menu_status_e status = MENU_STATUS_NORMAL;
@@ -36,6 +63,10 @@ menu_status_e menu_update(menu_s *menu, int *result)
         *result = menu->selected;
         status = MENU_STATUS_SELECT;
         snd_play_no_overlap(SND_ID_MENU_SELECT);
+
+        menu->timer = 0;
+        menu_draw_item(menu, menu->selected, false);
+        
         goto no_sync;
     }
     else if (key_hit(KEY_B) && !menu->no_back)
@@ -156,13 +187,13 @@ void menu_render_page(const char *header, const char *lines[], uint line_count,
                              GFX_TEXTPAL_NORMAL);
 
     int yp = MENU_CENTER_Y(line_count + 1);
-    gfx_text_bmap_print(text_center_x(header), yp,
+    gfx_text_bmap_print(text_center_x(header, SCREEN_WIDTH), yp,
                         header, TEXT_COLOR_BLUE);
     yp += 12;
 
     for (uint i = 0; i < line_count; ++i, yp += 12)
     {
-        gfx_text_bmap_print(text_center_x(lines[i]), yp, lines[i],
+        gfx_text_bmap_print(text_center_x(lines[i], SCREEN_WIDTH), yp, lines[i],
                             TEXT_COLOR_WHITE);
     }
 

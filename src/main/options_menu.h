@@ -5,13 +5,11 @@
 
 typedef struct optmenu_config
 {
-    int region_x, region_y;
-    int region_w, region_h;
+    int x, y;
+    bool center_x, center_y;
 } optmenu_config_s;
 
-extern optmenu_config_s optmenu_config;
-
-void optmenu_open(void);
-void optmenu_close(void);
+void optmenu_open(const optmenu_config_s *config);
+bool optmenu_update(void); // returns true if menu is still open
 
 #endif

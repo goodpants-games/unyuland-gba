@@ -9,6 +9,7 @@
 #include "menu.h"
 #include "gfx.h"
 #include "sound.h"
+#include "options_menu.h"
 
 #define HUD_ROW_ORIGIN (GFX_TEXT_BMP_ROWS - 2)
 #define HUD_Y_ORIGIN   (HUD_ROW_ORIGIN * 8 + 6)
@@ -21,6 +22,12 @@ enum
     MENU_MODE_OPTIONS,
 };
 
+static const char *const main_menu_options[] =
+    {"START", "CONTROLS", "OPTIONS", "CREDITS"};
+
+static const char *const page_menu_options[] =
+    {"BACK"};
+
 struct
 {
     menu_s menu;
@@ -28,6 +35,25 @@ struct
     int mode;
 }
 static state EWRAM_BSS;
+
+static void render_page(const char *header, const char *lines[],
+                        uint line_count)
+{
+    int yp;
+    menu_render_page(header, lines, line_count, &yp);
+    
+    state.page_menu = (menu_s)
+    {
+        .selection_count = 1,
+        .selection_labels = page_menu_options,
+
+        .origin_x = TEXT_CENTER_X_OFS("BACK", 8),
+        .origin_y = yp
+    };
+
+    menu_show(&state.page_menu);
+    state.mode = MENU_MODE_PAGE;
+}
 
 static void scene_load(uintptr_t data)
 {
@@ -45,10 +71,6 @@ static void scene_load(uintptr_t data)
         .origin_y = MENU_CENTER_Y(ARRLEN(main_menu_options)),
         .no_back = true,
     };
-
-#ifdef PLATFORM_PC
-    update_volume_text();
-#endif
 
     menu_show(&state.menu);
     gfx_text_bmap_dst_assign(SCREEN_HEIGHT_T / 2, GFX_TEXT_BMP_ROWS, 0,
@@ -122,7 +144,17 @@ static void scene_frame(void)
             
 
             case 2:
-                open_options_menu(true);
+                gfx_text_bmap_clear(0, 0, GFX_TEXT_BMP_COLS, GFX_TEXT_BMP_ROWS);
+
+                optmenu_open(&(optmenu_config_s)
+                {
+                    .center_x = true,
+                    .center_y = true,
+                    .x = SCREEN_WIDTH / 2,
+                    .y = SCREEN_HEIGHT / 4
+                });
+
+                state.mode = MENU_MODE_OPTIONS;
                 break;
             
             case 3:
@@ -143,7 +175,13 @@ static void scene_frame(void)
     }
     else if (state.mode == MENU_MODE_OPTIONS)
     {
-        options_menu_update();
+        if (!optmenu_update())
+        {
+            gfx_ctl.bg[1].enabled = true;
+            state.mode = MENU_MODE_MAIN;
+            gfx_text_bmap_clear(0, 0, GFX_TEXT_BMP_COLS, GFX_TEXT_BMP_ROWS);
+            menu_show(&state.menu);
+        }
     }
     else if (state.mode == MENU_MODE_PAGE)
     {

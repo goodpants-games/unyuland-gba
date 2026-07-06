@@ -40,13 +40,14 @@ int menu_calc_max_width(const char *const items[], uint item_count);
 int menu_calc_draw_x(const menu_s *menu, const char *text);
 int menu_calc_draw_y(const menu_s *menu, uint item_index);
 void menu_show(menu_s *menu);
+void menu_draw_item(menu_s *menu, uint item_index, bool clear);
 menu_status_e menu_update(menu_s *menu, int *result);
 void menu_render_page(const char *header, const char *lines[], uint line_count,
                       int *o_yp);
 
-static inline int text_center_x(const char *str)
+static inline int text_center_x(const char *str, int width)
 {
-    return (SCREEN_WIDTH - (strlen(str) * 12)) / 2;
+    return (width - (strlen(str) * 12)) / 2;
 }
 
 #endif
