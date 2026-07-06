@@ -440,7 +440,10 @@ void platctl_set_volume(unsigned int volume)
 
 void platctl_set_fullscreen(bool fulscr)
 {
-    SDL_SetWindowFullscreen(s_window, fulscr);
+    if (!SDL_SetWindowFullscreen(s_window, fulscr))
+    {
+        SDL_Log("could not set fullscreen: %s", SDL_GetError());
+    }
 }
 
 bool platctl_get_fullscreen(void)
