@@ -394,10 +394,6 @@ static void audio_update(void)
             samples[i+0] *= 0x40;
             samples[i+1] *= 0x40;
 
-            // final post-processing volume reduction
-            samples[i+0] /= 2;
-            samples[i+1] /= 2;
-
             // apply speaker volume
             samples[i+0] = (s16)(((s32)samples[i+0] * s_audio_volume) / PLATCTL_VOLUME_MAX);
             samples[i+1] = (s16)(((s32)samples[i+1] * s_audio_volume) / PLATCTL_VOLUME_MAX);

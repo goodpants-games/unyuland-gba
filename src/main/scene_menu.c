@@ -28,8 +28,8 @@ static const char *const page_menu_options[] =
 static char volume_string[] = "VOLUME:\0\0\0\0\0";
 static const uint volume_levels[6] = {
     (uint)(PLATCTL_VOLUME_MAX * 0.00),
-    (uint)(PLATCTL_VOLUME_MAX * 0.10),
-    (uint)(PLATCTL_VOLUME_MAX * 0.25),
+    (uint)(PLATCTL_VOLUME_MAX * 0.05),
+    (uint)(PLATCTL_VOLUME_MAX * 0.15),
     (uint)(PLATCTL_VOLUME_MAX * 0.50),
     (uint)(PLATCTL_VOLUME_MAX * 1.00),
     (uint)(PLATCTL_VOLUME_MAX * 3.00),
