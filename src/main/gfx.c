@@ -180,10 +180,9 @@ void gfx_reset_palette(void)
     for (int i = 0; i < 16; ++i)
         pal_obj_bank[i][0] = RGB8(255, 0, 255);
 
-    // TODO: REmove this
-#ifdef DEVDEBUG
-    pal_bg_bank[0][0] = RGB8(255, 0, 255);
-#endif
+// #ifdef DEVDEBUG
+//     pal_bg_bank[0][0] = RGB8(255, 0, 255);
+// #endif
 }
 
 ARM_FUNC NO_INLINE
@@ -898,14 +897,27 @@ void gfx_text_bmap_print(uint x, uint y, const char *text,
 {
     const TILE *const text_data = (const TILE *)font_gfxTiles;
 
-    bool is_white = text_color == TEXT_COLOR_WHITE;
+    bool is_white = false;
     u32 color_bits = 0;
-    if (text_color == TEXT_COLOR_BLUE)
+
+    switch (text_color)
+    {
+    case TEXT_COLOR_WHITE:
+        is_white = true;
+        break;
+    case TEXT_COLOR_BLUE:
         color_bits = 0x33333333;
-    else if (text_color == TEXT_COLOR_YELLOW)
+        break;
+    case TEXT_COLOR_YELLOW:
         color_bits = 0x22222222;
-    else if (text_color == TEXT_COLOR_BLACK)
+        break;
+    case TEXT_COLOR_BLACK:
         color_bits = 0x11111111;
+        break;
+    case TEXT_COLOR_CLEAR:
+        color_bits = 0x00000000;
+        break;
+    }
     
     gfx_text_bmp_dirty_rows[y / 8] = true;
     gfx_text_bmp_dirty_rows[y / 8 + 1] = true;

@@ -62,6 +62,7 @@ typedef enum text_color
     TEXT_COLOR_BLUE,
     TEXT_COLOR_YELLOW,
     TEXT_COLOR_BLACK,
+    TEXT_COLOR_CLEAR,
 }
 text_color_e;
 
