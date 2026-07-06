@@ -10,6 +10,8 @@ typedef struct optmenu_config
 } optmenu_config_s;
 
 void optmenu_open(const optmenu_config_s *config);
+void optmenu_close(void);
 bool optmenu_update(void); // returns true if menu is still open
+uint optmenu_get_option_count(void);
 
 #endif

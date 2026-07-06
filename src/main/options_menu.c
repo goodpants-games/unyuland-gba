@@ -166,6 +166,18 @@ void optmenu_open(const optmenu_config_s *config)
     menu_show(&page_menu);
 }
 
+void optmenu_close(void)
+{
+#ifdef PLATFORM_PC
+    platctl_set_fullscreen_change_watcher(NULL);
+#endif
+}
+
+uint optmenu_get_option_count(void)
+{
+    return ARRLEN(options_options);
+}
+
 bool optmenu_update(void)
 {
     // beware evil gotos. because i'm lazy as fuck.
@@ -253,9 +265,7 @@ bool optmenu_update(void)
     return true;
 
     exit:
-#ifdef PLATFORM_PC
-        platctl_set_fullscreen_change_watcher(NULL);
-#endif
+        optmenu_close();
         return false;
 
 #ifdef PLATFORM_PC

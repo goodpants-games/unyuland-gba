@@ -16,6 +16,7 @@
 #include "scenes.h"
 #include "automap.h"
 #include "math_util.h"
+#include "options_menu.h"
 
 
 #define HUD_ROW_ORIGIN (GFX_TEXT_BMP_ROWS - 2)
@@ -24,14 +25,15 @@
 #define HUD_SPRITE_COUNT 16
 #define PAUSE_PALETTE_MUL FX(0.55)
 
-#define PAUSE_MENU_OPTION_COUNT 4
+#define PAUSE_MENU_OPTION_COUNT 5
 static const char *pause_menu_options[PAUSE_MENU_OPTION_COUNT] =
-    {"RESUME", "RESPAWN", "MAP", "QUIT"};
+    {"RESUME", "RESPAWN", "MAP", "OPTIONS", "QUIT"};
 
 enum
 {
     SUBSTATE_NORMAL,
     SUBSTATE_PAUSED,
+    SUBSTATE_OPTIONS,
     SUBSTATE_MAP,
 };
 
@@ -118,7 +120,7 @@ static void update_hud_sprites(uint face_frame, uint mode_frame)
 static void setup_game_hud(void)
 {
     // set up pause menu display
-    gfx_text_bmap_dst_assign(0, 9, 0, GFX_TEXTPAL_NORMAL);
+    gfx_text_bmap_dst_assign(0, 10, 0, GFX_TEXTPAL_NORMAL);
     // set up HUD display
     gfx_text_bmap_dst_assign(18, 2, HUD_ROW_ORIGIN, GFX_TEXTPAL_MUL);
 
@@ -171,7 +173,7 @@ static void open_map(void)
     gfx_load_map(1, &state.automap.scrmap_header);
 
     // clear pause gui
-    gfx_text_bmap_dst_clear(0, 9);
+    gfx_text_bmap_dst_clear(0, 10);
 
     // change bottom bar to say controls
     clear_game_hud();
@@ -203,7 +205,7 @@ static void close_map(void)
     gfx_ctl.bg[3].enabled = enable_bg;
 
     // reset pause menu display
-    gfx_text_bmap_dst_assign(0, 9, 0, GFX_TEXTPAL_NORMAL);
+    gfx_text_bmap_dst_assign(0, 10, 0, GFX_TEXTPAL_NORMAL);
 
     setup_game_hud();
     update_hud(true);
@@ -246,7 +248,7 @@ static void update_map(void)
 static void open_pause_menu(void)
 {
     // background fill
-    gfx_text_bmap_fill_rect(2, 2, 98, 62, 1, 0);
+    gfx_text_bmap_fill_rect(2, 2, 98, 74, 1, 0);
     // u32 bg_t[8] =  {0x00000000, 0x00000000, 0x11111111, 0x11111111,
     //                 0x11111111, 0x11111111, 0x11111111, 0x11111111};
     // u32 bg_r[8] =  {0x00001111, 0x00001111, 0x00001111, 0x00001111,
@@ -268,8 +270,6 @@ static void open_pause_menu(void)
 
     // print text
     gfx_text_bmap_print(4, 0 + 4, "PAUSED", TEXT_COLOR_BLUE);
-
-    state.pause_menu.selected = 0;
     menu_show(&state.pause_menu);
 }
 
@@ -277,12 +277,14 @@ static void close_pause_menu(void)
 {
     u32 t[8] =  {0x00000000, 0x00000000, 0x00000000, 0x00000000,
                  0x00000000, 0x00000000, 0x00000000, 0x00000000};
-    gfx_text_bmap_fill(0, 0, 13, 8, t);
+    gfx_text_bmap_fill(0, 0, 22, 10, t);
 }
 
 static void pause_game(void)
 {
     state.substate = SUBSTATE_PAUSED;
+    state.pause_menu.selected = 0;
+
     open_pause_menu();
     mplay_set_volume((int)(1024 * 0.1));
     gfx_set_palette_multiplied(PAUSE_PALETTE_MUL);
@@ -314,7 +316,27 @@ static void update_pause_menu(void)
                 case 2: // map
                     open_map();
                     break;
-                case 3: // quit
+                case 3: // options
+                {
+                    u32 t[8] =  {0x00000000, 0x00000000, 0x00000000, 0x00000000,
+                                 0x00000000, 0x00000000, 0x00000000, 0x00000000};
+                    gfx_text_bmap_fill(0, 0, 13, 10, t);
+
+                    uint w = 13 * 12 + MENU_DOT_ADVANCE_X + 2;
+                    uint h = 12 * (1 + optmenu_get_option_count()) + 2;
+
+                    gfx_text_bmap_fill_rect(2, 2, w, h, 1, 0);
+
+                    optmenu_open(&(optmenu_config_s)
+                    {
+                        .x = 4,
+                        .y = 4,
+                    });
+
+                    state.substate = SUBSTATE_OPTIONS;
+                    break;
+                }
+                case 4: // quit
                     scenemgr_change(&scene_desc_menu, 0);
                     break;
             }
@@ -453,8 +475,9 @@ static void scene_frame(void)
         {
             pause_game();
         }
-        else if (state.substate == SUBSTATE_PAUSED)
+        else if (state.substate == SUBSTATE_PAUSED || state.substate == SUBSTATE_OPTIONS)
         {
+            optmenu_close();
             unpause_game();
         }
     }
@@ -477,6 +500,18 @@ static void scene_frame(void)
     
     case SUBSTATE_PAUSED:
         update_pause_menu();
+        break;
+    
+    case SUBSTATE_OPTIONS:
+        if (!optmenu_update())
+        {
+            u32 t[8] =  {0x00000000, 0x00000000, 0x00000000, 0x00000000,
+                        0x00000000, 0x00000000, 0x00000000, 0x00000000};
+            gfx_text_bmap_fill(0, 0, 22, 10, t);
+
+            open_pause_menu();
+            state.substate = SUBSTATE_PAUSED;
+        }
         break;
 
     case SUBSTATE_MAP:
