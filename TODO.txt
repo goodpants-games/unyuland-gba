@@ -13,6 +13,8 @@
 - Add final boss and beginning area depicting unyu villag.
 - Fix respawning when just started the game.
   that is, create a state snapshot on launch
+- palette double-buffering (also so that gba color option can be toggled in-game
+  without being ~Buggy)
 
 - pc port: add frame time display
 - pc port: controller support
