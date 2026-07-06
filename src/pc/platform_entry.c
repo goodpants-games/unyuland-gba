@@ -47,6 +47,7 @@ void platform_app_frame(void);
 
 static SDL_Window *s_window = NULL;
 static SDL_AudioStream *s_astream = NULL;
+static SDL_Gamepad *s_gamepad = NULL;
 static SDL_GLContext s_gl = NULL;
 static bool s_is_fullscreen = false;
 
@@ -494,6 +495,75 @@ static uint get_key_input_flag(SDL_Keycode key)
     }
 }
 
+static void update_gamepad_inputs(void)
+{
+    if (!s_gamepad) return;
+
+    u16 key_input = 0;
+    
+    // == poll inputs ==
+
+    // d-pad
+    bool gp_l = SDL_GetGamepadButton(s_gamepad, SDL_GAMEPAD_BUTTON_DPAD_LEFT);
+    bool gp_r = SDL_GetGamepadButton(s_gamepad, SDL_GAMEPAD_BUTTON_DPAD_RIGHT);
+    bool gp_u = SDL_GetGamepadButton(s_gamepad, SDL_GAMEPAD_BUTTON_DPAD_UP);
+    bool gp_d = SDL_GetGamepadButton(s_gamepad, SDL_GAMEPAD_BUTTON_DPAD_DOWN);
+
+    // left joystick
+    s16 gp_lj_x = SDL_GetGamepadAxis(s_gamepad, SDL_GAMEPAD_AXIS_LEFTX);
+    s16 gp_lj_y = SDL_GetGamepadAxis(s_gamepad, SDL_GAMEPAD_AXIS_LEFTY);
+
+    // face buttons
+    bool gp_a = SDL_GetGamepadButton(s_gamepad, SDL_GAMEPAD_BUTTON_SOUTH);
+    bool gp_b = SDL_GetGamepadButton(s_gamepad, SDL_GAMEPAD_BUTTON_EAST);
+    bool gp_x = SDL_GetGamepadButton(s_gamepad, SDL_GAMEPAD_BUTTON_WEST);
+    bool gp_y = SDL_GetGamepadButton(s_gamepad, SDL_GAMEPAD_BUTTON_NORTH);
+
+    // bumpers
+    bool gp_lb = SDL_GetGamepadButton(s_gamepad, SDL_GAMEPAD_BUTTON_LEFT_SHOULDER);
+    bool gp_rb = SDL_GetGamepadButton(s_gamepad, SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER);
+
+    // triggers
+    s16 gp_lt = SDL_GetGamepadAxis(s_gamepad, SDL_GAMEPAD_AXIS_LEFT_TRIGGER);
+    s16 gp_rt = SDL_GetGamepadAxis(s_gamepad, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER);
+
+    // start/back
+    bool gp_start = SDL_GetGamepadButton(s_gamepad, SDL_GAMEPAD_BUTTON_START);
+    bool gp_back = SDL_GetGamepadButton(s_gamepad, SDL_GAMEPAD_BUTTON_BACK);
+    
+    // == apply inputs ==
+
+    // gba directional inputs
+    if (gp_l || gp_lj_x < SDL_JOYSTICK_AXIS_MIN / 2)
+        key_input |= KEY_LEFT;
+    if (gp_r || gp_lj_x > SDL_JOYSTICK_AXIS_MAX / 2)
+        key_input |= KEY_RIGHT;
+    if (gp_u || gp_lj_y < SDL_JOYSTICK_AXIS_MIN / 2)
+        key_input |= KEY_UP;
+    if (gp_d || gp_lj_y > SDL_JOYSTICK_AXIS_MAX / 2)
+        key_input |= KEY_DOWN;
+
+    // gba face buttons
+    if (gp_a) key_input |= KEY_A;
+    if (gp_b) key_input |= KEY_B;
+
+    // gba shoulder buttons
+    if (gp_lb || gp_x || gp_lt > SDL_JOYSTICK_AXIS_MAX / 2)
+        key_input |= KEY_L;
+    if (gp_rb || gp_y || gp_rt > SDL_JOYSTICK_AXIS_MAX / 2)
+        key_input |= KEY_R;
+
+    // gba start and select
+    if (gp_start) key_input |= KEY_START;
+    if (gp_back) key_input |= KEY_SELECT;
+
+    if (key_input)
+    {
+        SDL_HideCursor();
+        REG_KEYINPUT &= ~key_input;
+    }
+}
+
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 {
 #ifdef PLATFORM_WEB
@@ -502,7 +572,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     SDL_SetHint(SDL_HINT_VIDEO_FORCE_EGL, "1");
 #endif
 
-    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO))
+    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD))
     {
         SDL_Log("Couldn't initialize SDL: %s", SDL_GetError());
         return SDL_APP_FAILURE;
@@ -625,11 +695,16 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     s_time_accum += dt_ns;
 
     bool did_update = false;
+
+    // update input
+    REG_KEYINPUT = s_key_input;
+    update_gamepad_inputs();
+
+    // run game iterations
     for (int iter = 0; iter < 8; ++iter)
     {
         if (s_time_accum < FRAME_LENGTH_NS) break;
 
-        REG_KEYINPUT = s_key_input;
         platform_app_frame();
     
         did_update = true;
@@ -717,6 +792,25 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
     case SDL_EVENT_MOUSE_MOTION:
         SDL_ShowCursor();
         break;
+
+    case SDL_EVENT_GAMEPAD_ADDED:
+        if (!s_gamepad)
+        {
+            s_gamepad = SDL_OpenGamepad(event->gdevice.which);
+            if (!s_gamepad)
+            {
+                SDL_Log("Failed to open gamepad ID %u: %s",
+                        (uint) event->gdevice.which, SDL_GetError());
+            }
+        }
+        break;
+
+    case SDL_EVENT_GAMEPAD_REMOVED:
+        if (s_gamepad && (SDL_GetGamepadID(s_gamepad) == event->gdevice.which))
+        {
+            SDL_CloseGamepad(s_gamepad);
+            s_gamepad = NULL;
+        }
     }
     
     return SDL_APP_CONTINUE;  /* carry on with the program! */
@@ -724,6 +818,8 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 
 void SDL_AppQuit(void *appstate, SDL_AppResult result)
 {
+    SDL_CloseGamepad(s_gamepad);
+
     glDeleteTextures(1, &s_gfx_state.screen_tex);
     glDeleteBuffers(1, &s_gfx_state.display_quad);
     glDeleteBuffers(1, &s_gfx_state.display_quad);
