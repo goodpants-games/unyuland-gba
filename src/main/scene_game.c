@@ -85,6 +85,7 @@ static void int_to_str(int n, char *buf)
 
 static void clear_game_hud(void)
 {
+    // gfx_text_bmap_fill_rect(0, HUD_Y_ORIGIN, SCREEN_WIDTH, 10, 1, 0);
     u32 bg1[8] = {0x00000000, 0x00000000, 0x00000000, 0x00000000,
                  0x00000000, 0x00000000, 0x11111111, 0x11111111};
     u32 bg2[8] = {0x11111111, 0x11111111, 0x11111111, 0x11111111,
@@ -245,7 +246,7 @@ static void update_map(void)
 static void open_pause_menu(void)
 {
     // background fill
-    gfx_text_bmap_fill_rect(2, 2, 30, 30, 1, 0);
+    gfx_text_bmap_fill_rect(2, 2, 98, 62, 1, 0);
     // u32 bg_t[8] =  {0x00000000, 0x00000000, 0x11111111, 0x11111111,
     //                 0x11111111, 0x11111111, 0x11111111, 0x11111111};
     // u32 bg_r[8] =  {0x00001111, 0x00001111, 0x00001111, 0x00001111,

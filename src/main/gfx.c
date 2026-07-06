@@ -4,6 +4,7 @@
 #include <platutil.h>
 #include <data/graphics/font_gfx.h>
 #include "gfx.h"
+#include "math_util.h"
 
 
 
@@ -178,6 +179,11 @@ void gfx_reset_palette(void)
 
     for (int i = 0; i < 16; ++i)
         pal_obj_bank[i][0] = RGB8(255, 0, 255);
+
+    // TODO: REmove this
+#ifdef DEVDEBUG
+    pal_bg_bank[0][0] = RGB8(255, 0, 255);
+#endif
 }
 
 ARM_FUNC NO_INLINE
@@ -660,14 +666,23 @@ void gfx_text_bmap_fill_rect(uint x, uint y, uint width, uint height,
 
     struct
     {
-        u32 tl[8];
-        u32 tr[8];
-        u32 bl[8];
-        u32 br[8];
-        u32 t[8];
-        u32 r[8];
-        u32 l[8];
-        u32 b[8];
+        union
+        {
+            struct
+            {
+                u32 tl[8];
+                u32 tr[8];
+                u32 bl[8];
+                u32 br[8];
+            };
+            struct
+            {
+                u32 t[8];
+                u32 r[8];
+                u32 l[8];
+                u32 b[8];
+            };
+        };
         u32 body[8];
     } bmaps;
 
@@ -685,7 +700,7 @@ void gfx_text_bmap_fill_rect(uint x, uint y, uint width, uint height,
     bg_fill |= bg_fill << 8;
     bg_fill |= bg_fill << 16;
 
-    const u32 bmask_all  = 0xFFFFFFFF;
+    const u32 bmask_all = 0xFFFFFFFF;
 
     uint yofs_t = y & 7;
     uint yofs_b = (y + height) & 7;
@@ -699,23 +714,17 @@ void gfx_text_bmap_fill_rect(uint x, uint y, uint width, uint height,
     mask_l = bmask_all << (xofs_l * 4);
     fill_l = (fg_fill & mask_l) | (bg_fill & ~mask_l);
 
-    mask_r = bmask_all << (xofs_r * 4);
+    mask_r = bmask_all >> (32 - xofs_r * 4);
     fill_r = (fg_fill & mask_r) | (bg_fill & ~mask_r);
+    
+    // fill body
+    memset32(bmaps.body, fg_fill, 8);
 
-    // fill top-left and top-right bitmaps
-    memset32(bmaps.tl, bg_fill, yofs_t);
-    memset32(bmaps.tr, bg_fill, yofs_t);
+    // perform tile fills:
+    //   body
+    gfx_text_bmap_fill(col_s + 1, row_s + 1, cols - 2, rows - 2, bmaps.body);
 
-    memset32(bmaps.tl + yofs_t, fill_l, 8 - yofs_t);
-    memset32(bmaps.tr + yofs_t, fill_r, 8 - yofs_t);
-
-    // fill bottom-left and bottom-right bitmaps
-    memset32(bmaps.bl, fill_l, yofs_t);
-    memset32(bmaps.br, fill_r, yofs_t);
-
-    memset32(bmaps.bl + yofs_b, bg_fill, 8 - yofs_t);
-    memset32(bmaps.br + yofs_b, bg_fill, 8 - yofs_t);
-
+    //    edges
     // fill left and right bitmaps
     memset32(bmaps.l, fill_l, 8);
     memset32(bmaps.r, fill_r, 8);
@@ -725,25 +734,33 @@ void gfx_text_bmap_fill_rect(uint x, uint y, uint width, uint height,
     memset32(bmaps.t + yofs_t, fg_fill, 8 - yofs_t);
 
     // fill bottom bitmap
-    memset32(bmaps.b, fg_fill, yofs_t);
-    memset32(bmaps.b + yofs_t, bg_fill, 8 - yofs_b);
+    memset32(bmaps.b, fg_fill, yofs_b);
+    memset32(bmaps.b + yofs_b, bg_fill, 8 - yofs_b);
     
-    // fill body
-    memset32(bmaps.body, fg_fill, 8);
-
-    // perform tile fills:
-    //   body
-    gfx_text_bmap_fill(col_s + 1, row_s + 1, cols - 2, rows - 2, bmaps.body);
-    //   corners
-    gfx_text_bmap_fill(col_s, row_s, 1, 1, bmaps.tl);
-    gfx_text_bmap_fill(col_e, row_s, 1, 1, bmaps.tr);
-    gfx_text_bmap_fill(col_s, row_e, 1, 1, bmaps.bl);
-    gfx_text_bmap_fill(col_e, row_e, 1, 1, bmaps.br);
-    //    edges
     gfx_text_bmap_fill(col_s, row_s + 1, 1, rows - 2, bmaps.l);
     gfx_text_bmap_fill(col_e, row_s + 1, 1, rows - 2, bmaps.r);
     gfx_text_bmap_fill(col_s + 1, row_s, cols - 2, 1, bmaps.t);
     gfx_text_bmap_fill(col_s + 1, row_e, cols - 2, 1, bmaps.b);
+
+    //   corners
+    // fill top-left and top-right bitmaps
+    memset32(bmaps.tl, bg_fill, yofs_t);
+    memset32(bmaps.tr, bg_fill, yofs_t);
+
+    memset32(bmaps.tl + yofs_t, fill_l, 8 - yofs_t);
+    memset32(bmaps.tr + yofs_t, fill_r, 8 - yofs_t);
+
+    // fill bottom-left and bottom-right bitmaps
+    memset32(bmaps.bl, fill_l, yofs_b);
+    memset32(bmaps.br, fill_r, yofs_b);
+
+    memset32(bmaps.bl + yofs_b, bg_fill, 8 - yofs_b);
+    memset32(bmaps.br + yofs_b, bg_fill, 8 - yofs_b);
+
+    gfx_text_bmap_fill(col_s, row_s, 1, 1, bmaps.tl);
+    gfx_text_bmap_fill(col_e, row_s, 1, 1, bmaps.tr);
+    gfx_text_bmap_fill(col_s, row_e, 1, 1, bmaps.bl);
+    gfx_text_bmap_fill(col_e, row_e, 1, 1, bmaps.br);
 }
 
 /*
