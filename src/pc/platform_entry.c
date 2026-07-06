@@ -480,7 +480,11 @@ static uint get_key_input_flag(SDL_Keycode key)
     case SDLK_X:      return 0x002; // B
     case SDLK_C:      return 0x200; // L
     case SDLK_V:      return 0x100; // R
-    case SDLK_ESCAPE: return 0x008; // Start 
+#ifdef PLATFORM_WEB
+    case SDLK_RETURN: return 0x008; // Start
+#else
+    case SDLK_ESCAPE: return 0x008; // Start
+#endif
     case SDLK_TAB:    return 0x004; // Select
     case SDLK_RIGHT:  return 0x010; // Right
     case SDLK_LEFT:   return 0x020; // Left
