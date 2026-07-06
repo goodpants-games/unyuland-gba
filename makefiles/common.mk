@@ -1,6 +1,5 @@
 PYTHON ?= python3
 ASEPRITE ?= aseprite
-DEVDEBUG ?= yes
 
 #---------------------------------------------------------------------------------
 .SUFFIXES:

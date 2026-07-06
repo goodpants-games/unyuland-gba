@@ -25,13 +25,20 @@ AUDIO_DRIVER := mpt
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
-CFLAGS  := -DPLATFORM_PC -gdwarf-4 -Og \
+CFLAGS  := -DPLATFORM_PC \
            $(shell $(PKGCONF) --cflags $(LIBNAMES)) $(CFLAGS)
 ASFLAGS := -DPLATFORM_PC $(ASFLAGS)
-LDFLAGS := -gdwarf-4 $(LDFLAGS)
+LDFLAGS := $(LDFLAGS)
+
+ifeq ($(DEVDEBUG),yes)
+  CFLAGS += -gdwarf-4 -Og
+  LDFLAGS += -gdwarf-4
+endif
 
 ifeq ($(OS), Windows_NT)
-  LIBS += -mconsole
+  ifeq ($(DEVDEBUG),yes)
+    LIBS += -mconsole
+  endif
 endif
 
 
