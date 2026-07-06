@@ -19,13 +19,6 @@
 #define EXTRA_OPTIONS // i.e. volume, fulscr, shader(?)
 #endif
 
-static const char *const main_menu_options[] =
-    {"START", "CONTROLS", "OPTIONS", "CREDITS"};
-
-static const char *const page_menu_options[] =
-    {"BACK"};
-
-static char volume_string[] = "VOLUME:\0\0\0\0\0";
 static const uint volume_levels[6] = {
     (uint)(PLATCTL_VOLUME_MAX * 0.00),
     (uint)(PLATCTL_VOLUME_MAX * 0.05),
@@ -35,9 +28,21 @@ static const uint volume_levels[6] = {
     (uint)(PLATCTL_VOLUME_MAX * 3.00),
 };
 
+static const char *const main_menu_options[] =
+    {"START", "CONTROLS", "OPTIONS", "CREDITS"};
+
+static const char *const page_menu_options[] =
+    {"BACK"};
+
+static char volume_string[] = "VOLUME:\0\0\0\0\0";
+
+static const char *const fulscr_off_string = "FULSCR:OFF";
+static const char *const fulscr_on_string = "FULSCR:ON";
+
 static const char *options_options[] = {
     "GBA COLOR:Off",
 #ifdef EXTRA_OPTIONS
+    fulscr_off_string,
     volume_string,
 #endif
     "BACK"
@@ -54,6 +59,7 @@ enum
 {
     OPTION_MENU_LCD_COLOR,
 #ifdef EXTRA_OPTIONS
+    OPTION_MENU_FULSCR,
     OPTION_MENU_VOLUME,
 #endif
     OPTION_MENU_BACK,
@@ -70,6 +76,9 @@ static state EWRAM_BSS;
 static EWRAM_BSS bool option_lcd_color = false;
 static EWRAM_BSS u8 option_volume = 4; // no more than 5
 static EWRAM_BSS bool option_mute = false;
+static EWRAM_BSS bool option_fulscr = false;
+
+static void open_options_menu(bool clean);
 
 static void render_page(const char *header, const char *lines[],
                         uint line_count)
@@ -104,8 +113,30 @@ static void update_volume_text(void)
     }
 }
 
+static inline void update_fulscr_text(void)
+{
+    options_options[OPTION_MENU_FULSCR] =
+        option_fulscr ? fulscr_on_string : fulscr_off_string;
+}
+
+static void fulscr_change_watcher(bool fulscr)
+{
+    option_fulscr = fulscr;
+    update_fulscr_text();
+    open_options_menu(false);
+}
+
 static void open_options_menu(bool clean)
 {
+#ifdef EXTRA_OPTIONS
+    if (clean)
+    {
+        option_fulscr = platctl_get_fullscreen();
+        update_fulscr_text();
+        platctl_set_fullscreen_change_watcher(fulscr_change_watcher);
+    }
+#endif
+
     gfx_text_bmap_clear(0, 0, GFX_TEXT_BMP_COLS, GFX_TEXT_BMP_ROWS);
 
     int yp = MENU_CENTER_Y(1 + ARRLEN(options_options));
@@ -130,6 +161,8 @@ static void open_options_menu(bool clean)
 
 static void options_menu_update(void)
 {
+    // beware evil gotos. because i'm lazy as fuck.
+
     int res;
     switch (menu_update(&state.page_menu, &res))
     {
@@ -156,6 +189,12 @@ static void options_menu_update(void)
         case OPTION_MENU_VOLUME:
             option_mute = !option_mute;
             goto update_volume;
+            break;
+
+        case OPTION_MENU_FULSCR:
+            platctl_set_fullscreen(!option_fulscr);
+            // rest of the functionality should be handled by the fullscreen
+            // change watcher
             break;
 #endif
 
@@ -204,6 +243,10 @@ static void options_menu_update(void)
     return;
 
     exit:
+#ifdef EXTRA_OPTIONS
+        platctl_set_fullscreen_change_watcher(NULL);
+#endif
+
         gfx_ctl.bg[1].enabled = true;
         state.mode = MENU_MODE_MAIN;
         gfx_text_bmap_clear(0, 0, GFX_TEXT_BMP_COLS, GFX_TEXT_BMP_ROWS);
@@ -235,6 +278,7 @@ static void scene_load(uintptr_t data)
     };
 
     update_volume_text();
+
     menu_show(&state.menu);
     gfx_text_bmap_dst_assign(SCREEN_HEIGHT_T / 2, GFX_TEXT_BMP_ROWS, 0,
                                 GFX_TEXTPAL_NORMAL);

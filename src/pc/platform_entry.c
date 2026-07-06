@@ -40,8 +40,8 @@
 #include "display.h"
 #include "audioutil.h"
 
-#define WINDOW_SCALE    3
-#define SAMPLE_RATE     32768
+#define DEF_WINDOW_SCALE 3
+#define SAMPLE_RATE      32768
 
 #define SECS(x) (s64)((x) * 1000000000)
 #define FRAME_LENGTH_NS SECS(1.0 / 60.0)
@@ -54,6 +54,7 @@ void platform_app_frame(void);
 static SDL_Window *s_window = NULL;
 static SDL_AudioStream *s_astream = NULL;
 static SDL_GLContext s_gl = NULL;
+static bool s_is_fullscreen = false;
 
 // leaky integrator for dc offset removal
 static double s_asamp_accum[2] = { 0.0, 0.0 };
@@ -277,31 +278,35 @@ static bool gfx_state_init(void)
 
 static void gfx_update(void)
 {
-    int win_sx, win_sy;
-    SDL_GetWindowSizeInPixels(s_window, &win_sx, &win_sy);
+    int win_sx_i, win_sy_i;
+    float win_sx, win_sy;
+    SDL_GetWindowSizeInPixels(s_window, &win_sx_i, &win_sy_i);
+    win_sx = (float) win_sx_i;
+    win_sy = (float) win_sy_i;
 
-    glViewport(0, 0, win_sx, win_sy);
+    glViewport(0, 0, win_sx_i, win_sy_i);
 
-    // not really any need to clear, so why not.
-    // glClearColor(1.0f, 0.0f, 0.0f, 1.0f);
-    // glClear(GL_COLOR_BUFFER_BIT);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
     
     // activate shader
     glUseProgram(s_gfx_state.display_prog);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, s_gfx_state.screen_tex);
 
-    {
-        GLint loc = glGetUniformLocation(s_gfx_state.display_prog, "u_matrix");
-        float mat[16] = {
-            1, 0, 0, 0,
-            0, 1, 0, 0,
-            0, 0, 1, 0,
-            0, 0, 0, 1
-        };
+    // projection matrix
+    float win_ar = win_sy / win_sx;
+    float scr_ar = (float)SCREEN_HEIGHT / SCREEN_WIDTH;
 
-        glUniformMatrix4fv(loc, 1, GL_FALSE, mat);
-    }
+    GLint uloc = glGetUniformLocation(s_gfx_state.display_prog, "u_matrix");
+    float mat[16] = {
+        win_ar / scr_ar, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        0, 0, 0, 1
+    };
+
+    glUniformMatrix4fv(uloc, 1, GL_FALSE, mat);
 
     // bind geometry and attributes
     typedef struct
@@ -415,12 +420,45 @@ static void audio_update(void)
     #undef NCHANNELS
 }
 
+#pragma endregion audio
+
+
+
+
+
+
+
+
+
+
+//------------------------------------------------------------------------------
+// platctl
+//------------------------------------------------------------------------------
+#pragma region platctl
+
+static platctl_fulscr_change_watcher_f s_fulscr_change_watcher = NULL;
+
 void platctl_set_volume(unsigned int volume)
 {
     s_audio_volume = volume;
 }
 
-#pragma endregion audio
+void platctl_set_fullscreen(bool fulscr)
+{
+    SDL_SetWindowFullscreen(s_window, fulscr);
+}
+
+bool platctl_get_fullscreen(void)
+{
+    return s_is_fullscreen;
+}
+
+void platctl_set_fullscreen_change_watcher(platctl_fulscr_change_watcher_f fun)
+{
+    s_fulscr_change_watcher = fun;
+}
+
+#pragma endregion platctl
 
 
 
@@ -486,10 +524,17 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 #   endif
 #endif
 
-    const int scr_w = SCREEN_WIDTH * WINDOW_SCALE;
-    const int scr_h = SCREEN_HEIGHT * WINDOW_SCALE;
-    const SDL_WindowFlags win_flags =
+    const int scr_w = SCREEN_WIDTH * DEF_WINDOW_SCALE;
+    const int scr_h = SCREEN_HEIGHT * DEF_WINDOW_SCALE;
+    SDL_WindowFlags win_flags =
         SDL_WINDOW_OPENGL | SDL_WINDOW_HIGH_PIXEL_DENSITY;
+
+    // for some reason, having a non-resizable window messes with HTML5
+    // fullscreen. i.e., apparently, when exiting fullscreen, the canvas's size
+    // becomes 0x0 (https://github.com/libsdl-org/SDL/issues/6798)
+#ifdef PLATFORM_WEB
+    win_flags |= SDL_WINDOW_RESIZABLE;
+#endif
     
     s_window = SDL_CreateWindow("Unyuland", scr_w, scr_h, win_flags);
     if (!s_window)
@@ -650,6 +695,22 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 
         break;
     }
+
+    case SDL_EVENT_WINDOW_ENTER_FULLSCREEN:
+        LOG_DBG("Enter fullscreen");
+        s_is_fullscreen = true;
+        if (s_fulscr_change_watcher)
+            s_fulscr_change_watcher(true);
+
+        break;
+
+    case SDL_EVENT_WINDOW_LEAVE_FULLSCREEN:
+        LOG_DBG("Leave fullscreen");
+        s_is_fullscreen = false;
+        if (s_fulscr_change_watcher)
+            s_fulscr_change_watcher(false);
+
+        break;
     }
     
     return SDL_APP_CONTINUE;  /* carry on with the program! */
