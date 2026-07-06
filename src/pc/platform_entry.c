@@ -680,7 +680,10 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
     {
         uint k = get_key_input_flag(event->key.key);
         if (k)
+        {
             s_key_input &= ~k;
+            SDL_HideCursor();
+        }
 
         break;
     }
@@ -708,6 +711,11 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
         if (s_fulscr_change_watcher)
             s_fulscr_change_watcher(false);
 
+        break;
+
+    case SDL_EVENT_MOUSE_BUTTON_DOWN:
+    case SDL_EVENT_MOUSE_MOTION:
+        SDL_ShowCursor();
         break;
     }
     
