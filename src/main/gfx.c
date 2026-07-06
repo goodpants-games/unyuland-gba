@@ -539,54 +539,6 @@ EWRAM_BSS bool gfx_text_bmp_dirty_rows[GFX_TEXT_BMP_ROWS + 2];
 
 ARM_FUNC void _gfx_text_blit_tile(uint x, uint y, const TILE4 *src_tile);
 
-/*
-ARM_FUNC NO_INLINE
-static void _gfx_text_blit_tileC(uint x, uint y, const TILE4 *src_tile)
-{
-    const uint shf = (x & 7) << 2;
-    uint ry = y & 7;
-    u32 *row = &gfx_text_bmp_buf[(y >> 3) * GFX_TEXT_BMP_COLS + (x >> 3)].data[ry];
-    const u32 *src_row = src_tile->data;
-
-    // bool *dirty = text_bmp_dirty_rows + (y >> 3);
-    // *dirty = true;
-
-    if (shf)
-    {
-        for (int r = 0; r < 8; ++r)
-        {
-            u32 src = *src_row;
-            *row |= src << shf;
-            *(row + 8) |= src >> (32 - shf);
-
-            ++row;
-            ++src_row;
-            if (++ry == 8)
-            {
-                row += (GFX_TEXT_BMP_COLS - 1) * 8;
-                // *(++dirty) = true;
-            }
-        }
-    }
-    else
-    {
-        for (int r = 0; r < 8; ++r)
-        {
-            u32 src = *src_row;
-            *row |= src;
-
-            ++row;
-            ++src_row;
-            if (++ry == 8)
-            {
-                row += (GFX_TEXT_BMP_COLS - 1) * 8;
-                // *(++dirty) = true;
-            }
-        }
-    }
-}
-*/
-
 ARM_FUNC NO_INLINE
 static void blit_tile_colored(uint x, uint y, const TILE4 *src_tile,
                               u32 color_bits)
@@ -683,6 +635,115 @@ void gfx_text_bmap_dst_assign(uint row, uint row_count, uint src_row,
     }
 
     gfx_queue_memcpy(&se_mem[GFX_BG0_INDEX][row * 32], alloc, sz);
+}
+
+ARM_FUNC NO_INLINE
+void gfx_text_bmap_fill_rect(uint x, uint y, uint width, uint height,
+                             uint fg_col, uint bg_col)
+{
+    if (width == 0 || height == 0) return;
+
+    uint col_s = x / 8;
+    uint row_s = y / 8;
+    uint col_e = (x + width) / 8;
+    uint row_e = (y + height) / 8;
+    uint cols = col_e - col_s + 1;
+    uint rows = row_e - row_s + 1;
+
+    // function expects all tiles to be used...
+    if (cols < 3 || rows < 3)
+    {
+        LOG_ERR("gfx_text_bmap_fill_rect: given rectangle is too small...");
+        DBG_BREAK();
+        return;
+    }
+
+    struct
+    {
+        u32 tl[8];
+        u32 tr[8];
+        u32 bl[8];
+        u32 br[8];
+        u32 t[8];
+        u32 r[8];
+        u32 l[8];
+        u32 b[8];
+        u32 body[8];
+    } bmaps;
+
+    // memset32(&bmaps, 0, sizeof(bmaps) / 4);
+
+    // create 32-bit number that is filled with the fg color nibble
+    u32 fg_fill = fg_col & 0xFF;
+    fg_fill |= fg_fill << 4;
+    fg_fill |= fg_fill << 8;
+    fg_fill |= fg_fill << 16;
+
+    // do the same with the bg color
+    u32 bg_fill = bg_col & 0xFF;
+    bg_fill |= bg_fill << 4;
+    bg_fill |= bg_fill << 8;
+    bg_fill |= bg_fill << 16;
+
+    const u32 bmask_all  = 0xFFFFFFFF;
+
+    uint yofs_t = y & 7;
+    uint yofs_b = (y + height) & 7;
+    uint xofs_l = x & 7;
+    uint xofs_r = (x + width) & 7;
+
+    u32 mask_l, mask_r;
+    u32 fill_l, fill_r;
+
+    // compute fills for left and right side
+    mask_l = bmask_all << (xofs_l * 4);
+    fill_l = (fg_fill & mask_l) | (bg_fill & ~mask_l);
+
+    mask_r = bmask_all << (xofs_r * 4);
+    fill_r = (fg_fill & mask_r) | (bg_fill & ~mask_r);
+
+    // fill top-left and top-right bitmaps
+    memset32(bmaps.tl, bg_fill, yofs_t);
+    memset32(bmaps.tr, bg_fill, yofs_t);
+
+    memset32(bmaps.tl + yofs_t, fill_l, 8 - yofs_t);
+    memset32(bmaps.tr + yofs_t, fill_r, 8 - yofs_t);
+
+    // fill bottom-left and bottom-right bitmaps
+    memset32(bmaps.bl, fill_l, yofs_t);
+    memset32(bmaps.br, fill_r, yofs_t);
+
+    memset32(bmaps.bl + yofs_b, bg_fill, 8 - yofs_t);
+    memset32(bmaps.br + yofs_b, bg_fill, 8 - yofs_t);
+
+    // fill left and right bitmaps
+    memset32(bmaps.l, fill_l, 8);
+    memset32(bmaps.r, fill_r, 8);
+
+    // fill top bitmap
+    memset32(bmaps.t, bg_fill, yofs_t);
+    memset32(bmaps.t + yofs_t, fg_fill, 8 - yofs_t);
+
+    // fill bottom bitmap
+    memset32(bmaps.b, fg_fill, yofs_t);
+    memset32(bmaps.b + yofs_t, bg_fill, 8 - yofs_b);
+    
+    // fill body
+    memset32(bmaps.body, fg_fill, 8);
+
+    // perform tile fills:
+    //   body
+    gfx_text_bmap_fill(col_s + 1, row_s + 1, cols - 2, rows - 2, bmaps.body);
+    //   corners
+    gfx_text_bmap_fill(col_s, row_s, 1, 1, bmaps.tl);
+    gfx_text_bmap_fill(col_e, row_s, 1, 1, bmaps.tr);
+    gfx_text_bmap_fill(col_s, row_e, 1, 1, bmaps.bl);
+    gfx_text_bmap_fill(col_e, row_e, 1, 1, bmaps.br);
+    //    edges
+    gfx_text_bmap_fill(col_s, row_s + 1, 1, rows - 2, bmaps.l);
+    gfx_text_bmap_fill(col_e, row_s + 1, 1, rows - 2, bmaps.r);
+    gfx_text_bmap_fill(col_s + 1, row_s, cols - 2, 1, bmaps.t);
+    gfx_text_bmap_fill(col_s + 1, row_e, cols - 2, 1, bmaps.b);
 }
 
 /*

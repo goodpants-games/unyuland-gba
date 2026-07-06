@@ -237,6 +237,8 @@ void gfx_set_palette_multiplied(FIXED factor);
 
 // gfx_text_bmap_fill written in asm. For funsies.
 void gfx_text_bmap_fill(uint oc, uint or_, uint cols, uint rows, u32 data[8]);
+void gfx_text_bmap_fill_rect(uint x, uint y, uint w, uint h,
+                             uint fg_col, uint bg_col);
 void gfx_text_bmap_print(uint x, uint y, const char *text, text_color_e color);
 void gfx_text_bmap_dst_clear(uint row, uint row_count);
 void gfx_text_bmap_dst_assign(uint row, uint row_count, uint src_row, uint pal);
