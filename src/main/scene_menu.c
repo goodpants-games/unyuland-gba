@@ -9,6 +9,7 @@
 #include "scenes.h"
 #include "menu.h"
 #include "gfx.h"
+#include "sound.h"
 
 #define HUD_ROW_ORIGIN (GFX_TEXT_BMP_ROWS - 2)
 #define HUD_Y_ORIGIN   (HUD_ROW_ORIGIN * 8 + 6)
@@ -24,10 +25,20 @@ static const char *const main_menu_options[] =
 static const char *const page_menu_options[] =
     {"BACK"};
 
+static char volume_string[] = "VOLUME:\0\0\0\0\0";
+static const uint volume_levels[6] = {
+    (uint)(PLATCTL_VOLUME_MAX * 0.00),
+    (uint)(PLATCTL_VOLUME_MAX * 0.10),
+    (uint)(PLATCTL_VOLUME_MAX * 0.25),
+    (uint)(PLATCTL_VOLUME_MAX * 0.50),
+    (uint)(PLATCTL_VOLUME_MAX * 1.00),
+    (uint)(PLATCTL_VOLUME_MAX * 3.00),
+};
+
 static const char *options_options[] = {
     "GBA COLOR:Off",
 #ifdef EXTRA_OPTIONS
-    "VOLUME:00000",
+    volume_string,
 #endif
     "BACK"
 };
@@ -57,6 +68,8 @@ struct
 static state EWRAM_BSS;
 
 static EWRAM_BSS bool option_lcd_color = false;
+static EWRAM_BSS u8 option_volume = 4; // no more than 5
+static EWRAM_BSS bool option_mute = false;
 
 static void render_page(const char *header, const char *lines[],
                         uint line_count)
@@ -75,6 +88,20 @@ static void render_page(const char *header, const char *lines[],
 
     menu_show(&state.page_menu);
     state.mode = MENU_MODE_PAGE;
+}
+
+static void update_volume_text(void)
+{
+    char *str = volume_string + 7;
+    for (int i = 0; i < 5; ++i, ++str)
+    {
+        if (option_mute)
+            *str = 'X';
+        else if (i < option_volume)
+            *str = '\x7F';
+        else
+            *str = '0';
+    }
 }
 
 static void open_options_menu(bool clean)
@@ -112,12 +139,12 @@ static void options_menu_update(void)
         case OPTION_MENU_LCD_COLOR:
             if ((option_lcd_color = !option_lcd_color))
             {
-                options_options[0] = "GBA Color:On";
+                options_options[OPTION_MENU_LCD_COLOR] = "GBA Color:On";
                 gfx_set_palette_mode(GFX_PAL_MODE_LCD_CORRECTED);
             }
             else
             {
-                options_options[0] = "GBA Color:Off";
+                options_options[OPTION_MENU_LCD_COLOR] = "GBA Color:Off";
                 gfx_set_palette_mode(GFX_PAL_MODE_NORMAL);
             }
             
@@ -127,17 +154,9 @@ static void options_menu_update(void)
         
 #ifdef EXTRA_OPTIONS
         case OPTION_MENU_VOLUME:
-        {
-            // TODO: make a full-block character for erasure purposes. (or, does
-            //       one already exist?) then, make a new block character for
-            //       printing bars. it's width should span slightly less than a
-            //       full block.
-            int draw_x = menu_calc_draw_x(&state.page_menu, "VOLUME:00000");
-            int draw_y = menu_calc_draw_y(&state.page_menu, 1);
-            gfx_text_bmap_print(draw_x + MENU_DOT_ADVANCE_X + 12 * 7, draw_y, "5", TEXT_COLOR_WHITE);
-            platctl_set_volume((uint)(PLATCTL_VOLUME_MAX * 0.2));
+            option_mute = !option_mute;
+            goto update_volume;
             break;
-        }
 #endif
 
         // back button
@@ -150,7 +169,36 @@ static void options_menu_update(void)
     case MENU_STATUS_BACK:
         goto exit;
 
-    default: break;
+    default:
+        if (state.page_menu.selected == OPTION_MENU_VOLUME)
+        {
+            if (key_hit(KEY_RIGHT))
+            {
+                if (option_volume != 5)
+                {
+                    ++option_volume;
+                }
+                else if (!option_mute) break;
+                
+                option_mute = false;
+                snd_play_no_overlap(SND_ID_MENU_MOVE);
+                goto update_volume;
+            }
+            else if (key_hit(KEY_LEFT))
+            {
+                if (option_volume != 0)
+                {
+                    --option_volume;
+                }
+                else if (!option_mute) break;
+
+                option_mute = false;
+                snd_play_no_overlap(SND_ID_MENU_MOVE);
+                goto update_volume;
+            }
+        }
+
+        break;
     }
 
     return;
@@ -160,6 +208,13 @@ static void options_menu_update(void)
         state.mode = MENU_MODE_MAIN;
         gfx_text_bmap_clear(0, 0, GFX_TEXT_BMP_COLS, GFX_TEXT_BMP_ROWS);
         menu_show(&state.menu);
+        return;
+
+    update_volume:
+        platctl_set_volume(option_mute ? 0 : volume_levels[option_volume]);
+        update_volume_text();
+        open_options_menu(false);
+        return;
 }
 
 static void scene_load(uintptr_t data)
@@ -179,6 +234,7 @@ static void scene_load(uintptr_t data)
         .no_back = true,
     };
 
+    update_volume_text();
     menu_show(&state.menu);
     gfx_text_bmap_dst_assign(SCREEN_HEIGHT_T / 2, GFX_TEXT_BMP_ROWS, 0,
                                 GFX_TEXTPAL_NORMAL);
