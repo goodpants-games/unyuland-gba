@@ -26,18 +26,12 @@ void platform_app_init(void)
 
     scenemgr_init(&scene_desc_menu, 0);
 
-    #ifdef MAIN_PROFILE
-    uint frame_len = 0;
-    profile_start();
-    #endif
-
     scenemgr_frame();
 }
 
 void platform_app_frame(void)
 {
     #ifdef MAIN_PROFILE
-    frame_len = 0;
     profile_start();
     #endif
 
@@ -47,7 +41,7 @@ void platform_app_frame(void)
     scenemgr_frame();
     
     #ifdef MAIN_PROFILE
-    frame_len = profile_stop();
+    uint frame_len = profile_stop();
     LOG_DBG("frame usage: %.1f%%", (float)frame_len / 280896.f * 100.f);
     #endif
 }
