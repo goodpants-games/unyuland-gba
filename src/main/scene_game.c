@@ -140,15 +140,15 @@ static void vram_bank1_load(int id)
     if (id == VRAM_BANK1_TILESET_AUTOMAP)
     {
         // load automap tileset
-        gfx_queue_memcpy(&tile_mem[1][0], automap_tiles_gfxTiles,
-                        automap_tiles_gfxTilesLen);
+        memcpy32(&tile_mem[1][0], automap_tiles_gfxTiles,
+                 automap_tiles_gfxTilesLen / 4);
     
     } else if (id == VRAM_BANK1_TILESET_SKY) {
         // copy sky_bg1 to bg 2 and 3. each half of the image contains 1024
         // tiles.
-        gfx_queue_memcpy(&se_mem[GFX_BG2_INDEX], sky_bg1_gfxMap, 1024 * 2);
-        gfx_queue_memcpy(&se_mem[GFX_BG3_INDEX], sky_bg1_gfxMap + 1024, 1024 * 2);
-        gfx_queue_memcpy(&tile_mem[1][0], sky_bg1_gfxTiles, sky_bg1_gfxTilesLen);
+        memcpy32(&se_mem[GFX_BG2_INDEX], sky_bg1_gfxMap, 1024 * 2 / 4);
+        memcpy32(&se_mem[GFX_BG3_INDEX], sky_bg1_gfxMap + 1024, 1024 * 2 / 4);
+        memcpy32(&tile_mem[1][0], sky_bg1_gfxTiles, sky_bg1_gfxTilesLen / 4);
     }
 }
 
@@ -159,6 +159,14 @@ static void update_hud(bool force_dirty);
 
 static void open_map(void)
 {
+    // disable display while vram data is being swapped...
+    gfx_ctl.bg[0].enabled = false;
+    gfx_ctl.bg[1].enabled = false;
+    gfx_ctl.bg[2].enabled = false;
+    gfx_ctl.bg[3].enabled = false;
+    gfx_ctl.enable_obj = false;
+    gfx_commit();
+
     gfx_set_palette_multiplied(FIX_ONE);
 
     state.substate = SUBSTATE_MAP;
@@ -193,6 +201,14 @@ static void open_map(void)
 
 static void close_map(void)
 {
+    // disable display while vram data is being swapped...
+    gfx_ctl.bg[0].enabled = false;
+    gfx_ctl.bg[1].enabled = false;
+    gfx_ctl.bg[2].enabled = false;
+    gfx_ctl.bg[3].enabled = false;
+    gfx_ctl.enable_obj = false;
+    gfx_commit();
+
     automap_close_view(&state.automap);
 
     gfx_ctl.bg[1].char_block = 0;
@@ -200,9 +216,6 @@ static void close_map(void)
     gfx_load_map(1, g_game.room->map);
 
     vram_bank1_load(VRAM_BANK1_TILESET_SKY);
-    bool enable_bg = g_game.room->map->bg_id == 1;
-    gfx_ctl.bg[2].enabled = enable_bg;
-    gfx_ctl.bg[3].enabled = enable_bg;
 
     // reset pause menu display
     gfx_text_bmap_dst_assign(0, 10, 0, GFX_TEXTPAL_NORMAL);
@@ -214,6 +227,10 @@ static void close_map(void)
 
 static void update_map(void)
 {
+    gfx_ctl.bg[0].enabled = true;
+    gfx_ctl.bg[1].enabled = true;
+    gfx_ctl.enable_obj = true;
+
     if (key_hit(KEY_START))
     {
         close_map();
@@ -397,11 +414,21 @@ static void update_hud(bool force_dirty)
     update_hud_sprites(face_frame, g_game.player_spit_mode);
 }
 
+static void update_game_bg_ctl(void)
+{
+    bool enable_bg = g_game.room->map->bg_id == 1;
+    gfx_ctl.bg[0].enabled = true;
+    gfx_ctl.bg[1].enabled = true;
+    gfx_ctl.bg[2].enabled = enable_bg;
+    gfx_ctl.bg[3].enabled = enable_bg;
+    gfx_ctl.enable_obj = true;
+}
+
 static void scene_load(uintptr_t data)
 {
     gfx_ctl.bg[1].bpp = GFX_BG_4BPP;
     gfx_ctl.bg[1].char_block = 0;
-    gfx_ctl.bg[1].enabled = true;
+    gfx_ctl.bg[1].enabled = false; // will be enabled on subsequent frame
 
     state = (struct scene_state)
     {
@@ -439,18 +466,22 @@ static void scene_load(uintptr_t data)
     game_load_room(room);
     game_reset_player_pos();
     game_save_state(); // fix respawn function before first checkpoint
-    setup_game_hud();
+
+    gfx_commit();
+
+    vram_bank1_load(VRAM_BANK1_TILESET_SKY);
 
     // load game tileset
-    gfx_queue_memset(&tile_mem[0][0] + GFX_CHAR_GAME_TILESET, 0, sizeof(TILE));
-    gfx_queue_memcpy(&tile_mem[0][0] + GFX_CHAR_GAME_TILESET + 1,
-                     tileset_gfxTiles, tileset_gfxTilesLen);
-    
-    vram_bank1_load(VRAM_BANK1_TILESET_SKY);
+    memset(&tile_mem[0][0] + GFX_CHAR_GAME_TILESET, 0, sizeof(TILE));
+    memcpy32(&tile_mem[0][0] + GFX_CHAR_GAME_TILESET + 1,
+             tileset_gfxTiles, tileset_gfxTilesLen / 4);
     
     // load sprite graphics data
-    gfx_queue_memcpy(tile_mem_obj[0][0].data, game_sprdb_gfxTiles,
-                     game_sprdb_gfxTilesLen);
+    memcpy32(tile_mem_obj[0][0].data, game_sprdb_gfxTiles,
+             game_sprdb_gfxTilesLen / 4);
+    
+    gfx_ctl.bg[1].enabled = true;
+    setup_game_hud();
 }
 
 static void scene_unload(void)
@@ -487,6 +518,7 @@ static void scene_frame(void)
     {
     case SUBSTATE_NORMAL:
     {
+        update_game_bg_ctl();
         game_update();
 
         const entity_s *player = &g_game.entities[0];
@@ -500,6 +532,7 @@ static void scene_frame(void)
     }
     
     case SUBSTATE_PAUSED:
+        update_game_bg_ctl();
         update_pause_menu();
         break;
     

@@ -205,6 +205,7 @@ typedef struct gfx_display_control
     u8 obj_userpal[GFX_OBJPAL_USER_COUNT][16];
     u8 bg_userpal_mul;
     u8 obj_userpal_mul;
+    bool enable_obj;
 }
 gfx_display_control_s;
 
@@ -216,6 +217,7 @@ extern u16 gfx_palette[16];
 
 void gfx_init(void);
 void gfx_new_frame(void);
+void gfx_commit(void);
 void gfx_load_map(uint bg_idx, const map_header_s *map);
 void gfx_mark_scroll_dirty(uint bg_idx);
 INLINE void gfx_unload_map(uint bg_idx)

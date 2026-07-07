@@ -1128,6 +1128,7 @@ void gfx_init(void)
     gfx_ctl.bg[1].priority = 1;
     gfx_ctl.bg[2].priority = 2;
     gfx_ctl.bg[3].priority = 3;
+    gfx_ctl.enable_obj = true;
 
     // REG_DISPCNT = DCNT_OBJ_1D;
 
@@ -1145,7 +1146,7 @@ void gfx_init(void)
     // REG_BG3CNT = BG_SBB(GFX_BG2_INDEX) | BG_4BPP | BG_PRIO(2);
 }
 
-void gfx_new_frame(void)
+void gfx_commit()
 {
     for (int i = 0; i < 16; ++i)
     {
@@ -1159,9 +1160,6 @@ void gfx_new_frame(void)
         pal_obj_bank[GFX_OBJPAL_USER1][i] =
             gfx_mul_palette[gfx_ctl.obj_userpal[1][i]];
     }
-
-    for (uint i = 0; i < 4; ++i)
-        update_map_scroll(i);
 
     oam_copy(oam_mem, gfx_oam_buffer, 128);
 
@@ -1202,13 +1200,16 @@ void gfx_new_frame(void)
     REG_BG3HOFS = gfx_ctl.bg[3].offset_x;
     REG_BG3VOFS = gfx_ctl.bg[3].offset_y;
     
-    u32 reg_dispcnt = DCNT_OBJ | DCNT_OBJ_1D;
+    u32 reg_dispcnt = DCNT_OBJ_1D;
     u16 bg_cnt[4] = { 0, 0, 0, 0 };
     
     bg_cnt[0] = BG_SBB(GFX_BG0_INDEX) | BG_REG_32x32;
     bg_cnt[1] = BG_SBB(GFX_BG1_INDEX) | BG_REG_32x32;
     bg_cnt[2] = BG_SBB(GFX_BG2_INDEX) | BG_REG_32x32;
     bg_cnt[3] = BG_SBB(GFX_BG3_INDEX) | BG_REG_32x32;
+
+    if (gfx_ctl.enable_obj)
+        reg_dispcnt |= DCNT_OBJ;
 
     for (uint i = 0; i < 4; ++i)
     {
@@ -1258,6 +1259,14 @@ void gfx_new_frame(void)
     REG_BG1CNT = bg_cnt[1];
     REG_BG2CNT = bg_cnt[2];
     REG_BG3CNT = bg_cnt[3];
+}
+
+void gfx_new_frame(void)
+{
+    for (uint i = 0; i < 4; ++i)
+        update_map_scroll(i);
+
+    gfx_commit();
 
 #if defined(DEVDEBUG) && defined(PLATFORM_GBA)
     if (REG_VCOUNT < 160)
