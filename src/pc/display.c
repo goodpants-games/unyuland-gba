@@ -275,18 +275,23 @@ void display_update(void)
     bg_enabled[2] = REG_DISPCNT & DCNT_BG2;
     bg_enabled[3] = REG_DISPCNT & DCNT_BG3;
 
+    bool obj_enabled = REG_DISPCNT & DCNT_OBJ;
+
     // object list categorized by priority
     object_bins_s obj_bins = (object_bins_s){0};
 
-    // iterate through the object list backwards, because objects of a lower
-    // index are drawn over objects of higher indices.
-    for (int si = 127; si >= 0; --si)
+    if (obj_enabled)
     {
-        OBJ_ATTR *obj = oam_mem + si;
-        if (obj->attr0 & ATTR0_HIDE) continue;
+        // iterate through the object list backwards, because objects of a lower
+        // index are drawn over objects of higher indices.
+        for (int si = 127; si >= 0; --si)
+        {
+            OBJ_ATTR *obj = oam_mem + si;
+            if (obj->attr0 & ATTR0_HIDE) continue;
 
-        int p = (obj->attr2 & ATTR2_PRIO_MASK) >> ATTR2_PRIO_SHIFT;
-        obj_bins.bins[p][obj_bins.bin_sz[p]++] = (u8) si;
+            int p = (obj->attr2 & ATTR2_PRIO_MASK) >> ATTR2_PRIO_SHIFT;
+            obj_bins.bins[p][obj_bins.bin_sz[p]++] = (u8) si;
+        }
     }
 
     bool enable_win0 = REG_DISPCNT & DCNT_WIN0;
