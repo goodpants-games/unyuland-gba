@@ -438,6 +438,7 @@ static void scene_load(uintptr_t data)
 
     game_load_room(room);
     game_reset_player_pos();
+    game_save_state(); // fix respawn function before first checkpoint
     setup_game_hud();
 
     // load game tileset

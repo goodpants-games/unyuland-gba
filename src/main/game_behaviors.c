@@ -1269,8 +1269,8 @@ static void behavior_water_tank_interact(entity_s *self, entity_s *source)
     FIXED tmp_vx = source->vel.x;
     FIXED tmp_vy = source->vel.y;
 
-    source->pos.x = self->pos.x;
-    source->pos.y = self->pos.y;
+    source->pos.x = self->pos.x + (int2fx(self->col.w) - int2fx(source->col.w)) / 2;
+    source->pos.y = self->pos.y + int2fx(self->col.h) - int2fx(source->col.h);
     source->vel.x = 0;
     source->vel.y = 0;
 
