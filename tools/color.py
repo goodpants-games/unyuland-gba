@@ -2,68 +2,15 @@
 import colorsys
 import sys
 import argparse
+import ioutil
+import math
+import struct
 
 def rgb_from_hex(hex: int) -> tuple[float, float, float]:
     b = hex & 0xFF
     g = (hex >> 8) & 0xFF
     r = (hex >> 16) & 0xFF
     return (r / 255, g / 255, b / 255)
-
-
-def clamp(v: float, min: float, max: float) -> float:
-    if v < min: return min
-    if v > max: return max
-    return v
-
-
-def clamp01(v: float) -> float:
-    return max(min(v, 1.0), 0.0)
-
-
-def rgb_to_r5g5b5(rgb: tuple[float, float, float]) -> int:
-    r, g, b = rgb
-    r = clamp01(r)
-    g = clamp01(g)
-    b = clamp01(b)
-
-    return (  (int(round(r * 0x1F)) & 0x1F)
-            | ((int(round(g * 0x1F)) & 0x1F) << 5)
-            | ((int(round(b * 0x1F)) & 0x1F) << 10))
-
-
-def proc_color(rgb: tuple[float,float,float], smul: float, vmul: float):
-    r, g, b = rgb
-    h, s, v = colorsys.rgb_to_hsv(r, g, b)
-    s = clamp01(s * smul)
-    v = clamp01(v * vmul)
-
-    r, g, b = colorsys.hsv_to_rgb(h, s, v)
-
-    return (r, g, b)
-    # scale_fac = 1.4
-
-    # if r > g and r > b:
-    #     r = r * scale_fac
-    #     g = g / scale_fac
-    #     b = b / scale_fac
-    # elif g > r and g > b:
-    #     r = r / scale_fac
-    #     g = g * scale_fac
-    #     b = b / scale_fac
-    # elif b > r and b > g:
-    #     r = r / scale_fac
-    #     g = g / scale_fac
-    #     b = b * scale_fac
-    # else:
-    #     r = r * scale_fac
-    #     g = g * scale_fac
-    #     b = b *scale_fac
-    
-    # r = max(min(r, 1.0), 0.0)
-    # g = max(min(g, 1.0), 0.0)
-    # b = max(min(b, 1.0), 0.0)
-
-    # return (r, g, b)
 
 
 PICO8_COLORS_NORMAL = [
@@ -108,7 +55,80 @@ PICO8_COLORS_LCD = [
 ]
 
 
-def proc(colors: list[int], smul: float, vmul: float) -> None:
+def clamp(v: float, min: float, max: float) -> float:
+    if v < min: return min
+    if v > max: return max
+    return v
+
+
+def clamp01(v: float) -> float:
+    return max(min(v, 1.0), 0.0)
+
+
+def rgb_to_r5g5b5(rgb: tuple[float, float, float]) -> int:
+    r, g, b = rgb
+    r = clamp01(r)
+    g = clamp01(g)
+    b = clamp01(b)
+
+    return (  (int(round(r * 0x1F)) & 0x1F)
+            | ((int(round(g * 0x1F)) & 0x1F) << 5)
+            | ((int(round(b * 0x1F)) & 0x1F) << 10))
+
+
+
+def linear_srgb_to_oklab(r:float, g:float, b:float) -> tuple[float, float, float]:
+    l:float = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b
+    m:float = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b
+    s:float = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b
+
+    l_:float = math.cbrt(l)
+    m_:float = math.cbrt(m)
+    s_:float = math.cbrt(s)
+
+    return (
+        0.2104542553*l_ + 0.7936177850*m_ - 0.0040720468*s_,
+        1.9779984951*l_ - 2.4285922050*m_ + 0.4505937099*s_,
+        0.0259040371*l_ + 0.7827717662*m_ - 0.8086757660*s_,
+    )
+
+
+def palgen_proc_color(rgb: tuple[float,float,float], smul: float, vmul: float):
+    r, g, b = rgb
+    h, s, v = colorsys.rgb_to_hsv(r, g, b)
+    s = clamp01(s * smul)
+    v = clamp01(v * vmul)
+
+    r, g, b = colorsys.hsv_to_rgb(h, s, v)
+
+    return (r, g, b)
+    # scale_fac = 1.4
+
+    # if r > g and r > b:
+    #     r = r * scale_fac
+    #     g = g / scale_fac
+    #     b = b / scale_fac
+    # elif g > r and g > b:
+    #     r = r / scale_fac
+    #     g = g * scale_fac
+    #     b = b / scale_fac
+    # elif b > r and b > g:
+    #     r = r / scale_fac
+    #     g = g / scale_fac
+    #     b = b * scale_fac
+    # else:
+    #     r = r * scale_fac
+    #     g = g * scale_fac
+    #     b = b *scale_fac
+    
+    # r = max(min(r, 1.0), 0.0)
+    # g = max(min(g, 1.0), 0.0)
+    # b = max(min(b, 1.0), 0.0)
+
+    # return (r, g, b)
+
+
+def palgen_proc(colors: list[int], smul: float, vmul: float) -> None:
     first = True
 
     for color in colors:
@@ -116,25 +136,15 @@ def proc(colors: list[int], smul: float, vmul: float) -> None:
             sys.stdout.write(",\n")
         first = False
         
-        color = proc_color(color, smul, vmul)
+        color = palgen_proc_color(color, smul, vmul)
         r5g5b5 = rgb_to_r5g5b5(color)
         str = "0x{:04x}".format(r5g5b5)
         sys.stdout.write(str)
     
     sys.stdout.write("\n")
 
-def main() -> None:
-    parser = argparse.ArgumentParser('color')
-    parser.add_argument('-m', '--mode', help="mode: 'normal' or 'lcd'")
-    parser.add_argument('-c', '--conv', help="convert color to r5g5b5 format")
 
-    args = parser.parse_args()
-
-    if args.conv is not None:
-        hex_color = int(args.conv, 16)
-        print("0x{:04x}".format(rgb_to_r5g5b5(rgb_from_hex(hex_color))))
-        return
-
+def main_palgen(args):
     if args.mode == 'normal':
         colors = PICO8_COLORS_NORMAL
         smul = 1.0
@@ -147,7 +157,97 @@ def main() -> None:
         print("invalid mode", file=sys.stderr)
         exit(1)
     
-    proc(colors, smul, vmul)
+    palgen_proc(colors, smul, vmul)
+
+
+def main_conv(args):
+    for arg in args.color:
+        hex_color = int(arg, 16)
+        print("0x{:04x}".format(rgb_to_r5g5b5(rgb_from_hex(hex_color))))
+
+
+def find_closest_color(r:float, g:float, b:float, palette:list[tuple[float, float, float]]) -> int:
+    min_dist = math.inf
+    index = -1
+
+    for i in range( len(palette) ):
+        (x, y, z) = palette[i]
+        dr = r - x
+        dg = g - y
+        db = b - z
+        dist_sq = dr * dr + dg * dg + db * db
+
+        if dist_sq < min_dist:
+            index = i
+            min_dist = dist_sq
+    
+    return index
+
+# 16 KiB quantization look-up table:
+# - 32,768 unique colors in r5g5b8 format
+# - palette index is encoded as a 4-bit integer:
+#   32,768 colors * 4 bits = 131,072 bits
+# - 131,072 bits / 8 bits = 16,384 bytes = 16 kibibytes
+def main_qlut(args):
+    output:list[int] = []
+
+    for r in range(32):
+        rf = r / 31
+        for g in range(32):
+            gf = g / 31
+            for b in range(32):
+                bf = b / 31
+                idx = find_closest_color(rf, gf, bf, PICO8_COLORS_NORMAL)
+
+                assert idx >= 0 and idx < 16
+                output.append(idx)
+    
+    # pad length of output to be an even size. this is because output will be
+    # emitted as an array where each element is four bits.
+    if len(output) % 2 == 1:
+        output.append(0)
+    
+    with ioutil.open_output(args.out, binary=True) as outf:
+        for i in range(0, len(output), 2):
+            n = (output[i] & 0xF) | ((output[i+1] & 0xF) << 4)
+            outf.write(struct.pack('<B', n))
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser('color')
+
+    subparsers = parser.add_subparsers(required=True)
+
+    # palgen subparser
+    parser_palgen = subparsers.add_parser('palgen',
+                                          help='generate color-corrected palette')
+
+    parser_palgen.add_argument('-m', '--mode',
+                               help="mode: 'normal' or 'lcd'",
+                               required=True)
+    
+    parser_palgen.set_defaults(func=main_palgen)
+
+    # conv subparser
+    parser_conv = subparsers.add_parser('conv',
+                                        help='convert color from r8g8b8 to r5g5b5 format')
+
+    parser_conv.add_argument('color', nargs='+',
+                             help='input r8g8b8 color in hexadecimal (without any prefixes)')
+    
+    parser_conv.set_defaults(func=main_conv)
+
+    # qlut subparser
+    parser_qlut = subparsers.add_parser('qlut',
+                                        help='generates a look-up table for color quantization')
+    parser_qlut.add_argument('-o', '--out',
+                             help='output file. - to write to stdout (default)',
+                             default='-')
+    parser_qlut.set_defaults(func=main_qlut)
+
+    args = parser.parse_args()
+    args.func(args)
+    
 
 if __name__ == '__main__':
     main()

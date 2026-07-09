@@ -3,6 +3,7 @@
 #include <tonc.h>
 #include <platutil.h>
 #include <data/graphics/font_gfx.h>
+#include <data/color_qlut_bin.h>
 #include "gfx.h"
 #include "math_util.h"
 
@@ -195,37 +196,21 @@ void gfx_set_palette_multiplied(FIXED factor)
 
     for (int i = 1; i < 16; ++i)
     {
-        int color = gfx_palette_normal[i];
-        FIXED r = (2 * FIX_ONE) * (color & 0x1F);
-        FIXED g = (2 * FIX_ONE) * ((color >> 5) & 0x1F);
-        FIXED b = (2 * FIX_ONE) * ((color >> 10) & 0x1F);
-        r = fxmul(r, factor);
-        g = fxmul(g, factor);
-        b = fxmul(b, factor);
+        uint color = gfx_palette_normal[i];
+        
+        FIXED rf = int2fx(color & 0x1F);
+        FIXED gf = int2fx((color >> 5) & 0x1F);
+        FIXED bf = int2fx((color >> 10) & 0x1F);
+        rf = fxmul(rf, factor);
+        gf = fxmul(gf, factor);
+        bf = fxmul(bf, factor);
+        uint r = fx2int(rf);
+        uint g = fx2int(gf);
+        uint b = fx2int(bf);
 
-        FIXED min_dist_sq = INT32_MAX;
-        int color_index = 0;
-
-        for (int j = 0; j < 16; ++j)
-        {
-            int ocolor = gfx_palette_normal[j];
-            FIXED or = (2 * FIX_ONE) * (ocolor & 0x1F);
-            FIXED og = (2 * FIX_ONE) * ((ocolor >> 5) & 0x1F);
-            FIXED ob = (2 * FIX_ONE) * ((ocolor >> 10) & 0x1F);
-
-            FIXED dr = or - r;
-            FIXED dg = og - g;
-            FIXED db = ob - b;
-
-            FIXED dist_sq = fxmul(dr, dr) + fxmul(dg, dg) + fxmul(db, db);
-            if (dist_sq < min_dist_sq)
-            {
-                color_index = j;
-                min_dist_sq = dist_sq;
-            }
-        }
-
-        gfx_mul_palette[i] = gfx_palette[color_index];
+        uint lut_idx = r * (32 * 32) + g * 32 + b;
+        uint color_idx = (color_qlut_bin[lut_idx>>1] >> ((lut_idx&1) * 4)) & 0xF;
+        gfx_mul_palette[i] = gfx_palette[color_idx];
     }
 
     for (int i = 1; i < 16; ++i)
