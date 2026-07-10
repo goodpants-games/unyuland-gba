@@ -22,3 +22,4 @@ tall_room
 room10
 room11
 room12
+testroom1

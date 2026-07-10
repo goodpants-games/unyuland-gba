@@ -10,6 +10,8 @@
 - Add final boss and beginning area depicting unyu villag.
 - palette double-buffering (also so that gba color option can be toggled in-game
   without being ~Buggy)
+- fix makefile order of evaluation. Hopefully I can do
+   $(SOURCES): $(OUTPUT_BIN) $(OUTPUT_SPRITE), etc
 
 - pc port: add frame time display
 

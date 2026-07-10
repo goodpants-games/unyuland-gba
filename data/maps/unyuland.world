@@ -146,6 +146,13 @@
             "width": 240,
             "x": 480,
             "y": -616
+        },
+        {
+            "fileName": "testroom1.tmx",
+            "height": 176,
+            "width": 240,
+            "x": -240,
+            "y": -88
         }
     ],
     "onlyShowAdjacentMaps": false,
