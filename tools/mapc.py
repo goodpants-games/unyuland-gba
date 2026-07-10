@@ -228,7 +228,7 @@ def parse(ifile_path: str, output_file: BinaryIO, tileset: Tileset):
     if ent_data:
         output_file.write(struct.pack('<I', section_offset)) # ent offset
     else:
-        output_file.write(bytes([0]))
+        output_file.write(bytes([0,0,0,0]))
 
     bytes_written = 0
 

@@ -696,8 +696,8 @@ void game_load_room(const world_room_s *room)
     u32 accum;
 
     const u8 *data_ptr = map_entity_data(map);
-    int ent_count = READ16(data_ptr, accum);
-
+    int ent_count = data_ptr ? READ16(data_ptr, accum) : 0;
+    
     for (int i = 0; i < ent_count; ++i)
     {
         int chunk_size = READ16(data_ptr, accum);
