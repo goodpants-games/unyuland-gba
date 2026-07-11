@@ -50,14 +50,7 @@ ifneq ($(BUILD),$(notdir $(CURDIR)))
 #---------------------------------------------------------------------------------
 
 export OUTPUT	:=	$(CURDIR)/$(TARGET)
-
-# export VPATH	:=	$(foreach dir,$(SOURCES),$(CURDIR)/$(dir)) \
-#                     $(foreach dir,$(DATA),$(CURDIR)/$(dir)) \
-#                     $(foreach dir,$(GRAPHICS),$(CURDIR)/$(dir)) \
-#                     $(foreach dir,$(MAPS),$(CURDIR)/$(dir)) \
-#                     $(foreach dir,$(SPRITES),$(CURDIR)/$(dir))
 export VPATH	:=	$(CURDIR)
-
 export DEPSDIR	:=	$(CURDIR)/$(BUILD)
 
 CFILES		:=	$(foreach dir,$(SOURCES),$(wildcard $(dir)/*.c))
@@ -76,11 +69,9 @@ ifneq ($(strip $(MUSIC)),)
 
   ifeq ($(AUDIO_DRIVER),mm)
     SOUNDBANK := data/mm_soundbank.bin.o
-  endif
-
-  ifeq ($(AUDIO_DRIVER),mpt)
+  else
     BINFILES  += $(addsuffix .bin,$(basename $(AUDIOFILES)))
-	SOUNDBANK := data/mpt_data.o
+	SOUNDBANK := data/mplay_data.o
   endif
 endif
 
@@ -220,17 +211,15 @@ data/mm_soundbank.bin data/mm_soundbank.h data/music.h : $(AUDIOFILES)
 	$(SILENTCMD)$(PYTHON) $(TOPLEVEL)/tools/modidx.py\
 	  -t mm $(AUDIOFILES) -o data/music.h
 
-endif
-
-ifeq ($(AUDIO_DRIVER),mpt)
+else
 #---------------------------------------------------------------------------------
-data/mpt_data.c data/music.h : $(AUDIOFILES)
+# rule to build mod index from module blobs
+#---------------------------------------------------------------------------------
+data/mplay_data.c data/music.h : $(AUDIOFILES) $(TOPLEVEL)/tools/modidx.py
 #---------------------------------------------------------------------------------
 	@mkdir -p $(dir $@)
 	$(SILENTCMD)$(PYTHON) $(TOPLEVEL)/tools/modidx.py\
-	  -t mpt --mpt-bank data/mpt_data.c $(AUDIOFILES) -o data/music.h
-
-endif
+	  --mod-bank data/mplay_data.c $(AUDIOFILES) -o data/music.h
 
 #---------------------------------------------------------------------------------
 # rules to copy music files to the build directory with the .bin extension
@@ -239,10 +228,12 @@ endif
 	@mkdir -p $(dir $@)
 	$(SILENTCMD)cp $< $@
 
-#---------------------------------------------------------------------------------
 %.bin: %.mod
 	@mkdir -p $(dir $@)
 	$(SILENTCMD)cp $< $@
+#---------------------------------------------------------------------------------
+endif
+
 
 #---------------------------------------------------------------------------------
 # This rule links in binary data with the .bin extension

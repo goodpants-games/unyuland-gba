@@ -19,7 +19,6 @@ SLIBS        := libxmp-lite.a
 LIBNAMES     := sdl3
 LIBS         := $(shell $(PKGCONF) --libs $(LIBNAMES))\
                 $(SLIBS)
-AUDIO_DRIVER := mpt
 
 
 #---------------------------------------------------------------------------------

@@ -11,8 +11,15 @@
 #include <data/music.h>
 #include <log.h>
 
-extern const void *const mpt_module_banks[MODDAT_NSONGS];
-extern const size_t mpt_module_sizes[MODDAT_NSONGS];
+typedef struct mplay_mod_data
+{
+    const void *module;
+    size_t size;
+}
+mplay_mod_data_s;
+
+// these are defined in mplay_data.c
+extern const mplay_mod_data_s mplay_module_data[MODDAT_NSONGS];
 
 #define VOLUME_SCALE 1024
 
@@ -35,8 +42,8 @@ static xmp_context load_module(mp_uint module_id)
 
     xmp_set_player(c, XMP_PLAYER_DEFPAN, 50);
 
-    int s =  xmp_load_module_from_memory(c, mpt_module_banks[module_id],
-                                         mpt_module_sizes[module_id]);
+    const mplay_mod_data_s *moddat = mplay_module_data + module_id;
+    int s =  xmp_load_module_from_memory(c, moddat->module, moddat->size);
     if (s) // error!
     {
         xmp_free_context(c);

@@ -17,9 +17,9 @@ class ModuleData:
         self.bin_include = bin_include
 
 
-def gen_libopenmpt(out, paths: list[str], mpt_c_path: str):
-    if not mpt_c_path:
-        raise ProgramError("argument --mpt-bank not given")    
+def gen_generic(out, paths: list[str], mod_c_path: str):
+    if not mod_c_path:
+        raise ProgramError("argument --mod-bank not given")    
 
     mod_data: list[ModuleData] = []
 
@@ -44,25 +44,21 @@ def gen_libopenmpt(out, paths: list[str], mpt_c_path: str):
     out.write(f"#define MODDAT_NSONGS {mod_count}\n")
 
     # write source file defining the module list 
-    with ioutil.open_output(mpt_c_path) as mpt_out_c:
-        mpt_out_c.write("#include <stddef.h>\n\n")
+    with ioutil.open_output(mod_c_path) as out_c:
+        out_c.write("#include <stddef.h>\n\n")
 
         for data in mod_data:
-            mpt_out_c.write(data.bin_include)
-            mpt_out_c.write("\n")
-        mpt_out_c.write("\n")
+            out_c.write(data.bin_include)
+            out_c.write("\n")
+        out_c.write("\n")
 
-        mpt_out_c.write(f"const void *const mpt_module_banks[{mod_count}] = {{\n")
-        for data in mod_data:
-            mpt_out_c.write("    ")
-            mpt_out_c.write(f"{data.symbol_name}_bin,\n")
-        mpt_out_c.write("};\n\n")
+        out_c.write("struct mod_data { const void *module; size_t size; };\n\n")
 
-        mpt_out_c.write(f"const size_t mpt_module_sizes[{mod_count}] = {{\n")
+        out_c.write(f"const struct mod_data mplay_module_data[{mod_count}] = {{\n")
         for data in mod_data:
-            mpt_out_c.write("    ")
-            mpt_out_c.write(f"{data.symbol_name}_bin_size,\n")
-        mpt_out_c.write("};\n")
+            out_c.write("    ")
+            out_c.write(f"{{ {data.symbol_name}_bin, {data.symbol_name}_bin_size }},\n")
+        out_c.write("};\n\n")
 
 
 def gen_maxmod(out, paths: list[str]):
@@ -73,11 +69,12 @@ def gen_maxmod(out, paths: list[str]):
 def main() -> None:
     parser = argparse.ArgumentParser('modidx')
     parser.add_argument('-t', '--target',
-                        help="'mm' (for maxmod) or 'mpt' (libopenmpt)")
+                        help="'mm' (for maxmod), or 'generic' (default)",
+                        default='generic')
     parser.add_argument('-o', '--output',
                         help="output file. stdout if omitted.")
-    parser.add_argument('--mpt-bank',
-                        help="output C source file used by mpt driver")
+    parser.add_argument('--mod-bank',
+                        help="output C source file used by the generic player")
     parser.add_argument('module', nargs='+')
 
     args = parser.parse_args()
@@ -91,8 +88,8 @@ def main() -> None:
         match args.target:
             case "mm":
                 gen_maxmod(out, args.module)
-            case "mpt":
-                gen_libopenmpt(out, args.module, args.mpt_bank)
+            case "generic":
+                gen_generic(out, args.module, args.mod_bank)
             case _:
                 raise ProgramError(f"error: unknown target '{args.target}'")
 
