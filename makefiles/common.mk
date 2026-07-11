@@ -200,6 +200,15 @@ ifeq ($(origin bin2o), undefined)
 endif
 
 
+#---------------------------------------------------------------------------------
+# control evaluation order for parallelized make
+#---------------------------------------------------------------------------------
+$(OFILES_SOURCES): $(OFILES_BIN) $(SOUNDBANK) $(OFILES_GRAPHICS)\
+                   $(OFILES_INTERMEDIATE) $(OFILES_MAPS) $(OFILES_SPRITES)
+world.o: data/music.h
+#---------------------------------------------------------------------------------
+
+
 ifeq ($(AUDIO_DRIVER),mm)
 #---------------------------------------------------------------------------------
 # rule to build soundbank from music files
