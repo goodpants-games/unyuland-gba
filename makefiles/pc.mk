@@ -18,7 +18,7 @@ INCLUDES := src/pc/include $(LIBXMP)/include
 SLIBS        := libxmp-lite.a
 LIBNAMES     := sdl3
 LIBS         := $(shell $(PKGCONF) --libs $(LIBNAMES))\
-                $(SLIBS)
+                $(SLIBS) -lm
 
 
 #---------------------------------------------------------------------------------

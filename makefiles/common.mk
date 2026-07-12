@@ -231,6 +231,14 @@ data/mplay_data.c data/music.h : $(AUDIOFILES) $(TOPLEVEL)/tools/modidx.py
 	  --mod-bank data/mplay_data.c $(AUDIOFILES) -o data/music.h
 
 #---------------------------------------------------------------------------------
+# mplay data depends on the binary files of each module.
+# uh except i'm too lazy to add a variable for specifically that so i'm just
+# going to make it depend on all binary files.
+#---------------------------------------------------------------------------------
+data/mplay_data.o: $(OFILES_BIN)
+#---------------------------------------------------------------------------------
+
+#---------------------------------------------------------------------------------
 # rules to copy music files to the build directory with the .bin extension
 #---------------------------------------------------------------------------------
 %.bin: %.xm
