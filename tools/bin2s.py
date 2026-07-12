@@ -51,6 +51,11 @@ def generate_default(name: str, data: bytes) -> None:
     out.write(f"\t.global     {symbol_name}_end\n")
     out.write(f"{symbol_name}_end:\n")
 
+    out.write("\n\n")
+    out.write("#if defined(__linux__) && defined(__ELF__)\n")
+    out.write("\t.section    .note.GNU-stack,\"\",%progbits\n")
+    out.write("#endif\n")
+
 
 # generate WASM source file that can be read by clang
 # (this is not WAT)
