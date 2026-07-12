@@ -16,56 +16,72 @@
 b05: player scared to go down Hole.
 player should be able to do a jig when hold down (very important)
 
-Boss:
+==================================== Boss ======================================
 
-use the environment to damage the boss (this adds a puzzle element) e.g. luring
-it into underneath stalactites, and then shooting the stalactites so that it
-drops into the boss and damages it.
+Upon re-entering the unyu village you started in, it is eerily barren of Unyus
+and there is also black goop and destruction everywhere.
 
-the boss would also take place across multiple rooms. once damaged enough it
-will flee into the next room, maybe breaking/displacing stuff along the way so
-that you can follow. maybe also there will be a puzzle-platform segment that you
-need to solve in order to reach the next room.
+Then, the unyu you play as sees a black Goop drip from the ceiling onto its
+head. It then jumps out of the way as the Boss falls from the top of the screen.
+Player regains control and the boss sequence starts.
 
-the last room will have the Outside Background. uhh maybe at the end the sign
-guy comes and saves you. like you enter a scripted sequence where you get hit
-by the black goop (but you don't fall out of the map - then it's obvious it's
-an intended scripted sequence) and then the sign guy comes and like. Kills the
-boss. obviously it's the sign guy's brother because the original sign guy is
-dead.
+-- Phase 1 --
+Boss mainly jumps around and spews out projectiles the player has to dodge.
+There is a water refill tank located in the arena, but it does not act as a
+checkpoint; there is no red-colored dot on the center of its sprite. The last
+checkpoint will be set to the moment the boss started.
 
--- First room --
-Boss spews out projectiles the player has to dodge. Boss will periodically rest
-for a moment probably after a very intense Attack phase it does. This will give
-the player the chance to damage boss by making a ladder up to the ceiling and
-breaking stalactite above the boss. Enemy projectiles don't remove ice platforms
-so the player can build this ladder across multiple rest periods. After one hit
-boss flees to next room.
+Boss will periodically rest for a moment probably after a very intense Attack
+phase it does. This will give the player the chance to damage boss by making a
+ladder up to the ceiling and breaking stalactite above the boss. Enemy
+projectiles don't remove ice platforms so the player can build this ladder
+across multiple rest periods. After one hit boss flees to next room.
 
--- Second room --
-Upon entering boss will avoid you but will break the stalactites above your head
-using its projectiles. So you need to dodge them all first.
+-- Phase 2 --
+The checkpoint will be set to the start of the room.
 
-Probably enter a sequence where you have to follow the boss as he flees But there's
-a bunch of bluxes along the path shooting at you that you have to avoid/hit. Then
-maybe you have to do a puzzle platform section to get to the third room
+Upon entering the room, boss will avoid you and will break the stalactites above
+your head using its projectiles. So you need to dodge them all first.
 
--- Third room --
-push it into a pool of water?
+Afterwards enter a sequence where you have to follow the boss as he flees But
+there's a bunch of bluxes along the path---probably a new enemy type as well---
+shooting at you that you have to avoid/hit. Then maybe you have to do a puzzle
+platform section to get to the third room
 
+-- Phase 3 --
+This room is outside
 
-attack idaes:
-- push it into pool of water?
-- maybe it spawns enemies whose bullets you have to trick into hitting the enemy
-    but that doesn't make sense why would their goop bullets be corrosive to itself
-    like its not the velocity of the projectiles that makes it dangerous it's the
-    substance itself
-- maybe you have to push like a block to fall on top of the boss which would hurt
-  it
+upon entering the room, the boss is hidden directly above the entrance. It will
+drop down on you once you arrive and start chomping you. But then the Sign Guy
+throws a spear at it from off-screen that hits the creature which frees you.
+Shortly afterward you get up and must start running away from creature.
 
--- Fourth room --
-upon entering the fourth room, the boss is hidden directly above the entrance.
-It will drop down on you once you arrive and eat you. The end.
+The checkpoint will be set at the point the player regains control.
 
-But then the Sign GUy comes and like. Kills the boss. And it explodes into a
-pile of goop. U and all ur friends are freed.
+Uhh then you and the sign guy work together (somehow) to lure the big creature
+into a pit of water. Like, I guess the creature gets Really Angry and starts
+chasing you and the sign guy (the sign guy no longer has a weapon so it has no
+reason to fear it). so you have to be do these platforming challenges (perphaps
+puzzles too?) with great exigency otherwise you Die.
+
+then you reach a Dead-End but there is a trap for the monster. like The ground
+is visibly different in one patch of ground and you can see water underneath.
+As the creature quickly approaches, Sign Guy opens up the trap. However the
+Creature abruptly stops before Sign Guy shortly before opens the trap, as It was
+suspect of the strange patch of ground. So that means the creature did not fall
+for the trap. The creature then does something which could be interpreted as
+laughing, and then leaps across the pit to Eat You. But then the Sign Guy throws
+the empty sign that he was carrying toward the Creature Mouth!! Omg!! The
+Creature didn't think about that Sign! What a clutch! The impact stops the
+creature's horizontal velocity, and it falls into the water.
+
+The boss, upon falling into the pit of water, dissolves and dies. And also
+all your unyu friends are then freed from its intestinal tract because it
+dissolved, but they're all frozen cus of the ice water.
+
+Sign Guy then explains that you can save your friends by using the Secret Orbs
+which will melt the ice before they die of hypothermia. Then, the number of
+secret orbs you collected equate to how many unyus get saved.
+
+If you collect no secret orbs then the minimum amount of Unyus are saved: some
+were able to hide in the village during the monster's attack.
