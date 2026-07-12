@@ -50,9 +50,9 @@ static bool droplet_check_tile(FIXED x, FIXED y)
 
 
 
-////////////////////
-// GENERIC: enemy //
-////////////////////
+//------------------------------------------------------------------------------
+// GENERIC: enemy
+//------------------------------------------------------------------------------
 #pragma region G_enemy
 
 typedef struct enemy_base
@@ -146,9 +146,9 @@ static bool enemy_base_proj_touch(entity_s *self, projectile_s *proj,
 
 
 
-/////////////////////
-// player_behavior //
-/////////////////////
+//------------------------------------------------------------------------------
+// player_behavior
+//------------------------------------------------------------------------------
 #pragma region player
 
 const behavior_def_s behavior_player;
@@ -647,10 +647,10 @@ const behavior_def_s behavior_player = {
 
 
 
-////////////////////
-// player_droplet //
-////////////////////
-#pragma region player_bullet
+//------------------------------------------------------------------------------
+// player_droplet
+//------------------------------------------------------------------------------
+#pragma region player_droplet
 
 const behavior_def_s behavior_player_droplet;
 
@@ -776,7 +776,7 @@ const behavior_def_s behavior_player_droplet = {
     .update = behavior_player_droplet_update
 };
 
-#pragma endregion player_bullet
+#pragma endregion player_droplet
 
 
 
@@ -787,9 +787,9 @@ const behavior_def_s behavior_player_droplet = {
 
 
 
-/////////////
-// crawler //
-/////////////
+//------------------------------------------------------------------------------
+// crawler
+//------------------------------------------------------------------------------
 #pragma region crawler
 
 const behavior_def_s behavior_crawler;
@@ -873,9 +873,9 @@ const behavior_def_s behavior_crawler = {
 
 
 
-///////////////
-// gun_enemy //
-///////////////
+//------------------------------------------------------------------------------
+// gun_enemy
+//------------------------------------------------------------------------------
 #pragma region gun_enemy
 
 const behavior_def_s behavior_gun_enemy;
@@ -1024,9 +1024,9 @@ const behavior_def_s behavior_gun_enemy = {
 
 
 
-///////////////
-// ice_block //
-///////////////
+//------------------------------------------------------------------------------
+// ice_block
+//------------------------------------------------------------------------------
 #pragma region ice_block
 
 void entity_ice_block_init(entity_s *self, FIXED px, FIXED py)
@@ -1054,9 +1054,9 @@ void entity_ice_block_init(entity_s *self, FIXED px, FIXED py)
 
 
 
-////////////
-// spring //
-////////////
+//------------------------------------------------------------------------------
+// spring
+//------------------------------------------------------------------------------
 #pragma region spring
 
 typedef struct spring_data
@@ -1115,9 +1115,9 @@ const behavior_def_s behavior_spring = {
 
 
 
-//////////
-// home //
-//////////
+//------------------------------------------------------------------------------
+// home
+//------------------------------------------------------------------------------
 #pragma region home
 static const behavior_def_s behavior_home;
 
@@ -1164,9 +1164,9 @@ static const behavior_def_s behavior_home = {
 
 
 
-//////////
-// sign //
-//////////
+//------------------------------------------------------------------------------
+// sign
+//------------------------------------------------------------------------------
 #pragma region sign
 
 const behavior_def_s behavior_sign;
@@ -1218,9 +1218,9 @@ const behavior_def_s behavior_sign = {
 
 
 
-////////////////
-// water tank //
-////////////////
+//------------------------------------------------------------------------------
+// water tank
+//------------------------------------------------------------------------------
 #pragma region water_tank
 
 const behavior_def_s behavior_water_tank;
@@ -1296,9 +1296,9 @@ const behavior_def_s behavior_water_tank = {
 
 
 
-///////////////////
-// fragile_block //
-///////////////////
+//------------------------------------------------------------------------------
+// fragile_block
+//------------------------------------------------------------------------------
 #pragma region fragile_block
 const behavior_def_s behavior_fragile_block;
 
@@ -1351,9 +1351,9 @@ const behavior_def_s behavior_fragile_block = {
 
 
 
-/////////
-// orb //
-/////////
+//------------------------------------------------------------------------------
+// orb
+//------------------------------------------------------------------------------
 #pragma region orb
 
 static const behavior_def_s behavior_orb;
@@ -1473,4 +1473,44 @@ static const behavior_def_s behavior_orb = {
     .ent_touch = behavior_orb_ent_touch
 };
 
-#pragma endregion
+#pragma endregion orb
+
+
+
+
+
+
+
+
+
+//------------------------------------------------------------------------------
+// boss
+//------------------------------------------------------------------------------
+#pragma region boss
+
+static const behavior_def_s behavior_boss;
+
+void entity_boss_init(entity_s *self, FIXED px, FIXED py)
+{
+    self->flags |= ENTITY_FLAG_MOVING | ENTITY_FLAG_COLLIDE |
+                   ENTITY_FLAG_ACTOR;
+    self->pos.x = px;
+    self->pos.y = py;
+    self->col.w = 8;
+    self->col.h = 8;
+    self->sprite.graphic_id = SPRID_GAME_CRAWLER_WALK;
+    self->behavior = &behavior_boss;
+}
+
+static void entity_boss_update(entity_s *self)
+{
+    self->actor.flags |= ACTOR_FLAG_CAN_MOVE;
+    self->actor.jump_trigger = 1;
+    self->actor.jump_velocity = FX(2.0);
+}
+
+static const behavior_def_s behavior_boss = {
+    .update = entity_boss_update
+};
+
+#pragma endregion boss

@@ -15,3 +15,57 @@
 
 b05: player scared to go down Hole.
 player should be able to do a jig when hold down (very important)
+
+Boss:
+
+use the environment to damage the boss (this adds a puzzle element) e.g. luring
+it into underneath stalactites, and then shooting the stalactites so that it
+drops into the boss and damages it.
+
+the boss would also take place across multiple rooms. once damaged enough it
+will flee into the next room, maybe breaking/displacing stuff along the way so
+that you can follow. maybe also there will be a puzzle-platform segment that you
+need to solve in order to reach the next room.
+
+the last room will have the Outside Background. uhh maybe at the end the sign
+guy comes and saves you. like you enter a scripted sequence where you get hit
+by the black goop (but you don't fall out of the map - then it's obvious it's
+an intended scripted sequence) and then the sign guy comes and like. Kills the
+boss. obviously it's the sign guy's brother because the original sign guy is
+dead.
+
+-- First room --
+Boss spews out projectiles the player has to dodge. Boss will periodically rest
+for a moment probably after a very intense Attack phase it does. This will give
+the player the chance to damage boss by making a ladder up to the ceiling and
+breaking stalactite above the boss. Enemy projectiles don't remove ice platforms
+so the player can build this ladder across multiple rest periods. After one hit
+boss flees to next room.
+
+-- Second room --
+Upon entering boss will avoid you but will break the stalactites above your head
+using its projectiles. So you need to dodge them all first.
+
+Probably enter a sequence where you have to follow the boss as he flees But there's
+a bunch of bluxes along the path shooting at you that you have to avoid/hit. Then
+maybe you have to do a puzzle platform section to get to the third room
+
+-- Third room --
+push it into a pool of water?
+
+
+attack idaes:
+- push it into pool of water?
+- maybe it spawns enemies whose bullets you have to trick into hitting the enemy
+    but that doesn't make sense why would their goop bullets be corrosive to itself
+    like its not the velocity of the projectiles that makes it dangerous it's the
+    substance itself
+- maybe you have to push like a block to fall on top of the boss which would hurt
+  it
+
+-- Fourth room --
+upon entering the fourth room, the boss is hidden directly above the entrance.
+It will drop down on you once you arrive and eat you. The end.
+
+But then the Sign GUy comes and like. Kills the boss. And it explodes into a
+pile of goop. U and all ur friends are freed.

@@ -100,7 +100,7 @@ static void scene_load(uintptr_t data)
         // }
     }
 
-    mplay_start(MOD_SAC08, true);
+    mplay_start(MOD_TITLE, true);
     mplay_set_volume((int)(1024 * 0.3));
 }
 

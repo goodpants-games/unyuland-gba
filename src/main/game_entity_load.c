@@ -177,6 +177,10 @@ void game_load_entity(const entity_load_s *load_data)
     {
         load_orb(ent, load_data, true);
     }
+    STR_CASE("boss")
+    {
+        entity_boss_init(ent, load_data->x, load_data->y);
+    }
     STR_CASE_FALLBACK
     {
         LOG_DBG("unknown entity type %s", name);
