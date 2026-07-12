@@ -205,7 +205,7 @@ endif
 #---------------------------------------------------------------------------------
 $(OFILES_SOURCES): $(OFILES_BIN) $(SOUNDBANK) $(OFILES_GRAPHICS)\
                    $(OFILES_INTERMEDIATE) $(OFILES_MAPS) $(OFILES_SPRITES)
-world.o: data/music.h
+world.o: data/music.h $(SOUNDBANK) $(OFILES_BIN)
 #---------------------------------------------------------------------------------
 
 
