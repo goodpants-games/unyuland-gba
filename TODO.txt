@@ -10,6 +10,13 @@
 - Add final boss and beginning area depicting unyu villag.
 - palette double-buffering (also so that gba color option can be toggled in-game
   without being ~Buggy)
+- if you are dead at the same time that the inter-room screen transition is
+  active, two things may occur:
+  1. if the fade-to-black did not finish, you will get sent back to the last
+     checkpoint, as intended, but the palette multiplier will not be reset.
+  2. if the fade-to-black did finish, you will be moved to the other room while
+     still in the Dead state, plus the worldstate gets saved at that point. this
+     means that the game goes in a restart loop and is softlocked.
 
 - pc port: add frame time display
 
