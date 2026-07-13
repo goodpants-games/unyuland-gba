@@ -203,9 +203,9 @@ endif
 #---------------------------------------------------------------------------------
 # control evaluation order for parallelized make
 #---------------------------------------------------------------------------------
-$(OFILES_SOURCES): $(OFILES_BIN) $(SOUNDBANK) $(OFILES_GRAPHICS)\
+$(OFILES_SOURCES): | $(OFILES_BIN) $(SOUNDBANK) $(OFILES_GRAPHICS)\
                    $(OFILES_INTERMEDIATE) $(OFILES_MAPS) $(OFILES_SPRITES)
-world.o: data/music.h $(SOUNDBANK) $(OFILES_BIN)
+world.o: | data/music.h $(SOUNDBANK) $(OFILES_BIN)
 #---------------------------------------------------------------------------------
 
 
@@ -235,7 +235,7 @@ data/mplay_data.c data/music.h : $(AUDIOFILES) $(TOPLEVEL)/tools/modidx.py
 # uh except i'm too lazy to add a variable for specifically that so i'm just
 # going to make it depend on all binary files.
 #---------------------------------------------------------------------------------
-data/mplay_data.o: $(OFILES_BIN)
+data/mplay_data.o: | $(OFILES_BIN)
 #---------------------------------------------------------------------------------
 
 #---------------------------------------------------------------------------------
