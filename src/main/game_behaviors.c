@@ -1,10 +1,12 @@
 #include <tonc_math.h>
 #include <tonc_input.h>
 #include <tonc_video.h>
+#include <tonc_bios.h>
 #include <assert.h>
 #include <modplay.h>
 #include <data/music.h>
 #include <log.h>
+#include <stdlib.h>
 
 #include "dialogue.h"
 #include "game.h"
@@ -15,6 +17,11 @@
 #include "gfx.h"
 
 #define DEFAULT_DAMP TO_FIXED(0.88)
+
+// to be used in a constant-expression TO_FIXED/FX
+// reminder to NEVER write code that makes the compiler emit FP procedures!!!
+// (because gba has no hardware support for them; soft FP is very slow)
+#define COS45 0.7071067811865475
 
 #define PLAYER_SIDE_SPIT_VX           TO_FIXED(0.50)
 #define PLAYER_SIDE_SPIT_CLOSE_VX     TO_FIXED(0.25)
@@ -864,7 +871,6 @@ const behavior_def_s behavior_crawler = {
 
 const behavior_def_s behavior_gun_enemy;
 
-#define COS45 0.7071067811865475
 #define GUN_ENEMY_SHOOT_COOLDOWN_LENGTH 50
 #define GUN_ENEMY_PROJ_SPEED 2.0
 
@@ -1472,7 +1478,33 @@ static const behavior_def_s behavior_orb = {
 //------------------------------------------------------------------------------
 #pragma region boss
 
+#define BOSS_JUMP_VEL FX(2.5)
+#define BOSS_ENT_FLAG_MASK ENTITY_FLAG_DAMPING
+
+#define BOSS_FLAG_CONTACT_DAMAGE (1 << 0)
+#define BOSS_FLAG_DID_JUMP       (1 << 1)
+#define BOSS_FLAG_WAS_ON_GROUND  (1 << 2)
+
+typedef enum boss_mode
+{
+    BOSS_MODE_WAIT,
+    BOSS_MODE_SLIDE_WARN,
+    BOSS_MODE_SLIDE,
+    BOSS_MODE_SHOOT_JUMP,
+}
+boss_mode_e;
+
 static const behavior_def_s behavior_boss;
+
+typedef struct boss_data
+{
+    u8 mode;
+    u8 flags;
+    u8 global_counter;
+    s16 wait_timer;
+}
+boss_data_s;
+EDATA_SIZE_CHECK(boss_data_s);
 
 void entity_boss_init(entity_s *self, FIXED px, FIXED py)
 {
@@ -1480,21 +1512,203 @@ void entity_boss_init(entity_s *self, FIXED px, FIXED py)
                    ENTITY_FLAG_ACTOR;
     self->pos.x = px;
     self->pos.y = py;
-    self->col.w = 8;
-    self->col.h = 8;
-    self->sprite.graphic_id = SPRID_GAME_CRAWLER_WALK;
+    self->col.w = 16;
+    self->col.h = 16;
+    self->col.group = COLGROUP_ENTITY;
+    self->col.mask = COLGROUP_DEFAULT | COLGROUP_PROJECTILE;
+    self->actor.flags |= ACTOR_FLAG_NO_VEL;
+    self->actor.move_speed = TO_FIXED(1.0);
+    self->actor.move_accel = TO_FIXED(1.0 / 8.0);
+    self->mass = 8;
+    self->sprite.graphic_id = SPRID_GAME_BOSS_IDLE;
     self->behavior = &behavior_boss;
+
+    boss_data_s *data = (boss_data_s *)self->userdata;
+    *data = (boss_data_s){
+        .wait_timer = 60
+    };
 }
 
-static void entity_boss_update(entity_s *self)
+static projectile_s *boss_shoot(entity_s *self, FIXED dx, FIXED dy)
 {
+    projectile_s *proj = projectile_alloc();
+    if (!proj) return NULL;
+
+    proj->px = self->pos.x + FX(8);
+    proj->py = self->pos.y + FX(10);
+    proj->vx = fxmul(dx, FX(1.0));
+    proj->vy = fxmul(dy, FX(1.0));
+    proj->kind = PROJ_KIND_ENEMY;
+    proj->graphic_id = SPRID_GAME_BULLET;
+    proj->life = 120;
+
+    return proj;
+}
+
+static bool behavior_boss_proj_touch(entity_s *self, projectile_s *proj)
+{
+    if (proj->kind != PROJ_KIND_ENEMY) return false;
+    return true;
+}
+
+static void behavior_boss_ent_touch(entity_s *self, entity_s *other,
+                                    int nx, int ny)
+{
+    boss_data_s *data = (boss_data_s *)self->userdata;
+
+    if (data->flags & BOSS_FLAG_CONTACT_DAMAGE)
+        if (other->behavior && other->behavior->attacked)
+            other->behavior->attacked(other, self, SGN3(self->vel.x));
+}
+
+static void behavior_boss_update(entity_s *self)
+{
+    boss_data_s *data = (boss_data_s *)self->userdata;
+
     self->actor.flags |= ACTOR_FLAG_CAN_MOVE;
-    self->actor.jump_trigger = 1;
-    self->actor.jump_velocity = FX(2.0);
+    entity_s *player = &g_game.entities[0];
+
+    u32 ent_flags = 0;
+    bool is_grounded = self->actor.flags & ACTOR_FLAG_GROUNDED;
+
+    if (is_grounded && !(data->flags & BOSS_FLAG_WAS_ON_GROUND))
+        snd_play_no_overlap(SND_ID_ENEMY_DIE);
+
+    data->flags &= ~BOSS_FLAG_WAS_ON_GROUND;
+    if (is_grounded) data->flags |= BOSS_FLAG_WAS_ON_GROUND;
+
+    switch (data->mode)
+    {
+    case BOSS_MODE_WAIT:
+    {
+        ent_flags |= ENTITY_FLAG_DAMPING;
+        self->damp = DEFAULT_DAMP;
+
+        if (--data->wait_timer == 0)
+        {
+            if (data->global_counter == 3)
+            {
+                data->global_counter = 0;
+                data->mode = BOSS_MODE_SHOOT_JUMP;
+
+                FIXED dirx = SGN(player->pos.x - self->pos.x);
+                FIXED target_x = player->pos.x + dirx * FX(80);
+
+                FIXED airborne_duration = fxdiv(2 * BOSS_JUMP_VEL, WORLD_GRAVITY);
+                self->vel.x = fxdiv(target_x - (self->pos.x + FX(4)), airborne_duration);
+                self->vel.y = -BOSS_JUMP_VEL;
+
+                data->wait_timer = 4;
+            }
+            else
+            {
+                data->wait_timer = 40;
+                data->mode = BOSS_MODE_SLIDE_WARN;
+                self->actor.move_x = SGN(player->pos.x - self->pos.x);
+                snd_play_no_overlap(SND_ID_ENEMY_HURT);
+                ++data->global_counter;
+            }
+        }
+        break;
+    }
+
+    case BOSS_MODE_SLIDE_WARN:
+    {
+        self->vel.x = self->actor.move_x * FX(-0.5);
+        if (--data->wait_timer == 0)
+        {
+            data->wait_timer = 40;
+            data->mode = BOSS_MODE_SLIDE;
+
+            FIXED disp = self->pos.y - (player->pos.y - FX(8));
+            if (disp < FX(4)) disp = FX(4);
+
+            self->actor.jump_velocity = Sqrt(2 * fxmul(disp, WORLD_GRAVITY)) * 16;
+            LOG_DBG("jump velocity: %f", fx2float(self->actor.jump_velocity));
+        }
+        break;
+    }
+
+    case BOSS_MODE_SLIDE:
+    {
+        self->vel.x = self->actor.move_x * FX(2);
+        data->flags |= BOSS_FLAG_CONTACT_DAMAGE;
+
+        FIXED player_dx = player->pos.x - self->pos.x;
+
+        if (!(data->flags & BOSS_FLAG_DID_JUMP) &&
+            abs(player_dx) < FX(8 * 4))
+        {
+            self->actor.jump_trigger = 1;
+            data->flags |= BOSS_FLAG_DID_JUMP;
+        }
+
+        if (-player_dx * self->actor.move_x > FX(8 * 4))
+        {
+            data->mode = BOSS_MODE_WAIT;
+            data->wait_timer = 60;
+            data->flags &= ~(BOSS_FLAG_DID_JUMP | BOSS_FLAG_CONTACT_DAMAGE);
+        }
+        break;
+    }
+
+    case BOSS_MODE_SHOOT_JUMP:
+    {
+        --data->wait_timer;
+        if (data->wait_timer == 0)
+        {
+            boss_shoot(self, FX(1), FX(0));
+            boss_shoot(self, FX(-1), FX(0));
+            boss_shoot(self, FX(0), FX(-1));
+            boss_shoot(self, FX(0), FX(1));
+            boss_shoot(self, FX(COS45), FX(COS45));
+            boss_shoot(self, -FX(COS45), FX(COS45));
+            boss_shoot(self, FX(COS45), -FX(COS45));
+            boss_shoot(self, -FX(COS45), -FX(COS45));
+
+            snd_play_no_overlap(SND_ID_ENEMY_SPIT);
+
+            data->wait_timer = 10;
+        }
+
+        if (self->actor.flags & ACTOR_FLAG_GROUNDED)
+        {
+            data->mode = BOSS_MODE_WAIT;
+            data->wait_timer = 60;
+        }
+        break;
+    }
+    }
+
+    self->flags = (self->flags & ~BOSS_ENT_FLAG_MASK) | (ent_flags & BOSS_ENT_FLAG_MASK);
+
+    // if (self->actor.flags & ACTOR_FLAG_GROUNDED)
+    //     --data->wait_timer;
+
+    // if (data->wait_timer == 0)
+    // {
+    //     data->wait_timer = 60;
+    //     FIXED dirx = SGN(player->pos.x - self->pos.x);
+    //     FIXED target_x = player->pos.x + dirx * FX(80);
+    //     // FIXED tx_inv = abs(fxdiv(FX(1), tx));
+
+    //     boss_shoot(self, FX(1), FX(0));
+    //     boss_shoot(self, FX(-1), FX(0));
+    //     boss_shoot(self, FX(0), FX(-1));
+    //     boss_shoot(self, FX(0), FX(1));
+
+    //     FIXED airborne_duration = fxdiv(2 * BOSS_JUMP_VEL, WORLD_GRAVITY);
+    //     self->vel.x = fxdiv(target_x - (self->pos.x + FX(4)), airborne_duration);
+    //     self->vel.y = -BOSS_JUMP_VEL;
+
+    //     snd_play_no_overlap(SND_ID_ENEMY_SPIT);
+    // }
 }
 
 static const behavior_def_s behavior_boss = {
-    .update = entity_boss_update
+    .update = behavior_boss_update,
+    .proj_touch = behavior_boss_proj_touch,
+    .ent_touch = behavior_boss_ent_touch,
 };
 
 #pragma endregion boss
