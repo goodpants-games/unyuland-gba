@@ -31,6 +31,7 @@
 #define ACTOR_FLAG_WALL       2
 #define ACTOR_FLAG_DID_JUMP   4
 #define ACTOR_FLAG_CAN_MOVE   8
+#define ACTOR_FLAG_NO_VEL     16 // disable velocity control in actor controller
 
 #define SPRITE_FLAG_PLAYING   1
 #define SPRITE_FLAG_FLIP_X    2
@@ -42,9 +43,10 @@
 #define COL_FLAG_IN_WATER      4
 #define COL_FLAG_HEAD_BUMP     8 // restitution on vertical contacts is increased
 
-#define COLGROUP_DEFAULT           ((1 << 0))
-#define COLGROUP_ENTITY            ((1 << 1))
-#define COLGROUP_PROJECTILE        ((1 << 2))
+#define COLGROUP_DEFAULT           (1 << 0)
+#define COLGROUP_PLR_PLAT          (1 << 1) // player platform
+#define COLGROUP_ENTITY            (1 << 2)
+#define COLGROUP_PROJECTILE        (1 << 3)
 #define COLGROUP_ALL               UINT16_MAX
 
 #define MAX_ENTITY_COUNT 32

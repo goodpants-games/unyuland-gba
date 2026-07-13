@@ -262,26 +262,29 @@ static void update_entities(void)
             const int actor_flags = (int) entity->actor.flags;
             int move_x = (int) entity->actor.move_x;
 
-            if (move_x != 0)
+            if (!(actor_flags & ACTOR_FLAG_NO_VEL))
             {
-                entity->actor.face_dir = (s8) sgn(move_x);
-                entity->vel.x += fxmul(entity->actor.move_accel,
-                                       int2fx(move_x));
-                
-                if (ABS(entity->vel.x) > entity->actor.move_speed)
+                if (move_x != 0)
                 {
-                    entity->vel.x = fxmul(entity->actor.move_speed,
-                                          int2fx(SGN(entity->vel.x)));
+                    entity->actor.face_dir = (s8) sgn(move_x);
+                    entity->vel.x += fxmul(entity->actor.move_accel,
+                                        int2fx(move_x));
+                    
+                    if (ABS(entity->vel.x) > entity->actor.move_speed)
+                    {
+                        entity->vel.x = fxmul(entity->actor.move_speed,
+                                            int2fx(SGN(entity->vel.x)));
+                    }
                 }
-            }
-            else
-            {
-                int sign = SGN3(entity->vel.x);
-                entity->vel.x += fxmul(entity->actor.move_accel,
-                                       int2fx(-sign));
-                
-                if (SGN3(entity->vel.x) != sign)
-                    entity->vel.x = 0;
+                else
+                {
+                    int sign = SGN3(entity->vel.x);
+                    entity->vel.x += fxmul(entity->actor.move_accel,
+                                        int2fx(-sign));
+                    
+                    if (SGN3(entity->vel.x) != sign)
+                        entity->vel.x = 0;
+                }
             }
 
             uint jump_trigger = (uint) entity->actor.jump_trigger;

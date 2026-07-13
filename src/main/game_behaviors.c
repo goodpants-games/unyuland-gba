@@ -173,7 +173,7 @@ void entity_player_init(entity_s *self)
     self->col.w = 6;
     self->col.h = 8;
     self->col.group = COLGROUP_ENTITY;
-    self->col.mask = COLGROUP_DEFAULT | COLGROUP_PROJECTILE;
+    self->col.mask = COLGROUP_DEFAULT | COLGROUP_PLR_PLAT | COLGROUP_PROJECTILE;
     self->actor.move_speed = TO_FIXED(1.0);
     self->actor.move_accel = TO_FIXED(1.0 / 8.0);
     self->actor.jump_velocity = TO_FIXED(2.0);
@@ -715,23 +715,6 @@ static void behavior_player_droplet_update(entity_s *self)
         const FIXED x_snap = int2fx(WORLD_TILE_SIZE / 2);
         const FIXED tile_size = int2fx(WORLD_TILE_SIZE);
 
-        // FIXED cy = self->pos.y + int2fx(WORLD_TILE_SIZE / 2);
-
-        // local offset = 0.0
-        // if self.droplet_type == "up_platform" then
-        //  offset = -0.5
-        // end
-        // local px = math.floor(position.x / x_snap + offset) * x_snap + 4.0
-        // local py = math.floor(self.target_y / TILE_SIZE) * TILE_SIZE + 1.0
-        // px, py = math.round(px), math.round(py)
-
-        // offset controls whether it rounds to the nearest tile or always
-        // downwards.
-        // int offset = 0;
-
-        // int offset = data->type == PLAYER_DROPLET_TYPE_UP
-        //                  ? 0
-        //                  : (FIXED)(FIX_ONE * 0.5);
         // not sure why i have to subtract one (aka 0.00390625),
         // but sure.
         FIXED px = fxmul(FX_FLOOR(fxdiv(cx, x_snap) - FIX_ONE / 2 - 1), x_snap);
@@ -759,7 +742,8 @@ static void behavior_player_droplet_update(entity_s *self)
             platf->pos.y = py;
             platf->col.w = 6;
             platf->col.h = 4;
-            platf->col.group = COLGROUP_DEFAULT;
+            platf->col.group = COLGROUP_PLR_PLAT;
+            platf->col.mask = COLGROUP_PROJECTILE;
             platf->col.flags |= COL_FLAG_FLOOR_ONLY;
             platf->sprite.graphic_id = SPRID_GAME_ICE_PLATFORM;
             platf->sprite.ox = -1;
@@ -813,7 +797,7 @@ void entity_crawler_init(entity_s *self, FIXED px, FIXED py, FIXED max_dist)
     self->col.w = 6;
     self->col.h = 8;
     self->col.group = COLGROUP_ENTITY;
-    self->col.mask = COLGROUP_DEFAULT | COLGROUP_PROJECTILE;
+    self->col.mask = COLGROUP_DEFAULT | COLGROUP_PLR_PLAT | COLGROUP_PROJECTILE;
     self->sprite.graphic_id = SPRID_GAME_CRAWLER_WALK;
     self->sprite.flags |= SPRITE_FLAG_PLAYING;
     self->sprite.ox = -1;
@@ -903,7 +887,7 @@ void entity_gun_enemy_init(entity_s *self, FIXED px, FIXED py, bool ceil,
     self->col.w = 6;
     self->col.h = 8;
     self->col.group = COLGROUP_ENTITY;
-    self->col.mask = COLGROUP_DEFAULT | COLGROUP_PROJECTILE;
+    self->col.mask = COLGROUP_DEFAULT | COLGROUP_PLR_PLAT | COLGROUP_PROJECTILE;
     self->sprite.graphic_id = SPRID_GAME_GUN_ENEMY_IDLE;
     self->sprite.ox = -1;
 
