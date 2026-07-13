@@ -1,7 +1,6 @@
 #include <tonc_math.h>
 #include <tonc_input.h>
 #include <tonc_video.h>
-#include <tonc_bios.h>
 #include <assert.h>
 #include <modplay.h>
 #include <data/music.h>
@@ -1623,7 +1622,7 @@ static void behavior_boss_update(entity_s *self)
             FIXED disp = self->pos.y - (player->pos.y - FX(8));
             if (disp < FX(4)) disp = FX(4);
 
-            self->actor.jump_velocity = Sqrt(2 * fxmul(disp, WORLD_GRAVITY)) * 16;
+            self->actor.jump_velocity = isqrt(2 * fxmul(disp, WORLD_GRAVITY)) * 16;
             LOG_DBG("jump velocity: %f", fx2float(self->actor.jump_velocity));
         }
         break;

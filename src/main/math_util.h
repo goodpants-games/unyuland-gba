@@ -3,6 +3,7 @@
 
 #include <tonc_math.h>
 #include <data/sinelut_bin.h>
+#include <platutil.h>
 
 // x always has to be greater than y
 #define UPAIR2U(x, y) ((((x) * (x) + (x)) >> 1) + (y))
@@ -42,5 +43,8 @@ static inline FIXED sine_lut(uint t)
     const FIXED *lut = (const FIXED *)sinelut_bin;
     return lut[(t & 127) << 1] * (((t & 255) >= 128) ? -1 : 1);
 }
+
+ARM_FUNC
+int isqrt(int x);
 
 #endif
