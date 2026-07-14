@@ -28,49 +28,78 @@ player should be able to do a jig when hold down (very important)
 Upon re-entering the unyu village you started in, it is eerily barren of Unyus
 and there is also black goop and destruction everywhere.
 
-Then, the unyu you play as sees a black Goop drip from the ceiling onto its
-head. It then jumps out of the way as the Boss falls from the top of the screen.
-Player regains control and the boss sequence starts.
+Then you find a survivor Unyu and a Tall Figure talking to each other. Tall
+Figure notices you and is like "Oh Thank The Gods, Another Unyu is Alive!!"
+"Er, sorry to inform you but a giant monster came here and destroyed everything
+and ate everyone. It's very sad and tragic." (todo: better writing).
+"unfortunately you Unyus seem to have taken residence near their territory."
+tall figure then explains that it is possible to save everyone if you managed to
+kill the monster. their tribe has killed one of them before and recall that any
+recently eaten creature was still alive once its body was dissolved in water.
+"hm. actually. I suppose I have a plan. There's this pond of water somewhere
+nearby. I could set up a trap and if we could just lure the monster over there
+then we can save everybody!! Im gonna need your help though Blabla okay follow
+me!"
+
+Unyu then follows him. Then there is this somewhat small tunnel you need to swim
+through to progress. SignGuy: "No, this isn't the one. It's further upward."
+"..." (that is the unyu talking) "Oh, right. I forgot. Urgh,, well,, ...hmmm"
+"okay ... I think there's another path up there we can take...I'll show you
+where it is"
+
+(He exits room) (Blablabla you find him he shows the path)
+
+"Okay I'm pretty sure this is the one. Although ... I don't think I can fit
+through that tunnel. You'll have to go there alone and I'll have to take the
+other path. Is that alright?" "... (unyu jumps)" "okay. Good luck. Hopefully
+there aren't any bluxes there."
+
+(There are in fact a lot of bluxes there)
 
 -- Phase 1 --
-Boss mainly jumps around and spews out projectiles the player has to dodge.
-There is a water refill tank located in the arena, but it does not act as a
-checkpoint; there is no red-colored dot on the center of its sprite. The last
-checkpoint will be set to the moment the boss started.
-
-Boss will periodically rest for a moment probably after a very intense Attack
-phase it does. This will give the player the chance to damage boss by making a
-ladder up to the ceiling and breaking stalactite above the boss. Enemy
-projectiles don't remove ice platforms so the player can build this ladder
-across multiple rest periods. After one hit boss flees to next room.
-
--- Phase 2 --
 The checkpoint will be set to the start of the room.
 
-Upon entering the room, boss will avoid you and will break the stalactites above
-your head using its projectiles. So you need to dodge them all first.
+1-min run and gun section with a new enemy type that is more difficult to deal
+with. Then maybe you have to do a puzzle platform section to get to the next
+room
 
-Afterwards enter a sequence where you have to follow the boss as he flees But
-there's a bunch of bluxes along the path---probably a new enemy type as well---
-shooting at you that you have to avoid/hit. Then maybe you have to do a puzzle
-platform section to get to the third room
+-- Intermission --
+You enter an unoccupied room through a one-way platform on the floor. The room
+is to be a battle arena. There is a left wall that has the left-side room exit
+on top of it. you need to place a few platforms to be able to scale it. Sign Guy
+is waiting at the top of this wall. Sign Guy: "okay, good, I was worried for a
+bit that I sent you down the wrong path, haha. hm. you know I just realizd we
+never formally introduced ourselves. My name is [insert name here] and-" And
+then the monster drops from the top of the screen right in front of the Unyu
+and. Licks its mouth. Then the player regains control.
+
+-- Phase 2 --
+regular one-on-one boss fight. Boss jumps around and can spew projectiles and
+stuff. You are unable to damage it using your droplets, so what you need to do
+instead is break stalactites to have it fall onto the boss and damage it. After
+a few hits the phase is completed.
+
+-- Intermission --
+After the boss rests for a second, it gets back up and then jumps up onto the
+left wall and into the next room. (SignGuy is absent by now) Then the player
+should follow it. Like there's nowhere else to go anyway, also that's where
+SignGuy went too so.
+
+The room is outdoors. upon entering the room, the boss is hidden directly above
+the entrance. It will drop down on you once you arrive and start chomping you.
+But then the Sign Guy throws a spear at it from off-screen that hits the
+creature which frees you. Shortly afterward you get up and must start running
+away from creature.
 
 -- Phase 3 --
-This room is outside
-
-upon entering the room, the boss is hidden directly above the entrance. It will
-drop down on you once you arrive and start chomping you. But then the Sign Guy
-throws a spear at it from off-screen that hits the creature which frees you.
-Shortly afterward you get up and must start running away from creature.
-
 The checkpoint will be set at the point the player regains control.
 
-Uhh then you and the sign guy work together (somehow) to lure the big creature
-into a pit of water. Like, I guess the creature gets Really Angry and starts
-chasing you and the sign guy (the sign guy no longer has a weapon so it has no
-reason to fear it). so you have to be do these platforming challenges (perphaps
-puzzles too?) with great exigency otherwise you Die.
+I guess the creature gets Really Angry and starts chasing you and the sign guy
+(the sign guy no longer has a weapon so it has no reason to fear it). so you
+have to be do these platforming challenges (perphaps puzzles too?) with great
+exigency otherwise you Die.
 
+-- Final --
 then you reach a Dead-End but there is a trap for the monster. like The ground
 is visibly different in one patch of ground and you can see water underneath.
 As the creature quickly approaches, Sign Guy opens up the trap. However the

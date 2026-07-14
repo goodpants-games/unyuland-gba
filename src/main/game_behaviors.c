@@ -1473,6 +1473,94 @@ static const behavior_def_s behavior_orb = {
 
 
 //------------------------------------------------------------------------------
+// stalactite
+//------------------------------------------------------------------------------
+#pragma region stalactite
+
+static behavior_def_s behavior_stalactite;
+
+typedef struct stalactite_data
+{
+    bool falling;
+    u8 times_hit;
+}
+stalactite_data_s;
+EDATA_SIZE_CHECK(stalactite_data_s)
+
+void entity_stalactite_init(entity_s *self, FIXED px, FIXED py)
+{
+    self->flags |= ENTITY_FLAG_COLLIDE;
+    self->pos.x = px;
+    self->pos.y = py;
+    self->col.w = 8;
+    self->col.h = 12;
+    self->col.group = 0;
+    self->col.mask = COLGROUP_PROJECTILE;
+    self->sprite.graphic_id = SPRID_GAME_STALACTITE;
+    self->behavior = &behavior_stalactite;
+
+    stalactite_data_s *data = (stalactite_data_s *)self->userdata;
+    *data = (stalactite_data_s){0};
+}
+
+static bool stalactite_proj_touch(entity_s *self, projectile_s *proj)
+{
+    stalactite_data_s *data = (stalactite_data_s *)self->userdata;
+    if (data->falling || proj->kind != PROJ_KIND_PLAYER) return true;
+
+    snd_play_no_overlap(SND_ID_PLATFORM_PLACE);
+    ++data->times_hit;
+
+    if (data->times_hit == 2)
+    {
+        // enable actor flag just so it can detect if it touched the ground
+        // (sucks i know. but i'm too lazy at this point.)
+        self->flags |= ENTITY_FLAG_MOVING | ENTITY_FLAG_ACTOR;
+        self->actor.flags |= ACTOR_FLAG_NO_VEL;
+        self->col.mask = COLGROUP_DEFAULT;
+        data->falling = true;
+    }
+
+    return false;
+}
+
+static void stalactite_ent_touch(entity_s *self, entity_s *other, int nx, int ny)
+{
+    stalactite_data_s *data = (stalactite_data_s *)self->userdata;
+    if (!data->falling) return;
+
+    if (other->behavior && other->behavior->attacked)
+        other->behavior->attacked(other, self, 0);
+
+    entity_queue_free(self);
+}
+
+static void stalactite_update(entity_s *self)
+{
+    stalactite_data_s *data = (stalactite_data_s *)self->userdata;
+    if (!data->falling) return;
+
+    if (self->actor.flags & ACTOR_FLAG_GROUNDED)
+        entity_queue_free(self);
+}
+
+static behavior_def_s behavior_stalactite = {
+    .proj_touch = stalactite_proj_touch,
+    .ent_touch = stalactite_ent_touch,
+    .update = stalactite_update
+};
+
+#pragma endregion stalactite
+
+
+
+
+
+
+
+
+
+//------------------------------------------------------------------------------
 // boss
 //------------------------------------------------------------------------------
 #pragma region boss
@@ -1484,12 +1572,18 @@ static const behavior_def_s behavior_orb = {
 #define BOSS_FLAG_DID_JUMP       (1 << 1)
 #define BOSS_FLAG_WAS_ON_GROUND  (1 << 2)
 
+/*
+TODO: make him do the slide move less, and think of more moves he can do, that
+obviously aren't as easy for the player to hit him with a stalactite.
+*/
+
 typedef enum boss_mode
 {
     BOSS_MODE_WAIT,
     BOSS_MODE_SLIDE_WARN,
     BOSS_MODE_SLIDE,
     BOSS_MODE_SHOOT_JUMP,
+    BOSS_MODE_HURT
 }
 boss_mode_e;
 
@@ -1535,8 +1629,8 @@ static projectile_s *boss_shoot(entity_s *self, FIXED dx, FIXED dy)
 
     proj->px = self->pos.x + FX(8);
     proj->py = self->pos.y + FX(10);
-    proj->vx = fxmul(dx, FX(1.0));
-    proj->vy = fxmul(dy, FX(1.0));
+    proj->vx = fxmul(dx, FX(0.8));
+    proj->vy = fxmul(dy, FX(0.8));
     proj->kind = PROJ_KIND_ENEMY;
     proj->graphic_id = SPRID_GAME_BULLET;
     proj->life = 120;
@@ -1558,6 +1652,17 @@ static void behavior_boss_ent_touch(entity_s *self, entity_s *other,
     if (data->flags & BOSS_FLAG_CONTACT_DAMAGE)
         if (other->behavior && other->behavior->attacked)
             other->behavior->attacked(other, self, SGN3(self->vel.x));
+}
+
+static void behavior_boss_attacked(entity_s *self, entity_s *other, int dir)
+{
+    boss_data_s *data = (boss_data_s *)self->userdata;
+    if (data->mode == BOSS_MODE_HURT) return;
+    
+    data->mode = BOSS_MODE_HURT;
+    data->flags &= ~BOSS_FLAG_CONTACT_DAMAGE;
+    data->wait_timer = 30;
+    snd_play_no_overlap(SND_ID_PLAYER_DIE);
 }
 
 static void behavior_boss_update(entity_s *self)
@@ -1658,12 +1763,12 @@ static void behavior_boss_update(entity_s *self)
         {
             boss_shoot(self, FX(1), FX(0));
             boss_shoot(self, FX(-1), FX(0));
-            boss_shoot(self, FX(0), FX(-1));
+            // boss_shoot(self, FX(0), FX(-1));
             boss_shoot(self, FX(0), FX(1));
             boss_shoot(self, FX(COS45), FX(COS45));
             boss_shoot(self, -FX(COS45), FX(COS45));
-            boss_shoot(self, FX(COS45), -FX(COS45));
-            boss_shoot(self, -FX(COS45), -FX(COS45));
+            // boss_shoot(self, FX(COS45), -FX(COS45));
+            // boss_shoot(self, -FX(COS45), -FX(COS45));
 
             snd_play_no_overlap(SND_ID_ENEMY_SPIT);
 
@@ -1676,6 +1781,25 @@ static void behavior_boss_update(entity_s *self)
             data->wait_timer = 60;
         }
         break;
+    }
+
+    case BOSS_MODE_HURT:
+    {
+        ent_flags |= ENTITY_FLAG_DAMPING;
+        self->damp = DEFAULT_DAMP;
+
+        --data->wait_timer;
+        int subf = data->wait_timer & 3;
+        if (subf < 2)
+            self->sprite.palette = GFX_OBJPAL_MUL;
+        else
+            self->sprite.palette = GFX_OBJPAL_USER2;
+
+        if (data->wait_timer == 0)
+        {
+            data->mode = BOSS_MODE_WAIT;
+            data->wait_timer = 30;
+        }
     }
     }
 
@@ -1708,6 +1832,7 @@ static const behavior_def_s behavior_boss = {
     .update = behavior_boss_update,
     .proj_touch = behavior_boss_proj_touch,
     .ent_touch = behavior_boss_ent_touch,
+    .attacked = behavior_boss_attacked
 };
 
 #pragma endregion boss
