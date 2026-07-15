@@ -136,8 +136,9 @@ typedef struct behavior_def
     void (*interact)(struct entity *self, struct entity *source);
     void (*attacked)(struct entity *self, struct entity *attacker, int dir);
 
-    // generic message
-    void (*message)(struct entity *self, const char *id, void *data);
+    // generic message. returns true if the message was recognized and should be
+    // sinked ("sink" behavior is context-dependent).
+    bool (*message)(struct entity *self, const char *id, void *data);
 } behavior_def_s;
 
 typedef struct entity
@@ -345,6 +346,6 @@ void entity_water_tank_init(entity_s *self, FIXED px, FIXED py);
 void entity_fragile_block_init(entity_s *self, FIXED px, FIXED py);
 void entity_orb(entity_s *self, FIXED px, FIXED py, bool blue);
 void entity_boss_init(entity_s *self, FIXED px, FIXED py);
-void entity_stalactite_init(entity_s *self, FIXED px, FIXED py);
+void entity_stalactite_init(entity_s *self, FIXED px, FIXED py, int gfx_variant);
 
 #endif

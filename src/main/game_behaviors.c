@@ -6,6 +6,7 @@
 #include <data/music.h>
 #include <log.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "dialogue.h"
 #include "game.h"
@@ -32,6 +33,9 @@
 #define EDATA_SIZE_CHECK(strt) \
     static_assert(sizeof(strt) <= sizeof(uintptr_t) * 4, \
                   "struct '" #strt "' exceeds storage capcity");
+
+#define MSG_ID_BROKE_STALACTITE "brkstalc"
+#define MSG_ID_STALACTITE_ATTACK "atkstalc"
 
 static bool droplet_check_tile(FIXED x, FIXED y)
 {
@@ -594,10 +598,30 @@ static void behavior_player_ent_touch(entity_s *self, entity_s *other, int nx,
         data->interactable = other;
 }
 
+static void player_hit_by_stalactite(entity_s *self, entity_s *other)
+{
+    player_data_s *data = (player_data_s *)self->userdata;
+    if (data->death_timer != -1) return;
+
+    self->flags &= ~ENTITY_FLAG_ACTOR;
+    self->vel.x = 0;
+    self->vel.y = other->vel.y;
+
+    self->sprite.graphic_id = SPRID_GAME_PLAYER_STALACTITE;
+    self->sprite.frame = 0;
+    self->sprite.accum = 0;
+
+    data->death_timer = 0;
+    g_game.player_is_dead = true;
+
+    snd_play(SND_ID_PLAYER_DIE);
+}
+
 static void behavior_player_attacked(entity_s *self, entity_s *attacker,
                                      int dir)
 {
     player_data_s *data = (player_data_s *)self->userdata;
+    if (data->death_timer != -1) return;
 
     self->flags &= ~(ENTITY_FLAG_COLLIDE | ENTITY_FLAG_ACTOR);
 
@@ -634,12 +658,26 @@ static bool behavior_player_proj_touch(entity_s *self, projectile_s *proj)
     return false;
 }
 
+static bool behavior_player_message(entity_s *self, const char *id, void *ud)
+{
+    (void)ud;
+
+    if (!strcmp(id, MSG_ID_STALACTITE_ATTACK))
+    {
+        player_hit_by_stalactite(self, ud);
+        return true;
+    }
+
+    return false;
+}
+
 const behavior_def_s behavior_player = {
     .free = behavior_player_free,
     .update = behavior_player_update,
     .ent_touch = behavior_player_ent_touch,
     .proj_touch = behavior_player_proj_touch,
     .attacked = behavior_player_attacked,
+    .message = behavior_player_message
 };
 
 #pragma endregion player
@@ -1483,11 +1521,12 @@ typedef struct stalactite_data
 {
     bool falling;
     u8 times_hit;
+    u8 shake_timer;
 }
 stalactite_data_s;
 EDATA_SIZE_CHECK(stalactite_data_s)
 
-void entity_stalactite_init(entity_s *self, FIXED px, FIXED py)
+void entity_stalactite_init(entity_s *self, FIXED px, FIXED py, int gfx_variant)
 {
     self->flags |= ENTITY_FLAG_COLLIDE;
     self->pos.x = px;
@@ -1497,6 +1536,7 @@ void entity_stalactite_init(entity_s *self, FIXED px, FIXED py)
     self->col.group = 0;
     self->col.mask = COLGROUP_PROJECTILE;
     self->sprite.graphic_id = SPRID_GAME_STALACTITE;
+    self->sprite.frame = gfx_variant - 1;
     self->behavior = &behavior_stalactite;
 
     stalactite_data_s *data = (stalactite_data_s *)self->userdata;
@@ -1506,8 +1546,12 @@ void entity_stalactite_init(entity_s *self, FIXED px, FIXED py)
 static bool stalactite_proj_touch(entity_s *self, projectile_s *proj)
 {
     stalactite_data_s *data = (stalactite_data_s *)self->userdata;
-    if (data->falling || proj->kind != PROJ_KIND_PLAYER) return true;
+    if (data->falling) return true;
 
+    data->shake_timer = 8;
+
+    // only player projectiles may cause it to fall
+    if (proj->kind != PROJ_KIND_PLAYER) return true;
     snd_play_no_overlap(SND_ID_PLATFORM_PLACE);
     ++data->times_hit;
 
@@ -1519,6 +1563,8 @@ static bool stalactite_proj_touch(entity_s *self, projectile_s *proj)
         self->actor.flags |= ACTOR_FLAG_NO_VEL;
         self->col.mask = COLGROUP_DEFAULT;
         data->falling = true;
+
+        game_send_global_message(MSG_ID_BROKE_STALACTITE, self);
     }
 
     return false;
@@ -1529,6 +1575,9 @@ static void stalactite_ent_touch(entity_s *self, entity_s *other, int nx, int ny
     stalactite_data_s *data = (stalactite_data_s *)self->userdata;
     if (!data->falling) return;
 
+    if (other->behavior && other->behavior->message)
+        other->behavior->message(other, MSG_ID_STALACTITE_ATTACK, self);
+
     if (other->behavior && other->behavior->attacked)
         other->behavior->attacked(other, self, 0);
 
@@ -1538,6 +1587,22 @@ static void stalactite_ent_touch(entity_s *self, entity_s *other, int nx, int ny
 static void stalactite_update(entity_s *self)
 {
     stalactite_data_s *data = (stalactite_data_s *)self->userdata;
+
+    if (data->shake_timer != 0)
+    {
+        uint anim_frame = data->shake_timer % 6;
+        if (anim_frame < 3)
+            self->sprite.ox = 1;
+        else
+            self->sprite.ox = -1;
+
+        --data->shake_timer;
+    }
+    else
+    {
+        self->sprite.ox = 0;
+    }
+
     if (!data->falling) return;
 
     if (self->actor.flags & ACTOR_FLAG_GROUNDED)
@@ -1565,8 +1630,9 @@ static behavior_def_s behavior_stalactite = {
 //------------------------------------------------------------------------------
 #pragma region boss
 
-#define BOSS_JUMP_VEL FX(2.5)
+#define BOSS_JUMP_VEL      FX(2.5)
 #define BOSS_ENT_FLAG_MASK ENTITY_FLAG_DAMPING
+#define BOSS_HEALTH        5
 
 #define BOSS_FLAG_CONTACT_DAMAGE (1 << 0)
 #define BOSS_FLAG_DID_JUMP       (1 << 1)
@@ -1576,14 +1642,12 @@ static behavior_def_s behavior_stalactite = {
 TODO: make him do the slide move less, and think of more moves he can do, that
 obviously aren't as easy for the player to hit him with a stalactite.
 
-- one where he uh. stays at a distance away from you. and then shoots. well.
-  i guess that would be his idle move.
 - one where he shoots a wall(s) of projectiles (via jumping). that you need to
-  weave around.
+  weave around(?)
 - charge and then high-jump to your position and GroundPound. (+ shockwave you
   need to dodge? that would require graphical dma effect?)
 
-phase 2: needs to stop sliding when player breaks a stalactite
+boss needs to make absolutely sure that the player cannot leave the boss arena
 */
 
 typedef enum boss_mode
@@ -1624,7 +1688,7 @@ static void boss_switch_mode(entity_s *self, boss_mode_e mode);
 void entity_boss_init(entity_s *self, FIXED px, FIXED py)
 {
     self->flags |= ENTITY_FLAG_MOVING | ENTITY_FLAG_COLLIDE |
-                   ENTITY_FLAG_ACTOR;
+                   ENTITY_FLAG_ACTOR | ENTITY_FLAG_GLOBAL_MSG;
     self->pos.x = px;
     self->pos.y = py;
     self->col.w = 16;
@@ -1838,6 +1902,7 @@ static void behavior_boss_update(entity_s *self)
 
             boss_shoot(self, self_cx, self->pos.y + FX(4), FX(dirx), FX(0), FIX_ONE);
             boss_shoot(self, self_cx, self->pos.y + FX(16 - 4), FX(dirx), FX(0), FIX_ONE);
+            snd_play(SND_ID_ENEMY_SPIT);
         }
 
         if (player_cy - self_cy < FX(-5))
@@ -1910,7 +1975,9 @@ static void behavior_boss_update(entity_s *self)
         if      (phase == 0) thresh = FX(8 * 4);
         else if (phase == 1) thresh = FX(8 * 2);
 
-        --data->wait_timer;
+        if (phase == 1)
+            --data->wait_timer;
+
         if (data->wait_timer == 0 || -player_dx * self->actor.move_x > thresh)
         {
             boss_switch_mode(self, BOSS_MODE_PHASE_DEFAULT);
@@ -1933,17 +2000,15 @@ static void behavior_boss_update(entity_s *self)
         --data->wait_timer;
         if (data->wait_timer == 0)
         {
-            // speed should be 0.8
-            FIXED spd = FX(0.8);
-            boss_shoot(self, self_cx, self_cy, FX(1), FX(0), spd);
-            boss_shoot(self, self_cx, self_cy, FX(-1), FX(0), spd);
-            // boss_shoot(self, FX(0), FX(-1));
-            boss_shoot(self, self_cx, self_cy, FX(0), FX(1), spd);
-            boss_shoot(self, self_cx, self_cy, FX(COS45), FX(COS45), spd);
-            boss_shoot(self, self_cx, self_cy, -FX(COS45), FX(COS45), spd);
-            // boss_shoot(self, FX(COS45), -FX(COS45));
-            // boss_shoot(self, -FX(COS45), -FX(COS45));
-
+            FIXED spd = FX(0.6);
+            boss_shoot(self, self_cx, self_cy,  FX(1),      FX(0),     spd);
+            boss_shoot(self, self_cx, self_cy,  FX(-1),     FX(0),     spd);
+            boss_shoot(self, self_cx, self_cy,  FX(0),      FX(-1),    spd);
+            boss_shoot(self, self_cx, self_cy,  FX(0),      FX(1),     spd);
+            boss_shoot(self, self_cx, self_cy,  FX(COS45),  FX(COS45), spd);
+            boss_shoot(self, self_cx, self_cy, -FX(COS45),  FX(COS45), spd);
+            boss_shoot(self, self_cx, self_cy,  FX(COS45), -FX(COS45), spd);
+            boss_shoot(self, self_cx, self_cy, -FX(COS45), -FX(COS45), spd);
             snd_play_no_overlap(SND_ID_ENEMY_SPIT);
 
             data->wait_timer = 10;
@@ -2037,6 +2102,11 @@ static void behavior_boss_attacked(entity_s *self, entity_s *other, int dir)
 
     data->phase_on_hurt = boss_get_phase(self);
     ++data->hits;
+
+    if (data->hits == BOSS_HEALTH)
+    {
+        game_start_dialogue("Boss is defeated\f");
+    }
     
     data->mode = BOSS_MODE_HURT;
     data->flags &= ~BOSS_FLAG_CONTACT_DAMAGE;
@@ -2044,11 +2114,31 @@ static void behavior_boss_attacked(entity_s *self, entity_s *other, int dir)
     snd_play_no_overlap(SND_ID_PLAYER_DIE);
 }
 
+static bool behavior_boss_message(entity_s *self, const char *id,
+                                  void *msg_data)
+{
+    // only reacts to stalactite broke message
+    if (strcmp(id, MSG_ID_BROKE_STALACTITE)) return false;
+
+    LOG_DBG("sensed broken stalactite");
+
+    boss_data_s *data = (boss_data_s *)self->userdata;
+    if ((data->mode == BOSS_MODE_SLIDE || data->mode == BOSS_MODE_SLIDE_WARN)
+        && boss_get_phase(self) == 1)
+    {
+        LOG_DBG("stop sliding!");
+        boss_switch_mode(self, BOSS_MODE_PHASE_DEFAULT);
+    }
+
+    return true;
+}
+
 static const behavior_def_s behavior_boss = {
     .update = behavior_boss_update,
     .proj_touch = behavior_boss_proj_touch,
     .ent_touch = behavior_boss_ent_touch,
-    .attacked = behavior_boss_attacked
+    .attacked = behavior_boss_attacked,
+    .message = behavior_boss_message,
 };
 
 #pragma endregion boss

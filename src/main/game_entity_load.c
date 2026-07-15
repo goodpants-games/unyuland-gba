@@ -8,38 +8,45 @@
 #define STR_CASE_FALLBACK else
 #define STR_CASE_END }
 
-bool get_property_string(const entity_load_s *load_data, const char *name,
-                         const char **out)
+static bool get_property(const entity_load_s *load_data, const char *name,
+                         int type, uintptr_t *out)
 {
     entity_load_prop_s *prop = load_data->props;
     entity_load_prop_s *end_prop = load_data->props + load_data->prop_count;
     for (; prop != end_prop; ++prop)
     {
-        if (!strcmp(prop->name, name) && prop->type == ELPT_STRING)
+        if (!strcmp(prop->name, name) && prop->type == type)
         {
-            *out = (const char *)prop->data;
+            *out = prop->data;
             return true;
         }
     }
-
     return false;
 }
 
-bool get_property_decimal(const entity_load_s *load_data, const char *name,
-                          FIXED *out)
+static inline bool get_property_string(const entity_load_s *load_data,
+                                       const char *name, const char **out)
 {
-    entity_load_prop_s *prop = load_data->props;
-    entity_load_prop_s *end_prop = load_data->props + load_data->prop_count;
-    for (; prop != end_prop; ++prop)
-    {
-        if (!strcmp(prop->name, name) && prop->type == ELPT_DECIMAL)
-        {
-            *out = (FIXED) prop->data;
-            return true;
-        }
-    }
+    *out = NULL;
+    return get_property(load_data, name, ELPT_STRING, (uintptr_t *)out);
+}
 
-    return false;
+static inline bool get_property_decimal(const entity_load_s *load_data,
+                                        const char *name, FIXED *p_out)
+{
+    uintptr_t out = 0;
+    bool s = get_property(load_data, name, ELPT_DECIMAL, &out);
+    *p_out = (FIXED) out;
+    return s;
+}
+
+static inline bool get_property_int(const entity_load_s *load_data,
+                                    const char *name, int *p_out)
+{
+    uintptr_t out = 0;
+    bool s = get_property(load_data, name, ELPT_INT, &out);
+    *p_out = (int) out;
+    return s;
 }
 
 static int parse_gun_enemy_flags(const entity_load_s *load_data)
@@ -179,7 +186,9 @@ void game_load_entity(const entity_load_s *load_data)
     }
     STR_CASE("stalactite")
     {
-        entity_stalactite_init(ent, load_data->x, load_data->y);
+        int variant;
+        get_property_int(load_data, "variant", &variant);
+        entity_stalactite_init(ent, load_data->x, load_data->y, variant);
     }
     STR_CASE("boss")
     {
