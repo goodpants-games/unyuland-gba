@@ -1575,15 +1575,28 @@ static behavior_def_s behavior_stalactite = {
 /*
 TODO: make him do the slide move less, and think of more moves he can do, that
 obviously aren't as easy for the player to hit him with a stalactite.
+
+- one where he uh. stays at a distance away from you. and then shoots. well.
+  i guess that would be his idle move.
+- one where he shoots a wall(s) of projectiles (via jumping). that you need to
+  weave around.
+- charge and then high-jump to your position and GroundPound. (+ shockwave you
+  need to dodge? that would require graphical dma effect?)
+
+phase 2: needs to stop sliding when player breaks a stalactite
 */
 
 typedef enum boss_mode
 {
-    BOSS_MODE_WAIT,
+    BOSS_MODE_BACK,
+    BOSS_MODE_PHASE0_IDLE,
     BOSS_MODE_SLIDE_WARN,
     BOSS_MODE_SLIDE,
+    BOSS_MODE_SHOOT_JUMP_WARN,
     BOSS_MODE_SHOOT_JUMP,
-    BOSS_MODE_HURT
+    BOSS_MODE_HURT,
+
+    BOSS_MODE_PHASE_DEFAULT = -1
 }
 boss_mode_e;
 
@@ -1594,10 +1607,19 @@ typedef struct boss_data
     u8 mode;
     u8 flags;
     u8 global_counter;
+    u8 hits;
     s16 wait_timer;
+
+    union
+    {
+        s16 sub_timer;
+        u8 phase_on_hurt;
+    };
 }
 boss_data_s;
 EDATA_SIZE_CHECK(boss_data_s);
+
+static void boss_switch_mode(entity_s *self, boss_mode_e mode);
 
 void entity_boss_init(entity_s *self, FIXED px, FIXED py)
 {
@@ -1617,20 +1639,20 @@ void entity_boss_init(entity_s *self, FIXED px, FIXED py)
     self->behavior = &behavior_boss;
 
     boss_data_s *data = (boss_data_s *)self->userdata;
-    *data = (boss_data_s){
-        .wait_timer = 60
-    };
+    *data = (boss_data_s){0};
+    boss_switch_mode(self, BOSS_MODE_PHASE0_IDLE);
 }
 
-static projectile_s *boss_shoot(entity_s *self, FIXED dx, FIXED dy)
+static projectile_s *boss_shoot(entity_s *self, FIXED px, FIXED py, FIXED dx,
+                                FIXED dy, FIXED mul)
 {
     projectile_s *proj = projectile_alloc();
     if (!proj) return NULL;
 
-    proj->px = self->pos.x + FX(8);
-    proj->py = self->pos.y + FX(10);
-    proj->vx = fxmul(dx, FX(0.8));
-    proj->vy = fxmul(dy, FX(0.8));
+    proj->px = px;
+    proj->py = py;
+    proj->vx = fxmul(dx, mul);
+    proj->vy = fxmul(dy, mul);
     proj->kind = PROJ_KIND_ENEMY;
     proj->graphic_id = SPRID_GAME_BULLET;
     proj->life = 120;
@@ -1638,38 +1660,120 @@ static projectile_s *boss_shoot(entity_s *self, FIXED dx, FIXED dy)
     return proj;
 }
 
-static bool behavior_boss_proj_touch(entity_s *self, projectile_s *proj)
+static inline uint boss_get_phase(entity_s *self)
 {
-    if (proj->kind != PROJ_KIND_ENEMY) return false;
-    return true;
+    boss_data_s *const data = (boss_data_s *)self->userdata;
+    return (data->hits >= 2) ? 1 : 0;
 }
 
-static void behavior_boss_ent_touch(entity_s *self, entity_s *other,
-                                    int nx, int ny)
+static void boss_switch_mode(entity_s *self, boss_mode_e mode)
 {
-    boss_data_s *data = (boss_data_s *)self->userdata;
+    if (mode == BOSS_MODE_PHASE_DEFAULT)
+    {
+        uint phase = boss_get_phase(self);
+        if (phase == 0)
+            boss_switch_mode(self, BOSS_MODE_PHASE0_IDLE);
+        else if (phase == 1)
+            boss_switch_mode(self, BOSS_MODE_BACK);
+        else
+            DBG_CRASH();
 
-    if (data->flags & BOSS_FLAG_CONTACT_DAMAGE)
-        if (other->behavior && other->behavior->attacked)
-            other->behavior->attacked(other, self, SGN3(self->vel.x));
-}
+        return;
+    }
 
-static void behavior_boss_attacked(entity_s *self, entity_s *other, int dir)
-{
-    boss_data_s *data = (boss_data_s *)self->userdata;
-    if (data->mode == BOSS_MODE_HURT) return;
-    
-    data->mode = BOSS_MODE_HURT;
-    data->flags &= ~BOSS_FLAG_CONTACT_DAMAGE;
-    data->wait_timer = 30;
-    snd_play_no_overlap(SND_ID_PLAYER_DIE);
+    boss_data_s *const data = (boss_data_s *)self->userdata;
+    boss_mode_e cur_mode = data->mode;
+    (void)cur_mode;
+
+    entity_s *player = &g_game.entities[0];
+
+    switch (mode)
+    {
+    case BOSS_MODE_BACK:
+    {
+        data->mode = BOSS_MODE_BACK;
+        data->wait_timer = 0;
+        break;
+    }
+
+    case BOSS_MODE_PHASE0_IDLE:
+    {
+        data->mode = BOSS_MODE_PHASE0_IDLE;
+        data->wait_timer = 60;
+        data->flags &= ~(BOSS_FLAG_DID_JUMP | BOSS_FLAG_CONTACT_DAMAGE);
+        break;
+    }
+
+    case BOSS_MODE_SHOOT_JUMP_WARN:
+    {
+        snd_play(SND_ID_CHECKPOINT);
+
+        data->mode = BOSS_MODE_SHOOT_JUMP_WARN;
+        data->wait_timer = 100;
+        break;
+    }
+
+    case BOSS_MODE_SHOOT_JUMP:
+    {
+        data->mode = BOSS_MODE_SHOOT_JUMP;
+
+        FIXED self_cx = self->pos.x + (FX(self->col.w) >> 1);
+        FIXED dirx = SGN(player->pos.x - self->pos.x);
+        FIXED target_x = player->pos.x + dirx * FX(8 * 10);
+        FIXED jump_dist = target_x - self_cx;
+
+        const FIXED max_jump_dist = FX(8 * 12);
+        if (ABS(jump_dist) > max_jump_dist)
+            jump_dist = max_jump_dist * SGN(jump_dist);
+
+        FIXED airborne_duration = fxdiv(2 * BOSS_JUMP_VEL, WORLD_GRAVITY);
+        self->vel.x = fxdiv(jump_dist, airborne_duration);
+        self->vel.y = -BOSS_JUMP_VEL;
+
+        data->wait_timer = 4;
+        break;
+    }
+
+    case BOSS_MODE_SLIDE_WARN:
+    {
+        data->wait_timer = 40;
+        data->mode = BOSS_MODE_SLIDE_WARN;
+        self->actor.move_x = SGN(player->pos.x - self->pos.x);
+        snd_play_no_overlap(SND_ID_ENEMY_HURT);
+        break;
+    }
+
+    case BOSS_MODE_SLIDE:
+    {
+        data->wait_timer = 40;
+        data->mode = BOSS_MODE_SLIDE;
+        data->flags &= ~BOSS_FLAG_DID_JUMP;
+
+        FIXED disp = self->pos.y - (player->pos.y - FX(8));
+        if (disp < FX(4)) disp = FX(4);
+
+        self->actor.jump_velocity = isqrt(2 * fxmul(disp, WORLD_GRAVITY)) * 16;
+        break;
+    }
+
+    case BOSS_MODE_HURT:
+    {
+        data->mode = BOSS_MODE_HURT;
+        data->flags &= ~BOSS_FLAG_CONTACT_DAMAGE;
+        data->wait_timer = 30;
+        snd_play_no_overlap(SND_ID_PLAYER_DIE);
+        break;
+    }
+
+    default: break;
+    }
 }
 
 static void behavior_boss_update(entity_s *self)
 {
-    boss_data_s *data = (boss_data_s *)self->userdata;
+    boss_data_s *const data = (boss_data_s *)self->userdata;
 
-    self->actor.flags |= ACTOR_FLAG_CAN_MOVE;
+    self->actor.flags |= ACTOR_FLAG_CAN_MOVE | ACTOR_FLAG_NO_VEL;
     entity_s *player = &g_game.entities[0];
 
     u32 ent_flags = 0;
@@ -1681,9 +1785,84 @@ static void behavior_boss_update(entity_s *self)
     data->flags &= ~BOSS_FLAG_WAS_ON_GROUND;
     if (is_grounded) data->flags |= BOSS_FLAG_WAS_ON_GROUND;
 
+    FIXED self_cx = self->pos.x + (FX(self->col.w) >> 1);
+    FIXED self_cy = self->pos.y + (FX(self->col.h) >> 1);
+    FIXED player_cx = player->pos.x + (FX(player->col.w) >> 1);
+    FIXED player_cy = player->pos.y + (FX(player->col.h) >> 1);
+
     switch (data->mode)
     {
-    case BOSS_MODE_WAIT:
+    case BOSS_MODE_BACK:
+    {
+        FIXED dx = player_cx - self_cx;
+        int dirx = SGN(dx);
+
+        self->actor.flags &= ~ACTOR_FLAG_NO_VEL;
+        self->actor.move_speed = FX(1.0);
+        self->actor.move_accel = FX(1.0 / 12.0);
+
+        // if (data->sub_timer >= 0)
+        // {
+        //     if (self->actor.flags & ACTOR_FLAG_GROUNDED)
+        //     {
+        //         data->sub_timer = -1;
+        //     }
+        //     else
+        //     {
+        //         if (data->sub_timer == 0)
+        //         {
+        //             data->sub_timer = 0;
+        //             FIXED shoot_y = self->pos.y + FX(self->col.h);
+        //             boss_shoot(self, self_cx, shoot_y, FX(1), FX(0));
+        //             snd_play_no_overlap(SND_ID_ENEMY_SPIT);
+        //         }
+
+        //         if (++data->sub_timer == 7)
+        //             data->sub_timer = 0;
+        //     }
+        // }
+        // else
+        // {
+
+        if (ABS(dx) < FX(8 * 7))
+            self->actor.move_x = -dirx;
+        else if (ABS(dx) > FX(8 * 9))
+            self->actor.move_x = dirx;
+        else
+            self->actor.move_x = 0;
+
+        ++data->wait_timer;
+        if (data->wait_timer == 30)
+        {
+            data->wait_timer = 0;
+
+            boss_shoot(self, self_cx, self->pos.y + FX(4), FX(dirx), FX(0), FIX_ONE);
+            boss_shoot(self, self_cx, self->pos.y + FX(16 - 4), FX(dirx), FX(0), FIX_ONE);
+        }
+
+        if (player_cy - self_cy < FX(-5))
+        {
+            FIXED disp = self->pos.y - (player->pos.y - FX(8));
+            if (disp < FX(4)) disp = FX(4);
+
+            self->actor.jump_velocity = isqrt(2 * fxmul(disp, WORLD_GRAVITY)) * 16;
+
+            if (self->actor.jump_velocity < FX(2))
+                self->actor.jump_velocity = FX(2);
+
+            self->actor.jump_trigger = 1;
+        }
+
+        if ((self->actor.flags & ACTOR_FLAG_GROUNDED) && (self->actor.flags & ACTOR_FLAG_WALL))
+        {
+            LOG_DBG("backed into wall");
+            boss_switch_mode(self, BOSS_MODE_SHOOT_JUMP_WARN);
+        }
+
+        break;
+    }
+
+    case BOSS_MODE_PHASE0_IDLE:
     {
         ent_flags |= ENTITY_FLAG_DAMPING;
         self->damp = DEFAULT_DAMP;
@@ -1693,24 +1872,12 @@ static void behavior_boss_update(entity_s *self)
             if (data->global_counter == 3)
             {
                 data->global_counter = 0;
-                data->mode = BOSS_MODE_SHOOT_JUMP;
-
-                FIXED dirx = SGN(player->pos.x - self->pos.x);
-                FIXED target_x = player->pos.x + dirx * FX(80);
-
-                FIXED airborne_duration = fxdiv(2 * BOSS_JUMP_VEL, WORLD_GRAVITY);
-                self->vel.x = fxdiv(target_x - (self->pos.x + FX(4)), airborne_duration);
-                self->vel.y = -BOSS_JUMP_VEL;
-
-                data->wait_timer = 4;
+                boss_switch_mode(self, BOSS_MODE_SHOOT_JUMP_WARN);
             }
             else
             {
-                data->wait_timer = 40;
-                data->mode = BOSS_MODE_SLIDE_WARN;
-                self->actor.move_x = SGN(player->pos.x - self->pos.x);
-                snd_play_no_overlap(SND_ID_ENEMY_HURT);
                 ++data->global_counter;
+                boss_switch_mode(self, BOSS_MODE_SLIDE_WARN);
             }
         }
         break;
@@ -1720,16 +1887,7 @@ static void behavior_boss_update(entity_s *self)
     {
         self->vel.x = self->actor.move_x * FX(-0.5);
         if (--data->wait_timer == 0)
-        {
-            data->wait_timer = 40;
-            data->mode = BOSS_MODE_SLIDE;
-
-            FIXED disp = self->pos.y - (player->pos.y - FX(8));
-            if (disp < FX(4)) disp = FX(4);
-
-            self->actor.jump_velocity = isqrt(2 * fxmul(disp, WORLD_GRAVITY)) * 16;
-            LOG_DBG("jump velocity: %f", fx2float(self->actor.jump_velocity));
-        }
+            boss_switch_mode(self, BOSS_MODE_SLIDE);
         break;
     }
 
@@ -1738,7 +1896,7 @@ static void behavior_boss_update(entity_s *self)
         self->vel.x = self->actor.move_x * FX(2);
         data->flags |= BOSS_FLAG_CONTACT_DAMAGE;
 
-        FIXED player_dx = player->pos.x - self->pos.x;
+        FIXED player_dx = player_cx - self_cx;
 
         if (!(data->flags & BOSS_FLAG_DID_JUMP) &&
             abs(player_dx) < FX(8 * 4))
@@ -1747,11 +1905,25 @@ static void behavior_boss_update(entity_s *self)
             data->flags |= BOSS_FLAG_DID_JUMP;
         }
 
-        if (-player_dx * self->actor.move_x > FX(8 * 4))
+        uint phase = boss_get_phase(self);
+        FIXED thresh;
+        if      (phase == 0) thresh = FX(8 * 4);
+        else if (phase == 1) thresh = FX(8 * 2);
+
+        --data->wait_timer;
+        if (data->wait_timer == 0 || -player_dx * self->actor.move_x > thresh)
         {
-            data->mode = BOSS_MODE_WAIT;
-            data->wait_timer = 60;
-            data->flags &= ~(BOSS_FLAG_DID_JUMP | BOSS_FLAG_CONTACT_DAMAGE);
+            boss_switch_mode(self, BOSS_MODE_PHASE_DEFAULT);
+        }
+        
+        break;
+    }
+
+    case BOSS_MODE_SHOOT_JUMP_WARN:
+    {
+        if (--data->wait_timer == 0)
+        {
+            boss_switch_mode(self, BOSS_MODE_SHOOT_JUMP);
         }
         break;
     }
@@ -1761,12 +1933,14 @@ static void behavior_boss_update(entity_s *self)
         --data->wait_timer;
         if (data->wait_timer == 0)
         {
-            boss_shoot(self, FX(1), FX(0));
-            boss_shoot(self, FX(-1), FX(0));
+            // speed should be 0.8
+            FIXED spd = FX(0.8);
+            boss_shoot(self, self_cx, self_cy, FX(1), FX(0), spd);
+            boss_shoot(self, self_cx, self_cy, FX(-1), FX(0), spd);
             // boss_shoot(self, FX(0), FX(-1));
-            boss_shoot(self, FX(0), FX(1));
-            boss_shoot(self, FX(COS45), FX(COS45));
-            boss_shoot(self, -FX(COS45), FX(COS45));
+            boss_shoot(self, self_cx, self_cy, FX(0), FX(1), spd);
+            boss_shoot(self, self_cx, self_cy, FX(COS45), FX(COS45), spd);
+            boss_shoot(self, self_cx, self_cy, -FX(COS45), FX(COS45), spd);
             // boss_shoot(self, FX(COS45), -FX(COS45));
             // boss_shoot(self, -FX(COS45), -FX(COS45));
 
@@ -1777,8 +1951,7 @@ static void behavior_boss_update(entity_s *self)
 
         if (self->actor.flags & ACTOR_FLAG_GROUNDED)
         {
-            data->mode = BOSS_MODE_WAIT;
-            data->wait_timer = 60;
+            boss_switch_mode(self, BOSS_MODE_PHASE_DEFAULT);
         }
         break;
     }
@@ -1797,9 +1970,22 @@ static void behavior_boss_update(entity_s *self)
 
         if (data->wait_timer == 0)
         {
-            data->mode = BOSS_MODE_WAIT;
-            data->wait_timer = 30;
+            uint phase = boss_get_phase(self);
+            if (phase == 0)
+            {
+                boss_switch_mode(self, BOSS_MODE_PHASE_DEFAULT);
+                data->wait_timer = 30;
+            }
+            else if (phase == 1)
+            {
+                if (data->phase_on_hurt != 1)
+                    boss_switch_mode(self, BOSS_MODE_PHASE_DEFAULT);
+                else
+                    boss_switch_mode(self, BOSS_MODE_SLIDE_WARN);
+            }
         }
+
+        break;
     }
     }
 
@@ -1826,6 +2012,36 @@ static void behavior_boss_update(entity_s *self)
 
     //     snd_play_no_overlap(SND_ID_ENEMY_SPIT);
     // }
+}
+
+static bool behavior_boss_proj_touch(entity_s *self, projectile_s *proj)
+{
+    if (proj->kind != PROJ_KIND_ENEMY) return false;
+    return true;
+}
+
+static void behavior_boss_ent_touch(entity_s *self, entity_s *other,
+                                    int nx, int ny)
+{
+    boss_data_s *data = (boss_data_s *)self->userdata;
+
+    if (data->flags & BOSS_FLAG_CONTACT_DAMAGE)
+        if (other->behavior && other->behavior->attacked)
+            other->behavior->attacked(other, self, SGN3(self->vel.x));
+}
+
+static void behavior_boss_attacked(entity_s *self, entity_s *other, int dir)
+{
+    boss_data_s *data = (boss_data_s *)self->userdata;
+    if (data->mode == BOSS_MODE_HURT) return;
+
+    data->phase_on_hurt = boss_get_phase(self);
+    ++data->hits;
+    
+    data->mode = BOSS_MODE_HURT;
+    data->flags &= ~BOSS_FLAG_CONTACT_DAMAGE;
+    data->wait_timer = 30;
+    snd_play_no_overlap(SND_ID_PLAYER_DIE);
 }
 
 static const behavior_def_s behavior_boss = {
