@@ -18,20 +18,22 @@
 #define GAME_OAM_START 64
 #define GAME_OAM_COUNT 64
 
-#define ENTITY_FLAG_ENABLED              1
-#define ENTITY_FLAG_MOVING               2
-#define ENTITY_FLAG_ACTOR                4
-#define ENTITY_FLAG_COLLIDE              8
-#define ENTITY_FLAG_DAMPING              16
-#define ENTITY_FLAG_REMOVE_ON_CHECKPOINT 32
-#define ENTITY_FLAG_KEEP_ON_ROOM_CHANGE  64
-#define ENTITY_FLAG_QFREE                128
+#define ENTITY_FLAG_ENABLED              (1 << 0)
+#define ENTITY_FLAG_MOVING               (1 << 1)
+#define ENTITY_FLAG_ACTOR                (1 << 2)
+#define ENTITY_FLAG_COLLIDE              (1 << 3)
+#define ENTITY_FLAG_DAMPING              (1 << 4)
+#define ENTITY_FLAG_REMOVE_ON_CHECKPOINT (1 << 5)
+#define ENTITY_FLAG_KEEP_ON_ROOM_CHANGE  (1 << 6)
+#define ENTITY_FLAG_GLOBAL_MSG           (1 << 7) // listens to global msgs
+#define ENTITY_FLAG_QFREE                (1 << 8) // is put in free queue?
 
-#define ACTOR_FLAG_GROUNDED   1
-#define ACTOR_FLAG_WALL       2
-#define ACTOR_FLAG_DID_JUMP   4
-#define ACTOR_FLAG_CAN_MOVE   8
-#define ACTOR_FLAG_NO_VEL     16 // disable velocity control in actor controller
+#define ACTOR_FLAG_GROUNDED   (1 << 0)
+#define ACTOR_FLAG_WALL       (1 << 1)
+#define ACTOR_FLAG_DID_JUMP   (1 << 2)
+#define ACTOR_FLAG_CAN_MOVE   (1 << 3)
+#define ACTOR_FLAG_NO_VEL     (1 << 4) // disable velocity control in actor
+                                       // controller
 
 #define SPRITE_FLAG_PLAYING   1
 #define SPRITE_FLAG_FLIP_X    2
@@ -133,6 +135,9 @@ typedef struct behavior_def
 
     void (*interact)(struct entity *self, struct entity *source);
     void (*attacked)(struct entity *self, struct entity *attacker, int dir);
+
+    // generic message
+    void (*message)(struct entity *self, const char *id, void *data);
 } behavior_def_s;
 
 typedef struct entity
@@ -175,8 +180,8 @@ typedef struct entity
         s16 oy;
     } sprite;
 
-    uintptr_t userdata[4];
     const behavior_def_s *behavior;
+    uintptr_t userdata[4];
 } entity_s;
 
 typedef struct room_trans_state
@@ -293,6 +298,7 @@ void game_deinit(void);
 void game_update(void);
 void game_load_room(const world_room_s *room);
 void game_reset_player_pos(void);
+void game_send_global_message(const char *id, void *data);
 void game_render(void);
 void game_save_state(void);
 void game_restore_state(void);

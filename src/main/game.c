@@ -797,6 +797,18 @@ void game_load_room(const world_room_s *room)
     }
 }
 
+void game_send_global_message(const char *id, void *data)
+{
+    for (int i = 0; i < MAX_ENTITY_COUNT; ++i)
+    {
+        entity_s *ent = g_game.entities + i;
+        if (!(ent->flags & ENTITY_FLAG_GLOBAL_MSG)) continue;
+
+        if (ent->behavior && ent->behavior->message)
+            ent->behavior->message(ent, id, data);
+    }
+}
+
 static inline int render_obj_zidx(const render_obj_s *obj)
 {
     if (obj->type == RENDER_OBJ_SPRITE)
