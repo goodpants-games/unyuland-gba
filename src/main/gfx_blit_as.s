@@ -304,7 +304,7 @@ gfx_text_bmap_fill:
 
 #endif
 
-# What the fuck gas
+// What the fuck gas
 #if defined(__linux__) && defined(__ELF__)
 .section .note.GNU-stack,"",%progbits
 #endif
