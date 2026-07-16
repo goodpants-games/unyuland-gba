@@ -23,6 +23,10 @@
 b05: player scared to go down Hole.
 player should be able to do a jig when hold down (very important)
 
+- boss camera autofollow
+- people will be confused by 2nd phase Default because they think it's time-
+  limited
+
 ==================================== Boss ======================================
 
 Upon re-entering the unyu village you started in, it is eerily barren of Unyus

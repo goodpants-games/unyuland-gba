@@ -1555,18 +1555,14 @@ static bool stalactite_proj_touch(entity_s *self, projectile_s *proj)
     snd_play_no_overlap(SND_ID_PLATFORM_PLACE);
     ++data->times_hit;
 
-    if (data->times_hit == 2)
-    {
-        // enable actor flag just so it can detect if it touched the ground
-        // (sucks i know. but i'm too lazy at this point.)
-        self->flags |= ENTITY_FLAG_MOVING | ENTITY_FLAG_ACTOR;
-        self->actor.flags |= ACTOR_FLAG_NO_VEL;
-        self->col.mask = COLGROUP_DEFAULT;
-        data->falling = true;
+    // enable actor flag just so it can detect if it touched the ground
+    // (sucks i know. but i'm too lazy at this point.)
+    self->flags |= ENTITY_FLAG_MOVING | ENTITY_FLAG_ACTOR;
+    self->actor.flags |= ACTOR_FLAG_NO_VEL;
+    self->col.mask = COLGROUP_DEFAULT;
+    data->falling = true;
 
-        game_send_global_message(MSG_ID_BROKE_STALACTITE, self);
-    }
-
+    game_send_global_message(MSG_ID_BROKE_STALACTITE, self);
     return false;
 }
 
@@ -1896,7 +1892,7 @@ static void behavior_boss_update(entity_s *self)
             self->actor.move_x = 0;
 
         ++data->wait_timer;
-        if (data->wait_timer == 30)
+        if (data->wait_timer == 34)
         {
             data->wait_timer = 0;
 
@@ -1963,12 +1959,12 @@ static void behavior_boss_update(entity_s *self)
 
         FIXED player_dx = player_cx - self_cx;
 
-        if (!(data->flags & BOSS_FLAG_DID_JUMP) &&
-            abs(player_dx) < FX(8 * 4))
-        {
-            self->actor.jump_trigger = 1;
-            data->flags |= BOSS_FLAG_DID_JUMP;
-        }
+        // if (!(data->flags & BOSS_FLAG_DID_JUMP) &&
+        //     abs(player_dx) < FX(8 * 4))
+        // {
+        //     self->actor.jump_trigger = 1;
+        //     data->flags |= BOSS_FLAG_DID_JUMP;
+        // }
 
         uint phase = boss_get_phase(self);
         FIXED thresh;
@@ -2011,7 +2007,7 @@ static void behavior_boss_update(entity_s *self)
             boss_shoot(self, self_cx, self_cy, -FX(COS45), -FX(COS45), spd);
             snd_play_no_overlap(SND_ID_ENEMY_SPIT);
 
-            data->wait_timer = 10;
+            data->wait_timer = 14;
         }
 
         if (self->actor.flags & ACTOR_FLAG_GROUNDED)
