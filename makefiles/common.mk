@@ -298,7 +298,9 @@ endif
 # as the room order. This data is then read by mapc.
 # Also creates a pointer list to each map file, as well as the world matrix.
 #---------------------------------------------------------------------------------
-data/world.json data/world.c data/world.h data/automap.bin: $(MAPFILES) $(TOPLEVEL)/tools/worldproc.py
+data/world.json data/world.c data/world.h data/automap.bin:\
+    $(MAPFILES)\
+	$(TOPLEVEL)/data/maps/unyuland.world $(TOPLEVEL)/tools/worldproc.py
 #---------------------------------------------------------------------------------
 	@mkdir -p $(dir $@)
 	
