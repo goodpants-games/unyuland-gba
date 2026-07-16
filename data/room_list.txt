@@ -1,6 +1,3 @@
-# this file defines the order of the room files. this is important because the
-# game references room by index, not name.
-# the first room listed will be the start room.
 b01
 b02
 a01
@@ -22,4 +19,9 @@ tall_room
 room10
 room11
 room12
+room13
 testroom1
+# this file defines the order of the room files. 
+# the game references room by index, not name. the first room listed will be the
+# start room. This comment is also on the bottom so that it is easier to for a
+# human to do a room index lookup using the line number.

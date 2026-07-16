@@ -18,6 +18,11 @@
 #include "math_util.h"
 #include "options_menu.h"
 
+#ifdef DEVDEBUG
+#define SPAWN_ROOM_INDEX 21
+#else
+#define SPAWN_ROOM_INDEX 0
+#endif
 
 #define HUD_ROW_ORIGIN (GFX_TEXT_BMP_ROWS - 2)
 #define HUD_Y_ORIGIN   (HUD_ROW_ORIGIN * 8 + 6)
@@ -449,7 +454,7 @@ static void scene_load(uintptr_t data)
 
     automap_init(&state.automap);
 
-    const world_room_s *room = &world_rooms[0];
+    const world_room_s *room = &world_rooms[SPAWN_ROOM_INDEX];
     gfx_load_map(1, room->map);
     gfx_ctl.bg[1].offset_x = 0;
     gfx_ctl.bg[1].offset_y = 0;
