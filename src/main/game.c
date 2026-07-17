@@ -373,6 +373,8 @@ static void update_projectiles()
         projectile_s *proj = g_game.projectiles + i;
         if (!IS_PROJ_ACTIVE(proj)) continue;
 
+        proj->vy += proj->g;
+
         if (--proj->life == 0)
             projectile_free(proj);
     }

@@ -19,7 +19,7 @@
 #include "options_menu.h"
 
 #ifdef DEVDEBUG
-#define SPAWN_ROOM_INDEX 21
+#define SPAWN_ROOM_INDEX 0
 #else
 #define SPAWN_ROOM_INDEX 0
 #endif

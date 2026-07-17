@@ -1532,7 +1532,7 @@ void entity_stalactite_init(entity_s *self, FIXED px, FIXED py, int gfx_variant)
     self->pos.x = px;
     self->pos.y = py;
     self->col.w = 8;
-    self->col.h = 12;
+    self->col.h = 16;
     self->col.group = 0;
     self->col.mask = COLGROUP_PROJECTILE;
     self->sprite.graphic_id = SPRID_GAME_STALACTITE;
@@ -1884,15 +1884,24 @@ static void behavior_boss_update(entity_s *self)
         // else
         // {
 
+        bool is_moving_toward_plr = false;
+
         if (ABS(dx) < FX(8 * 7))
+        {
             self->actor.move_x = -dirx;
+        }
         else if (ABS(dx) > FX(8 * 9))
+        {
             self->actor.move_x = dirx;
+            is_moving_toward_plr = true;
+        }
         else
             self->actor.move_x = 0;
 
-        ++data->wait_timer;
-        if (data->wait_timer == 34)
+        if (!is_moving_toward_plr)
+            ++data->wait_timer;
+
+        if (data->wait_timer == 30)
         {
             data->wait_timer = 0;
 
@@ -1946,9 +1955,13 @@ static void behavior_boss_update(entity_s *self)
 
     case BOSS_MODE_SLIDE_WARN:
     {
-        self->vel.x = self->actor.move_x * FX(-0.5);
-        if (--data->wait_timer == 0)
-            boss_switch_mode(self, BOSS_MODE_SLIDE);
+        if (self->actor.flags & ACTOR_FLAG_GROUNDED)
+        {
+            self->vel.x = self->actor.move_x * FX(-0.5);
+            if (--data->wait_timer == 0)
+                boss_switch_mode(self, BOSS_MODE_SLIDE);
+        }
+        
         break;
     }
 
@@ -1996,7 +2009,7 @@ static void behavior_boss_update(entity_s *self)
         --data->wait_timer;
         if (data->wait_timer == 0)
         {
-            FIXED spd = FX(0.6);
+            FIXED spd = FX(0.5);
             boss_shoot(self, self_cx, self_cy,  FX(1),      FX(0),     spd);
             boss_shoot(self, self_cx, self_cy,  FX(-1),     FX(0),     spd);
             boss_shoot(self, self_cx, self_cy,  FX(0),      FX(-1),    spd);
@@ -2077,7 +2090,33 @@ static void behavior_boss_update(entity_s *self)
 
 static bool behavior_boss_proj_touch(entity_s *self, projectile_s *proj)
 {
-    if (proj->kind != PROJ_KIND_ENEMY) return false;
+    if (proj->kind == PROJ_KIND_PLAYER)
+    {
+        FIXED cx = self->pos.x + (FX(self->col.w) >> 1);
+        FIXED cy = self->pos.y + (FX(self->col.h) >> 1);
+        FIXED dx = cx - proj->px;
+        FIXED dy = cy - proj->py;
+        // FIXED dlen = isqrt(fxmul(dx, dx) + fxmul(dy, dy)) * 16;
+        // dx = fxdiv(dx, dlen);
+        // dy = fxdiv(dy, dlen);
+
+        FIXED dot = fxmul(dx, proj->vx) + fxmul(dy, proj->vy);
+        if (dot > 0 && proj->g == 0)
+        {
+            self->pos.x += proj->vx / 32;
+            self->pos.y += proj->vy / 32;
+
+            proj->vx = SGN(proj->vx) * FX(-0.5);
+            proj->vy = FX(-1);
+            proj->g = FX(0.2);
+
+            // proj->vx -= fxmul(dx, dot) * 2;
+            // proj->vy -= fxmul(dy, dot) * 2;
+            // proj->vx += self->vel.x;
+            // proj->vy += self->vel.y;
+        }
+    }
+
     return true;
 }
 
@@ -2085,10 +2124,10 @@ static void behavior_boss_ent_touch(entity_s *self, entity_s *other,
                                     int nx, int ny)
 {
     boss_data_s *data = (boss_data_s *)self->userdata;
+    (void)data;
 
-    if (data->flags & BOSS_FLAG_CONTACT_DAMAGE)
-        if (other->behavior && other->behavior->attacked)
-            other->behavior->attacked(other, self, SGN3(self->vel.x));
+    if (other->behavior && other->behavior->attacked)
+        other->behavior->attacked(other, self, SGN3(self->vel.x));
 }
 
 static void behavior_boss_attacked(entity_s *self, entity_s *other, int dir)

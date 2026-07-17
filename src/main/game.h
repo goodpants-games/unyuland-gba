@@ -118,6 +118,7 @@ typedef struct projectile
 
     FIXED px, py;
     FIXED vx, vy;
+    FIXED g;
 } projectile_s;
 
 typedef struct behavior_def
