@@ -1766,7 +1766,7 @@ static void boss_switch_mode(entity_s *self, boss_mode_e mode)
 
     case BOSS_MODE_SHOOT_JUMP_WARN:
     {
-        snd_play(SND_ID_CHECKPOINT);
+        snd_play(SND_ID_BOSS_JUMP_WINDUP);
 
         data->mode = BOSS_MODE_SHOOT_JUMP_WARN;
         data->wait_timer = 100;
@@ -1791,6 +1791,7 @@ static void boss_switch_mode(entity_s *self, boss_mode_e mode)
         self->vel.y = -BOSS_JUMP_VEL;
 
         data->wait_timer = 4;
+        snd_play(SND_ID_BOSS_JUMP);
         break;
     }
 
@@ -1799,7 +1800,7 @@ static void boss_switch_mode(entity_s *self, boss_mode_e mode)
         data->wait_timer = 40;
         data->mode = BOSS_MODE_SLIDE_WARN;
         self->actor.move_x = SGN(player->pos.x - self->pos.x);
-        snd_play_no_overlap(SND_ID_ENEMY_HURT);
+        snd_play_no_overlap(SND_ID_BOSS_DASH_WINDUP);
         break;
     }
 
@@ -1813,6 +1814,7 @@ static void boss_switch_mode(entity_s *self, boss_mode_e mode)
         if (disp < FX(4)) disp = FX(4);
 
         self->actor.jump_velocity = isqrt(2 * fxmul(disp, WORLD_GRAVITY)) * 16;
+        snd_play_no_overlap(SND_ID_BOSS_DASH);
         break;
     }
 
@@ -1821,7 +1823,7 @@ static void boss_switch_mode(entity_s *self, boss_mode_e mode)
         data->mode = BOSS_MODE_HURT;
         data->flags &= ~BOSS_FLAG_CONTACT_DAMAGE;
         data->wait_timer = 30;
-        snd_play_no_overlap(SND_ID_PLAYER_DIE);
+        snd_play_no_overlap(SND_ID_BOSS_HIT);
         break;
     }
 
@@ -1840,7 +1842,7 @@ static void behavior_boss_update(entity_s *self)
     bool is_grounded = self->actor.flags & ACTOR_FLAG_GROUNDED;
 
     if (is_grounded && !(data->flags & BOSS_FLAG_WAS_ON_GROUND))
-        snd_play_no_overlap(SND_ID_ENEMY_DIE);
+        snd_play_no_overlap(SND_ID_BOSS_LAND);
 
     data->flags &= ~BOSS_FLAG_WAS_ON_GROUND;
     if (is_grounded) data->flags |= BOSS_FLAG_WAS_ON_GROUND;
@@ -2142,11 +2144,8 @@ static void behavior_boss_attacked(entity_s *self, entity_s *other, int dir)
     {
         game_start_dialogue("Boss is defeated\f");
     }
-    
-    data->mode = BOSS_MODE_HURT;
-    data->flags &= ~BOSS_FLAG_CONTACT_DAMAGE;
-    data->wait_timer = 30;
-    snd_play_no_overlap(SND_ID_PLAYER_DIE);
+
+    boss_switch_mode(self, BOSS_MODE_HURT);
 }
 
 static bool behavior_boss_message(entity_s *self, const char *id,

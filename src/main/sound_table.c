@@ -18,7 +18,7 @@
 
 #define SNDCMD_SET_CH(idx, mode) (0x0001 | ((idx) << 4) | ((mode) << 6))
 #define SNDCMD_ARP2(ofs) (0x0002 | ((ofs) << 4))
-#define SNDCMD_ARP3(ofs) (0x0003 | ((ofs) << 4))
+#define SNDCMD_ARP3(ofs1, ofs2) (0x0003 | ((ofs1) << 4) | ((ofs2 << 8)))
 #define SNDCMD_PITCH(i, key) (0x0004 | ((key) << 4) | ((i) << 12))
 #define SNDCMD_PLAY_ENV(len, start, end) (0x0005 | ((len) << 4) | ((start) << 10) | ((end) << 13))
 #define SNDCMD_PLAY_ENV_SWP(len, start, end) (0x0006 | ((len) << 4) | ((start) << 10) | ((end) << 13))
@@ -109,6 +109,68 @@ static const snd_cmd sound_enemy_death[] = {
     SNDCMD_END,
 };
 
+static const snd_cmd sound_boss_hit[] = {
+    SNDCMD_PRIO(SNDCMD_PRIO_DEFAULT),
+    SNDCMD_SET_CH(SNDCMD_CH_SQR2, SNDCMD_CH_SQR_DUTY2),
+    SNDCMD_PITCH(0, SNDCMD_KEY(A,3)),
+    SNDCMD_PITCH(1, SNDCMD_KEY(C,2)),
+    SNDCMD_PLAY_SWP(6),
+    SNDCMD_PITCH(0, SNDCMD_KEY(C,3)),
+    SNDCMD_PITCH(1, SNDCMD_KEY(C,2)),
+    SNDCMD_PLAY_SWP(6),
+    SNDCMD_END
+};
+
+static const snd_cmd sound_boss_land[] = {
+    SNDCMD_PRIO(SNDCMD_PRIO_PLAYER),
+    SNDCMD_SET_CH(SNDCMD_CH_SQR2, SNDCMD_CH_SQR_DUTY2),
+    SNDCMD_PITCH(0, SNDCMD_KEY(A,4)),
+    SNDCMD_PITCH(1, SNDCMD_KEY(C,2)),
+    SNDCMD_PLAY_ENV_SWP(4, 6, 6),
+    SNDCMD_END
+};
+
+static const snd_cmd sound_boss_dash_windup[] = {
+    SNDCMD_PRIO(SNDCMD_PRIO_DEFAULT),
+    SNDCMD_SET_CH(SNDCMD_CH_SQR2, SNDCMD_CH_SQR_DUTY2),
+    SNDCMD_PITCH(0, SNDCMD_KEY(C,2)),
+    SNDCMD_PITCH(1, SNDCMD_KEY(A,4)),
+    SNDCMD_ARP2(7),
+    SNDCMD_PLAY_SWP(40),
+    SNDCMD_END
+};
+
+static const snd_cmd sound_boss_dash[] = {
+    SNDCMD_PRIO(SNDCMD_PRIO_DEFAULT),
+    SNDCMD_SET_CH(SNDCMD_CH_SQR2, SNDCMD_CH_SQR_DUTY2),
+    SNDCMD_PITCH(0, SNDCMD_KEY(A,4)),
+    SNDCMD_PITCH(1, SNDCMD_KEY(C,2)),
+    SNDCMD_ARP3(7, 12),
+    SNDCMD_PLAY_ENV_SWP(40, 7, 2),
+    SNDCMD_END
+};
+
+static const snd_cmd sound_boss_jump_windup[] = {
+    SNDCMD_PRIO(SNDCMD_PRIO_DEFAULT),
+    SNDCMD_SET_CH(SNDCMD_CH_SQR2, SNDCMD_CH_SQR_DUTY4),
+    SNDCMD_PITCH(0, SNDCMD_KEY(D,2)),
+    SNDCMD_PITCH(1, SNDCMD_KEY(C,4)),
+    SNDCMD_ARP2(12),
+    SNDCMD_PLAY_SWP(63),
+    SNDCMD_END
+};
+
+static const snd_cmd sound_boss_jump[] = {
+    SNDCMD_PRIO(SNDCMD_PRIO_DEFAULT),
+    SNDCMD_SET_CH(SNDCMD_CH_SQR2, SNDCMD_CH_SQR_DUTY2),
+    SNDCMD_PITCH(0, SNDCMD_KEY(A,4)),
+    SNDCMD_PITCH(1, SNDCMD_KEY(E,2)),
+    // SNDCMD_ARP3(7, 12),
+    SNDCMD_VIBRATO(5, 6),
+    SNDCMD_PLAY_ENV_SWP(40, 7, 2),
+    SNDCMD_END
+};
+
 static const snd_cmd sound_spring[] = {
     SNDCMD_PRIO(SNDCMD_PRIO_DEFAULT),
     SNDCMD_SET_CH(SNDCMD_CH_SQR2, SNDCMD_CH_SQR_DUTY8),
@@ -158,17 +220,24 @@ static const snd_cmd sound_menu_back[] = {
 
 void snd_init_table(void)
 {
-    snd_sounds[SND_ID_PLAYER_JUMP]    = sound_player_jump;
-    snd_sounds[SND_ID_PLAYER_SHOOT]   = sound_player_shoot;
-    snd_sounds[SND_ID_PLAYER_SPIT]    = sound_player_spit;
-    snd_sounds[SND_ID_PLATFORM_PLACE] = sound_platform_place;
-    snd_sounds[SND_ID_PLAYER_DIE]     = sound_player_death;
-    snd_sounds[SND_ID_CHECKPOINT]     = sound_checkpoint;
-    snd_sounds[SND_ID_SPRING]         = sound_spring;
-    snd_sounds[SND_ID_ENEMY_SPIT]     = sound_enemy_spit;
-    snd_sounds[SND_ID_ENEMY_HURT]     = sound_enemy_hurt;
-    snd_sounds[SND_ID_ENEMY_DIE]      = sound_enemy_death;
-    snd_sounds[SND_ID_MENU_MOVE]      = sound_menu_move;
-    snd_sounds[SND_ID_MENU_SELECT]    = sound_menu_select;
-    snd_sounds[SND_ID_MENU_BACK]      = sound_menu_back;
+    snd_sounds[SND_ID_PLAYER_JUMP]      = sound_player_jump;
+    snd_sounds[SND_ID_PLAYER_SHOOT]     = sound_player_shoot;
+    snd_sounds[SND_ID_PLAYER_SPIT]      = sound_player_spit;
+    snd_sounds[SND_ID_PLATFORM_PLACE]   = sound_platform_place;
+    snd_sounds[SND_ID_PLAYER_DIE]       = sound_player_death;
+    snd_sounds[SND_ID_CHECKPOINT]       = sound_checkpoint;
+    snd_sounds[SND_ID_SPRING]           = sound_spring;
+    snd_sounds[SND_ID_ENEMY_SPIT]       = sound_enemy_spit;
+    snd_sounds[SND_ID_ENEMY_HURT]       = sound_enemy_hurt;
+    snd_sounds[SND_ID_ENEMY_DIE]        = sound_enemy_death;
+    snd_sounds[SND_ID_BOSS_HIT]         = sound_boss_hit;
+    snd_sounds[SND_ID_BOSS_LAND]        = sound_boss_land;
+    snd_sounds[SND_ID_BOSS_DASH_WINDUP] = sound_boss_dash_windup;
+    snd_sounds[SND_ID_BOSS_DASH]        = sound_boss_dash;
+    snd_sounds[SND_ID_BOSS_JUMP_WINDUP] = sound_boss_jump_windup;
+    snd_sounds[SND_ID_BOSS_JUMP]        = sound_boss_jump;
+    snd_sounds[SND_ID_BOSS_DIE]         = NULL;
+    snd_sounds[SND_ID_MENU_MOVE]        = sound_menu_move;
+    snd_sounds[SND_ID_MENU_SELECT]      = sound_menu_select;
+    snd_sounds[SND_ID_MENU_BACK]        = sound_menu_back;
 }
