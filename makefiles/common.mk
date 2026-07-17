@@ -1,6 +1,8 @@
 PYTHON ?= python3
 ASEPRITE ?= aseprite
 
+# TODO: map dependency graph is fucked up. please. fix this. what the fuck. why.
+
 #---------------------------------------------------------------------------------
 .SUFFIXES:
 #---------------------------------------------------------------------------------
@@ -100,7 +102,9 @@ export OFILES_SOURCES := $(CPPFILES:.cpp=.o) $(CFILES:.c=.o) $(SFILES:.s=.o)
 
 export OFILES_GRAPHICS := $(addsuffix _gfx.o,$(PNGFILES:.png=))
 
-export OFILES_MAPS := $(addsuffix .o,$(MAPFILES)) data/world.o data/automap.bin.o
+export OFILES_MAPS := $(addsuffix .o,$(MAPFILES))
+
+export OFILES_WORLD := data/world.o data/automap.bin.o
 
 export OFILES_SPRITES := $(addsuffix _sprdb.bin.o,$(SPRFILES:.sprdb=))\
                          $(addsuffix _sprdb_gfx.o,$(SPRFILES:.sprdb=))
@@ -108,8 +112,8 @@ export OFILES_SPRITES := $(addsuffix _sprdb.bin.o,$(SPRFILES:.sprdb=))\
 export OFILES_INTERMEDIATE :=
 
 export OFILES := $(OFILES_BIN) $(SOUNDBANK) $(OFILES_GRAPHICS)\
-                 $(OFILES_INTERMEDIATE) $(OFILES_MAPS) $(OFILES_SPRITES)\
-				 $(OFILES_SOURCES)
+                 $(OFILES_INTERMEDIATE) $(OFILES_MAPS) $(OFILES_WORLD)\
+				 $(OFILES_SPRITES) $(OFILES_SOURCES)
 
 export INCLUDE	:=	$(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
 					$(foreach dir,$(LIBDIRS),-I$(dir)/include) \
@@ -204,8 +208,10 @@ endif
 # control evaluation order for parallelized make
 #---------------------------------------------------------------------------------
 $(OFILES_SOURCES): | $(OFILES_BIN) $(SOUNDBANK) $(OFILES_GRAPHICS)\
-                   $(OFILES_INTERMEDIATE) $(OFILES_MAPS) $(OFILES_SPRITES)
-world.o: | data/music.h $(SOUNDBANK) $(OFILES_BIN)
+                   $(OFILES_INTERMEDIATE) $(OFILES_MAPS) $(OFILES_WORLD)\
+                   $(OFILES_SPRITES)
+world.o: | data/music.h $(SOUNDBANK) $(OFILES_BIN) $(OFILES_MAPS)\
+         $(OFILES_WORLD)
 #---------------------------------------------------------------------------------
 
 
