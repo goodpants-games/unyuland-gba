@@ -203,6 +203,15 @@
         ]
     },
     {
+        "id": "sign_room13_hint",
+        "pages": [
+            "Did you know?",
+            "There are these red blocks. They will break if a bullet hits them 3 times!",
+            "A whole three times! Ain't that crazy?",
+            "I hope this information is useful!"
+        ]
+    },
+    {
         "id": "tut_shoot_ceiling",
         "pages": [
             "Did you know? You can shoot these ceiling-mounted enemies from below.",
