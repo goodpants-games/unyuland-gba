@@ -299,8 +299,8 @@ endif
 # Also creates a pointer list to each map file, as well as the world matrix.
 #---------------------------------------------------------------------------------
 data/world.json data/world.c data/world.h data/automap.bin:\
-    $(MAPFILES)\
-	$(TOPLEVEL)/data/maps/unyuland.world $(TOPLEVEL)/tools/worldproc.py
+    $(MAPFILES) $(TOPLEVEL)/data/maps/unyuland.world\
+	$(TOPLEVEL)/data/room_list.txt $(TOPLEVEL)/tools/worldproc.py
 #---------------------------------------------------------------------------------
 	@mkdir -p $(dir $@)
 	
