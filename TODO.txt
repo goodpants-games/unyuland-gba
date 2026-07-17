@@ -17,15 +17,39 @@
   2. if the fade-to-black did finish, you will be moved to the other room while
      still in the Dead state, plus the worldstate gets saved at that point. this
      means that the game goes in a restart loop and is softlocked.
-
+- make it so pressing Start during dialogue will end the dialogue. (instead of.
+  you know. bugging out the ui.)
 - pc port: add frame time display
 
 b05: player scared to go down Hole.
 player should be able to do a jig when hold down (very important)
 
+room13:
+- Maybe make it so the player can't save after fetching the ice block?
+- also, player does have to restart because they will obviously kill the gun
+  enemy first. maybe there's a way to design the room that doesn't require
+  a restart.
+
 - boss camera autofollow
 - people will be confused by 2nd phase Default because they think it's time-
   limited
+- maybe make player bullets bounce off boss so it's more obvious it does no
+  damage to it
+- ok maybe timing the stalactite hits are pretty hard. Maybe if the boss played
+  a sound at the moment it started dashing it would be easier.
+- hmm maybe address the issue of the boss making impossible to dodge walls when
+  it is moving towards the player. in phase 2.
+- how tf do i make the boss easier
+- Players struggle to figure out that you're supposed to push the boss forward
+  (Not sure how to convey this... Maybe just if the boss doesn't move towards
+   you if you're too far, it'd make more sense?)
+- "Make stalactites taller"
+- "that attack where it jumps and spews out 4 sets of goop orbs. make all the
+  places the goop will go telegraphed before theyre shot. because oh my GOD"
+  (I probably won't do this because integrating bitmap graphics like that into
+  the game scene is more effort than I think is worth)
+- Probably make the bullet hell attack just make the bullets slower
+- I just realized i didn't add the open parenthesis to the character set :(
 
 ==================================== Boss ======================================
 

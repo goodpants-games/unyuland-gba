@@ -17,7 +17,7 @@ INCLUDES := src/pc/include $(LIBXMP)/include
 #---------------------------------------------------------------------------------
 SLIBS        := libxmp-lite.a
 LIBNAMES     := sdl3
-LIBS         := $(shell $(PKGCONF) --libs $(LIBNAMES))\
+LIBS         := $(shell $(PKGCONF) $(PKGCONF_FLAGS) --libs $(LIBNAMES))\
                 $(SLIBS) -lm
 
 
@@ -25,7 +25,7 @@ LIBS         := $(shell $(PKGCONF) --libs $(LIBNAMES))\
 # options for code generation
 #---------------------------------------------------------------------------------
 CFLAGS  := -DPLATFORM_PC \
-           $(shell $(PKGCONF) --cflags $(LIBNAMES)) $(CFLAGS)
+           $(shell $(PKGCONF) $(PKGCONF_FLAGS) --cflags $(LIBNAMES)) $(CFLAGS)
 ASFLAGS := -DPLATFORM_PC $(ASFLAGS)
 LDFLAGS := $(LDFLAGS)
 
