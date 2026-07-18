@@ -1,7 +1,9 @@
 PYTHON ?= python3
 ASEPRITE ?= aseprite
+DEVDEBUG ?= yes
 
-# TODO: map dependency graph is fucked up. please. fix this. what the fuck. why.
+# TODO: why the fuck does doing make -B cause the map files to be built twice.
+#       wtf??
 
 #---------------------------------------------------------------------------------
 .SUFFIXES:
@@ -25,6 +27,12 @@ endif
 
 ifeq ($(origin BUILD), undefined)
     BUILD	:= build
+endif
+
+ifeq ($(origin TOPLEVEL), undefined)
+  # the extra slash is important, so that scripts can do
+  # $(TOPLEVEL)makefiles/common.mk
+  export TOPLEVEL := $(CURDIR)/
 endif
 
 SOURCES		:= $(SOURCES) src/main
@@ -72,7 +80,7 @@ ifneq ($(strip $(MUSIC)),)
   ifeq ($(AUDIO_DRIVER),mm)
     SOUNDBANK := data/mm_soundbank.bin.o
   else
-    BINFILES  += $(addsuffix .bin,$(basename $(AUDIOFILES)))
+    export AUDIO_BINFILES := $(addsuffix .bin,$(basename $(AUDIOFILES)))
 	SOUNDBANK := data/mplay_data.o
   endif
 endif
@@ -98,6 +106,8 @@ export MAPFILES := $(addsuffix .map,$(TMXFILES:.tmx=))
 
 export OFILES_BIN := $(addsuffix .o,$(BINFILES))
 
+export OFILES_AUDIO := $(addsuffix .o,$(AUDIO_BINFILES))
+
 export OFILES_SOURCES := $(CPPFILES:.cpp=.o) $(CFILES:.c=.o) $(SFILES:.s=.o)
 
 export OFILES_GRAPHICS := $(addsuffix _gfx.o,$(PNGFILES:.png=))
@@ -109,17 +119,19 @@ export OFILES_WORLD := data/world.o data/automap.bin.o
 export OFILES_SPRITES := $(addsuffix _sprdb.bin.o,$(SPRFILES:.sprdb=))\
                          $(addsuffix _sprdb_gfx.o,$(SPRFILES:.sprdb=))
 
-export OFILES_INTERMEDIATE :=
-
-export OFILES := $(OFILES_BIN) $(SOUNDBANK) $(OFILES_GRAPHICS)\
-                 $(OFILES_INTERMEDIATE) $(OFILES_MAPS) $(OFILES_WORLD)\
-				 $(OFILES_SPRITES) $(OFILES_SOURCES)
+export OFILES := $(OFILES_BIN) $(OFILES_AUDIO) $(SOUNDBANK) $(OFILES_GRAPHICS)\
+                 $(OFILES_MAPS) $(OFILES_WORLD) $(OFILES_SPRITES)\
+				 $(OFILES_SOURCES)
 
 export INCLUDE	:=	$(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
 					$(foreach dir,$(LIBDIRS),-I$(dir)/include) \
 					-I$(CURDIR)/$(BUILD)
 
 export LIBPATHS	:=	$(foreach dir,$(LIBDIRS),-L$(dir)/lib)
+
+# the first makefile *should* be the  makefile that included this one; i.e., the
+# platform makefile.
+PLATFORM_MAKEFILE := $(abspath $(firstword $(MAKEFILE_LIST)))
 
 .PHONY: $(BUILD) clean
 
@@ -161,7 +173,6 @@ ADD_COMPILE_COMMAND ?= @true
 #---------------------------------------------------------------------------------
 # rules to compile .cpp, .c, and .s files
 #---------------------------------------------------------------------------------
-
 %.o: %.cpp
 	$(SILENTMSG) $(notdir $<)
 	@mkdir -p $(dir $@)
@@ -210,8 +221,6 @@ endif
 $(OFILES_SOURCES): | $(OFILES_BIN) $(SOUNDBANK) $(OFILES_GRAPHICS)\
                    $(OFILES_INTERMEDIATE) $(OFILES_MAPS) $(OFILES_WORLD)\
                    $(OFILES_SPRITES)
-world.o: | data/music.h $(SOUNDBANK) $(OFILES_BIN) $(OFILES_MAPS)\
-         $(OFILES_WORLD)
 #---------------------------------------------------------------------------------
 
 
@@ -237,11 +246,9 @@ data/mplay_data.c data/music.h : $(AUDIOFILES) $(TOPLEVEL)/tools/modidx.py
 	  --mod-bank data/mplay_data.c $(AUDIOFILES) -o data/music.h
 
 #---------------------------------------------------------------------------------
-# mplay data depends on the binary files of each module.
-# uh except i'm too lazy to add a variable for specifically that so i'm just
-# going to make it depend on all binary files.
+# mplay data depends on the binary files of each module
 #---------------------------------------------------------------------------------
-data/mplay_data.o: | $(OFILES_BIN)
+data/mplay_data.o: $(OFILES_AUDIO)
 #---------------------------------------------------------------------------------
 
 #---------------------------------------------------------------------------------
@@ -304,8 +311,8 @@ endif
 # as the room order. This data is then read by mapc.
 # Also creates a pointer list to each map file, as well as the world matrix.
 #---------------------------------------------------------------------------------
-data/world.json data/world.c data/world.h data/automap.bin:\
-    $(MAPFILES) $(TOPLEVEL)/data/maps/unyuland.world\
+data/world.c data/world.h data/automap.bin:\
+    $(OFILES_MAPS) $(TOPLEVEL)/data/maps/unyuland.world\
 	$(TOPLEVEL)/data/room_list.txt $(TOPLEVEL)/tools/worldproc.py
 #---------------------------------------------------------------------------------
 	@mkdir -p $(dir $@)
@@ -313,9 +320,15 @@ data/world.json data/world.c data/world.h data/automap.bin:\
 	$(SILENTCMD)$(PYTHON) $(TOPLEVEL)/tools/worldproc.py \
 	  $(TOPLEVEL)/data/maps/unyuland.world \
 	  $(TOPLEVEL)/data/room_list.txt \
-	  --json data/world.json \
 	  --c data/world.c \
 	  --automap data/automap.bin
+
+#---------------------------------------------------------------------------------
+# Ensure world.o properly gets rebuilt whenever its dependencies change
+#---------------------------------------------------------------------------------
+data/world.o: data/music.h $(SOUNDBANK) $(AUDIO_BINFILES) $(OFILES_MAPS)
+#---------------------------------------------------------------------------------
+
 
 #---------------------------------------------------------------------------------
 # This rule creates the sine look-up table.

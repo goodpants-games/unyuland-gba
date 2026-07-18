@@ -1,7 +1,7 @@
 CC := emcc
 
-TARGET := web/game
-BUILD  := buildweb
+TARGET       := web/game
+BUILD        := buildweb
 
 LIBXMP := third_party/libxmp
 
@@ -54,5 +54,4 @@ endef
 
 
 #---------------------------------------------------------------------------------
-export PLATFORM_MAKEFILE := $(TOPLEVEL)/makefiles/web.mk
-include $(TOPLEVEL)/makefiles/common.mk
+include $(TOPLEVEL)makefiles/common.mk

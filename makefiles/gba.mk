@@ -66,5 +66,4 @@ endef
 
 
 #---------------------------------------------------------------------------------
-export PLATFORM_MAKEFILE := $(TOPLEVEL)/makefiles/gba.mk
-include $(TOPLEVEL)/makefiles/common.mk
+include $(TOPLEVEL)makefiles/common.mk

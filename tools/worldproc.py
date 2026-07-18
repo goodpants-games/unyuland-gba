@@ -67,13 +67,17 @@ def int_ceil_div(x: int, y: int) -> int:
 
 
 def abort_errors():
-    if len(g_errors) == 1:
-        raise g_errors[0]
-    else:
-        err_text = ""
-        for err in g_errors:
-            err_text += "\n\t" + str(err)
-        raise RuntimeError("multiple errors occurred: " + err_text)
+    for err in g_errors:
+        print("\033[0;31merror: " + str(err), file=sys.stderr)
+    print("aborting!\033[0m", file=sys.stderr)
+    exit(1)
+    # if len(g_errors) == 1:
+    #     raise g_errors[0]
+    # else:
+    #     err_text = ""
+    #     for err in g_errors:
+    #         err_text += "\n\t" + str(err)
+    #     raise RuntimeError("multiple errors occurred: " + err_text)
 
 
 def get_room_music(world_path: str, room_name: str) -> str:
@@ -128,6 +132,14 @@ def worldproc(world_path: str, room_list: list[str],
     min_y =  0x7FFFFFFF
     max_x = -0x80000000
     max_y = -0x80000000
+
+    # check for rooms not in world data
+    for i in range(len(room_list) - 1, 0, -1):
+        name = room_list[i]
+        if not name in rooms:
+            g_errors.append(
+                RuntimeError(f"room '{name}' is in room list but is not in the world data"))
+            del room_list[i]
 
     for name in room_list:
         room = rooms[name]

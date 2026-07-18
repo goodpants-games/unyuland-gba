@@ -1,8 +1,10 @@
+
 PKGCONF ?= pkg-config
 CC ?= gcc
+DEVDEBUG ?= yes
 
-TARGET := unyuland
-BUILD  := buildpc
+TARGET       := unyuland
+BUILD        := buildpc
 
 LIBXMP := third_party/libxmp
 
@@ -69,5 +71,4 @@ endef
 
 
 #---------------------------------------------------------------------------------
-export PLATFORM_MAKEFILE := $(TOPLEVEL)/makefiles/pc.mk
-include $(TOPLEVEL)/makefiles/common.mk
+include $(TOPLEVEL)makefiles/common.mk

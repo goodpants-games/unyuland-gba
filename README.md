@@ -8,6 +8,7 @@ Prerequisites:
 - Tiled
 - Python 3
 - GNU Make
+- Bash
 
 ### Gameboy Advance
 ```bash
@@ -30,7 +31,7 @@ Additional prerequisites:
 - GCC/Clang (*only* works with these compilers. You can use MSYS2 on Windows.)
 - SDL3
 - A `pkg-config` interface
-- (And yes, you still need devkitPro, for grit.)
+- (And yes, you still need devkitPro, for grit, and Bash.)
 
 ```bash
 # run this if you only have pkgconf installed, with no pkg-config symlink.
@@ -54,7 +55,7 @@ make pc
 ### WebAssembly
 Additional prerequisities:
 - Emscripten
-- (Still need devkitPro)
+- (Still need devkitPro and Bash)
 
 ```bash
 # compile libxmp
