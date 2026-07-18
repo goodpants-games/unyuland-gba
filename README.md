@@ -19,11 +19,9 @@ export DEVKITPRO=/opt/devkitpro/
 export DEVKITARM=/opt/devkitpro/devkitARM
 export PATH="/opt/devkitpro/tools/bin:$PATH"
 
-mkdir build
-
 # this compiles the resources and code
 # creates unyuland-gba.elf and unyuland-gba.gba in the project directory.
-make gba
+./make gba
 ```
 
 ### Windows/Linux
@@ -44,12 +42,10 @@ cd third_party/libxmp
 make
 cd ../..
 
-mkdir buildpc
-
 # creates unyuland or unyuland.exe in the project directory.
 # SDL3 dependency will be located using pkg-config. If you are on Windows, you
 # can install it through the MSYS2 package manager.
-make pc
+./make pc
 ```
 
 ### WebAssembly
@@ -66,8 +62,6 @@ cd third_party/libxmp
 make
 cd ../..
 
-mkdir buildweb
-
 # creates web/game.js and web/game.html, relative to the project directory.
-make web
+./make web
 ```
