@@ -1,2 +1,4 @@
 #!/usr/bin/bash
-make -f makefiles/$1.mk "${@:2}"
+set -e
+MAKE="${MAKE:-make}"
+$MAKE -f makefiles/$1.mk "${@:2}"

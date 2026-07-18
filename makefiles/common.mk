@@ -2,8 +2,9 @@ PYTHON ?= python3
 ASEPRITE ?= aseprite
 DEVDEBUG ?= yes
 
-# TODO: why the fuck does doing make -B cause the map files to be built twice.
-#       wtf??
+# TODO: should I move the grit > C source rule to common.mk? only reason it's
+#       defined per-platform is because I wanted the GBA compilation to use
+#       grit's png-to-GBA-assembly...
 
 #---------------------------------------------------------------------------------
 .SUFFIXES:
@@ -27,12 +28,6 @@ endif
 
 ifeq ($(origin BUILD), undefined)
     BUILD	:= build
-endif
-
-ifeq ($(origin TOPLEVEL), undefined)
-  # the extra slash is important, so that scripts can do
-  # $(TOPLEVEL)makefiles/common.mk
-  export TOPLEVEL := $(CURDIR)/
 endif
 
 SOURCES		:= $(SOURCES) src/main
@@ -62,6 +57,12 @@ ifneq ($(BUILD),$(notdir $(CURDIR)))
 export OUTPUT	:=	$(CURDIR)/$(TARGET)
 export VPATH	:=	$(CURDIR)
 export DEPSDIR	:=	$(CURDIR)/$(BUILD)
+
+# the extra slash is important, as it ensures TOPLEVEL ends in a slash. this
+# is so that scripts can do $(TOPLEVEL)makefiles/common.mk and have it
+# evaluate to the proper path if TOPLEVEL has not been defined yet (it
+# evaluates to an empty string)
+export TOPLEVEL := $(CURDIR)/
 
 CFILES		:=	$(foreach dir,$(SOURCES),$(wildcard $(dir)/*.c))
 CPPFILES	:=	$(foreach dir,$(SOURCES),$(wildcard $(dir)/*.cpp))
@@ -151,7 +152,6 @@ else
 #---------------------------------------------------------------------------------
 # main targets
 #---------------------------------------------------------------------------------
-
 $(eval $(BUILD_TARGETS))
 
 #---------------------------------------------------------------------------------
@@ -218,9 +218,9 @@ endif
 #---------------------------------------------------------------------------------
 # control evaluation order for parallelized make
 #---------------------------------------------------------------------------------
-$(OFILES_SOURCES): | $(OFILES_BIN) $(SOUNDBANK) $(OFILES_GRAPHICS)\
-                   $(OFILES_INTERMEDIATE) $(OFILES_MAPS) $(OFILES_WORLD)\
-                   $(OFILES_SPRITES)
+$(OFILES_SOURCES): | $(OFILES_BIN) $(OFILES_AUDIO) $(SOUNDBANK)\
+                   $(OFILES_GRAPHICS) $(OFILES_MAPS) $(OFILES_WORLD)\
+				   $(OFILES_SPRITES)
 #---------------------------------------------------------------------------------
 
 
@@ -228,27 +228,28 @@ ifeq ($(AUDIO_DRIVER),mm)
 #---------------------------------------------------------------------------------
 # rule to build soundbank from music files
 #---------------------------------------------------------------------------------
-data/mm_soundbank.bin data/mm_soundbank.h data/music.h : $(AUDIOFILES)
+data/mm_soundbank.bin data/mm_soundbank.h data/music.h &: $(AUDIOFILES)
 #---------------------------------------------------------------------------------
 	@mkdir -p $(dir $@)
 	$(SILENTCMD)mmutil $^ -odata/mm_soundbank.bin -hdata/mm_soundbank.h
 	$(SILENTCMD)$(PYTHON) $(TOPLEVEL)/tools/modidx.py\
-	  -t mm $(AUDIOFILES) -o data/music.h
+	  -t mm -o data/music.h $^
 
 else
 #---------------------------------------------------------------------------------
 # rule to build mod index from module blobs
 #---------------------------------------------------------------------------------
-data/mplay_data.c data/music.h : $(AUDIOFILES) $(TOPLEVEL)/tools/modidx.py
+data/mplay_data.c data/music.h &: $(AUDIOFILES) $(TOPLEVEL)/tools/modidx.py
 #---------------------------------------------------------------------------------
 	@mkdir -p $(dir $@)
 	$(SILENTCMD)$(PYTHON) $(TOPLEVEL)/tools/modidx.py\
-	  --mod-bank data/mplay_data.c $(AUDIOFILES) -o data/music.h
+	  --mod-bank data/mplay_data.c -o data/music.h $(AUDIOFILES)
 
 #---------------------------------------------------------------------------------
-# mplay data depends on the binary files of each module
+# mplay data depends on the object files of each module
+# (why do i need this rule? shouldn't AUDIOFILES above be enough?)
 #---------------------------------------------------------------------------------
-data/mplay_data.o: $(OFILES_AUDIO)
+data/mplay_data.o: | $(OFILES_AUDIO)
 #---------------------------------------------------------------------------------
 
 #---------------------------------------------------------------------------------
@@ -307,11 +308,11 @@ endif
 	@echo -fts -gB 4 -p! > $*_sprdb.grit
 
 #---------------------------------------------------------------------------------
-# This rule compiles the positions of each room in the world matrix, as well
-# as the room order. This data is then read by mapc.
-# Also creates a pointer list to each map file, as well as the world matrix.
+# This rule creates the world data: a list of rooms, in the order defined in the
+# room list, which itself holds the room position in the world as well as the
+# pointer to the map; the world matrix; and automap data.
 #---------------------------------------------------------------------------------
-data/world.c data/world.h data/automap.bin:\
+data/world.c data/world.h data/automap.bin &:\
     $(OFILES_MAPS) $(TOPLEVEL)/data/maps/unyuland.world\
 	$(TOPLEVEL)/data/room_list.txt $(TOPLEVEL)/tools/worldproc.py
 #---------------------------------------------------------------------------------
@@ -326,7 +327,7 @@ data/world.c data/world.h data/automap.bin:\
 #---------------------------------------------------------------------------------
 # Ensure world.o properly gets rebuilt whenever its dependencies change
 #---------------------------------------------------------------------------------
-data/world.o: data/music.h $(SOUNDBANK) $(AUDIO_BINFILES) $(OFILES_MAPS)
+data/world.o: data/music.h | $(AUDIO_BINFILES) $(OFILES_MAPS)
 #---------------------------------------------------------------------------------
 
 
