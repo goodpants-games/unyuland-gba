@@ -1626,9 +1626,12 @@ static behavior_def_s behavior_stalactite = {
 //------------------------------------------------------------------------------
 #pragma region boss
 
-#define BOSS_JUMP_VEL      FX(2.5)
-#define BOSS_ENT_FLAG_MASK ENTITY_FLAG_DAMPING
-#define BOSS_HEALTH        5
+#define BOSS_JUMP_VEL           FX(2.5)
+#define BOSS_ENT_FLAG_MASK      ENTITY_FLAG_DAMPING
+#define BOSS_HEALTH             5
+
+#define BOSS_STANDOFF_BASE_DIST_NORMAL FX(8 * 7)
+#define BOSS_STANDOFF_BASE_DIST_FAR    FX(8 * 9)
 
 #define BOSS_FLAG_CONTACT_DAMAGE (1 << 0)
 #define BOSS_FLAG_DID_JUMP       (1 << 1)
@@ -1674,7 +1677,10 @@ typedef struct boss_data
     {
         s16 sub_timer;
         u8 phase_on_hurt;
+        s16 back_desired_dist;
     };
+
+    s16 standoff_base_dist;
 }
 boss_data_s;
 EDATA_SIZE_CHECK(boss_data_s);
@@ -1699,7 +1705,10 @@ void entity_boss_init(entity_s *self, FIXED px, FIXED py)
     self->behavior = &behavior_boss;
 
     boss_data_s *data = (boss_data_s *)self->userdata;
-    *data = (boss_data_s){0};
+    *data = (boss_data_s){
+        .standoff_base_dist = BOSS_STANDOFF_BASE_DIST_NORMAL
+    };
+
     boss_switch_mode(self, BOSS_MODE_PHASE0_IDLE);
 }
 
@@ -1723,7 +1732,15 @@ static projectile_s *boss_shoot(entity_s *self, FIXED px, FIXED py, FIXED dx,
 static inline uint boss_get_phase(entity_s *self)
 {
     boss_data_s *const data = (boss_data_s *)self->userdata;
-    return (data->hits >= 2) ? 1 : 0;
+
+    // normal standoff
+    if (data->hits >= 3) return 2;
+
+    // standoff, but won't back off if player approaches or breaks a stalactite
+    if (data->hits >= 2) return 1;
+
+    // very aggressive
+    return 0;
 }
 
 static void boss_switch_mode(entity_s *self, boss_mode_e mode)
@@ -1733,10 +1750,8 @@ static void boss_switch_mode(entity_s *self, boss_mode_e mode)
         uint phase = boss_get_phase(self);
         if (phase == 0)
             boss_switch_mode(self, BOSS_MODE_PHASE0_IDLE);
-        else if (phase == 1)
-            boss_switch_mode(self, BOSS_MODE_BACK);
         else
-            DBG_CRASH();
+            boss_switch_mode(self, BOSS_MODE_BACK);
 
         return;
     }
@@ -1753,6 +1768,11 @@ static void boss_switch_mode(entity_s *self, boss_mode_e mode)
     {
         data->mode = BOSS_MODE_BACK;
         data->wait_timer = 0;
+
+        data->standoff_base_dist =
+            boss_get_phase(self) == 2 ? BOSS_STANDOFF_BASE_DIST_FAR
+                                      : BOSS_STANDOFF_BASE_DIST_NORMAL;
+        data->back_desired_dist = data->standoff_base_dist;
         break;
     }
 
@@ -1852,12 +1872,23 @@ static void behavior_boss_update(entity_s *self)
     FIXED player_cx = player->pos.x + (FX(player->col.w) >> 1);
     FIXED player_cy = player->pos.y + (FX(player->col.h) >> 1);
 
+    uint gfx_id = SPRID_GAME_BOSS_IDLE;
+
     switch (data->mode)
     {
     case BOSS_MODE_BACK:
     {
         FIXED dx = player_cx - self_cx;
         int dirx = SGN(dx);
+
+        if (ABS(dx) < FX(2.5 * 8) && player->actor.flags & ACTOR_FLAG_GROUNDED)
+        {
+            self->actor.move_x = dirx;
+            boss_switch_mode(self, BOSS_MODE_SLIDE);
+            break;
+        }
+
+        uint phase = boss_get_phase(self);
 
         self->actor.flags &= ~ACTOR_FLAG_NO_VEL;
         self->actor.move_speed = FX(1.0);
@@ -1886,24 +1917,55 @@ static void behavior_boss_update(entity_s *self)
         // else
         // {
 
-        bool is_moving_toward_plr = false;
+        enum move_dir { NONE, TOWARD, AWAY } move_dir;
 
-        if (ABS(dx) < FX(8 * 7))
+        if (ABS(dx) < data->back_desired_dist - FX(8))
         {
+            // move away from player
             self->actor.move_x = -dirx;
+            move_dir = AWAY;
         }
-        else if (ABS(dx) > FX(8 * 9))
+        else if (ABS(dx) > data->back_desired_dist + FX(8))
         {
+            // move toward player
             self->actor.move_x = dirx;
-            is_moving_toward_plr = true;
+            move_dir = TOWARD;
         }
         else
+        {
             self->actor.move_x = 0;
+            move_dir = NONE;
+        }
 
-        if (!is_moving_toward_plr)
+        switch (move_dir)
+        {
+        case AWAY:
+            if (phase == 2)
+            {
+                gfx_id = SPRID_GAME_BOSS_SCARED;
+                data->back_desired_dist += FX(0.5);
+                const s16 max_dist = data->standoff_base_dist;
+                if (data->back_desired_dist > max_dist)
+                    data->back_desired_dist = max_dist;
+
+            }
             ++data->wait_timer;
+            break;
 
-        if (data->wait_timer == 30)
+        case NONE:
+            data->back_desired_dist -= FX(0.2);
+            self->pos.x += dirx * FX(0.2);
+
+            ++data->wait_timer;
+            break;
+
+        case TOWARD:
+            break;
+        }
+
+        const uint fire_wait = data->hits == BOSS_HEALTH - 1 ? 35 : 40;
+
+        if (data->wait_timer == fire_wait)
         {
             data->wait_timer = 0;
 
@@ -1928,7 +1990,7 @@ static void behavior_boss_update(entity_s *self)
         if ((self->actor.flags & ACTOR_FLAG_GROUNDED) && (self->actor.flags & ACTOR_FLAG_WALL))
         {
             LOG_DBG("backed into wall");
-            boss_switch_mode(self, BOSS_MODE_SHOOT_JUMP_WARN);
+            boss_switch_mode(self, phase == 2 ? BOSS_MODE_SHOOT_JUMP_WARN : BOSS_MODE_SLIDE_WARN);
         }
 
         break;
@@ -1983,11 +2045,13 @@ static void behavior_boss_update(entity_s *self)
 
         uint phase = boss_get_phase(self);
         FIXED thresh;
-        if      (phase == 0) thresh = FX(8 * 4);
-        else if (phase == 1) thresh = FX(8 * 2);
-
-        if (phase == 1)
+        if (phase == 0)
+            thresh = FX(8 * 4);
+        else
+        {
+            thresh = FX(8 * 2);
             --data->wait_timer;
+        }
 
         if (data->wait_timer == 0 || -player_dx * self->actor.move_x > thresh)
         {
@@ -2052,7 +2116,7 @@ static void behavior_boss_update(entity_s *self)
                 boss_switch_mode(self, BOSS_MODE_PHASE_DEFAULT);
                 data->wait_timer = 30;
             }
-            else if (phase == 1)
+            else
             {
                 if (data->phase_on_hurt != 1)
                     boss_switch_mode(self, BOSS_MODE_PHASE_DEFAULT);
@@ -2066,6 +2130,14 @@ static void behavior_boss_update(entity_s *self)
     }
 
     self->flags = (self->flags & ~BOSS_ENT_FLAG_MASK) | (ent_flags & BOSS_ENT_FLAG_MASK);
+
+    if (self->sprite.graphic_id != gfx_id)
+    {
+        self->sprite.graphic_id = gfx_id;
+        self->sprite.accum = 0;
+        self->sprite.frame = 0;
+        self->sprite.flags |= SPRITE_FLAG_PLAYING;
+    }
 
     // if (self->actor.flags & ACTOR_FLAG_GROUNDED)
     //     --data->wait_timer;
@@ -2092,6 +2164,8 @@ static void behavior_boss_update(entity_s *self)
 
 static bool behavior_boss_proj_touch(entity_s *self, projectile_s *proj)
 {
+    boss_data_s *data = (boss_data_s *)self->userdata;
+
     if (proj->kind == PROJ_KIND_PLAYER)
     {
         FIXED cx = self->pos.x + (FX(self->col.w) >> 1);
@@ -2105,6 +2179,14 @@ static bool behavior_boss_proj_touch(entity_s *self, projectile_s *proj)
         FIXED dot = fxmul(dx, proj->vx) + fxmul(dy, proj->vy);
         if (dot > 0 && proj->g == 0)
         {
+            if (data->mode == BOSS_MODE_BACK)
+            {
+                data->back_desired_dist += FX(2.0);
+                const s16 max_dist = data->standoff_base_dist;
+                if (data->back_desired_dist > max_dist)
+                    data->back_desired_dist = max_dist;
+            }
+
             self->pos.x += proj->vx / 32;
             self->pos.y += proj->vy / 32;
 
@@ -2156,12 +2238,18 @@ static bool behavior_boss_message(entity_s *self, const char *id,
 
     LOG_DBG("sensed broken stalactite");
 
+    uint phase = boss_get_phase(self);
+
     boss_data_s *data = (boss_data_s *)self->userdata;
     if ((data->mode == BOSS_MODE_SLIDE || data->mode == BOSS_MODE_SLIDE_WARN)
-        && boss_get_phase(self) == 1)
+        && phase >= 1)
     {
         LOG_DBG("stop sliding!");
         boss_switch_mode(self, BOSS_MODE_PHASE_DEFAULT);
+    }
+    else if (data->mode == BOSS_MODE_BACK && phase >= 2)
+    {
+        data->back_desired_dist = data->standoff_base_dist;
     }
 
     return true;
