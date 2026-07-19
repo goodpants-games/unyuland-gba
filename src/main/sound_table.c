@@ -118,7 +118,7 @@ static const snd_cmd sound_boss_hit[] = {
     SNDCMD_PITCH(0, SNDCMD_KEY(C,4)),
     SNDCMD_PITCH(1, SNDCMD_KEY(G,3)),
     SNDCMD_ARP2(3),
-    SNDCMD_PLAY_SWP(16),
+    SNDCMD_PLAY_SWP(24),
     SNDCMD_END
 };
 
