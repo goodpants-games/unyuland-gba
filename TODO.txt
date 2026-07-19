@@ -34,10 +34,9 @@ room13:
   a restart.
 
 - boss camera autofollow
-- people will be confused by 2nd phase Default because they think it's time-
-  limited
-- ok maybe timing the stalactite hits are pretty hard. Maybe if the boss played
-  a sound at the moment it started dashing it would be easier.
+- 3rd phase is kinda confusing... Even player might not figure out why the
+  boss is backing up.
+- ok maybe timing the stalactite hits are pretty hard.
 - how tf do i make the boss easier
 - Players struggle to figure out that you're supposed to push the boss forward
   (Not sure how to convey this... Maybe just if the boss doesn't move towards
