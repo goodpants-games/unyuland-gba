@@ -2152,6 +2152,7 @@ static void behavior_boss_update(entity_s *self)
     {
         ent_flags |= ENTITY_FLAG_DAMPING;
         self->damp = DEFAULT_DAMP;
+        data->flags &= ~BOSS_FLAG_CONTACT_DAMAGE;
 
         --data->wait_timer;
         int subf = data->wait_timer & 3;
