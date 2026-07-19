@@ -129,6 +129,15 @@ static void scene_frame(void)
             
             case 1:
                 {
+#ifdef PLATFORM_PC
+                    static const char *lines[] = {
+                        "CTRL  KBD ACTION",
+                        "A     Z   Jump  ",
+                        "B     X   Fire  ",
+                        "LB/RB C   Switch",
+                        "START ESC Pause ",
+                    };
+#else
                     static const char *lines[] = {
                         "D-Pad    Move",
                         "A        Jump",
@@ -136,7 +145,7 @@ static void scene_frame(void)
                         "L      Switch",
                         "Start   Pause",
                     };
-
+#endif
                     render_page("Controls", lines, ARRLEN(lines));
                     break;
                 }
