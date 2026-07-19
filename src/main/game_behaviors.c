@@ -1949,6 +1949,12 @@ static void behavior_boss_update(entity_s *self)
                     data->back_desired_dist = max_dist;
 
             }
+            else
+            {
+                data->back_desired_dist -= FX(0.2);
+                self->pos.x += dirx * FX(0.2);
+            }
+
             ++data->wait_timer;
             break;
 
@@ -2118,7 +2124,7 @@ static void behavior_boss_update(entity_s *self)
             }
             else
             {
-                if (data->phase_on_hurt != 1)
+                if (data->phase_on_hurt < 1)
                     boss_switch_mode(self, BOSS_MODE_PHASE_DEFAULT);
                 else
                     boss_switch_mode(self, BOSS_MODE_SLIDE_WARN);
