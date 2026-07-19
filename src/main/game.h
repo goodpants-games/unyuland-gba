@@ -47,7 +47,7 @@
 
 #define COLGROUP_DEFAULT           (1 << 0)
 #define COLGROUP_PLR_PLAT          (1 << 1) // player platform
-#define COLGROUP_ENTITY            (1 << 2)
+#define COLGROUP_ACTOR             (1 << 2)
 #define COLGROUP_PROJECTILE        (1 << 3)
 #define COLGROUP_ALL               UINT16_MAX
 
