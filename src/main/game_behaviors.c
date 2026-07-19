@@ -1848,7 +1848,7 @@ static void boss_switch_mode(entity_s *self, boss_mode_e mode)
         FIXED disp = self->pos.y - (player->pos.y - FX(8));
         if (disp < FX(4)) disp = FX(4);
 
-        self->actor.jump_velocity = isqrt(2 * fxmul(disp, WORLD_GRAVITY)) * 16;
+        self->actor.jump_velocity = FXSQRT(2 * fxmul(disp, WORLD_GRAVITY));
         snd_play_no_overlap(SND_ID_BOSS_DASH);
         break;
     }
@@ -2008,7 +2008,7 @@ static void behavior_boss_update(entity_s *self)
             FIXED disp = self->pos.y - (player->pos.y - FX(8));
             if (disp < FX(4)) disp = FX(4);
 
-            self->actor.jump_velocity = isqrt(2 * fxmul(disp, WORLD_GRAVITY)) * 16;
+            self->actor.jump_velocity = FXSQRT(2 * fxmul(disp, WORLD_GRAVITY));
 
             if (self->actor.jump_velocity < FX(2))
                 self->actor.jump_velocity = FX(2);
@@ -2245,7 +2245,7 @@ static bool behavior_boss_proj_touch(entity_s *self, projectile_s *proj)
         FIXED cy = self->pos.y + (FX(self->col.h) >> 1);
         FIXED dx = cx - proj->px;
         FIXED dy = cy - proj->py;
-        // FIXED dlen = isqrt(fxmul(dx, dx) + fxmul(dy, dy)) * 16;
+        // FIXED dlen = fxsqrt(fxmul(dx, dx) + fxmul(dy, dy));
         // dx = fxdiv(dx, dlen);
         // dy = fxdiv(dy, dlen);
 

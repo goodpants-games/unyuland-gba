@@ -14,6 +14,10 @@
 #define TO_FIXED(n) (FIXED)(FIX_ONE * (n))
 #define FX(n) TO_FIXED(n)
 
+// sqrt(Bx) / B = (sqrt(x) * sqrt(B)) / B
+// B = 256; sqrt(B) = 16
+#define FXSQRT(x) (isqrt(x) * 16)
+
 // inclusive clamp (because tonc's is max-exclusive?)
 static inline int iclamp(int v, int min, int max)
 {
