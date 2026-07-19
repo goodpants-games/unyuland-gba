@@ -222,6 +222,29 @@ void automap_set_pos(automap_s *map, const world_room_s *room, int local_x,
     }
 }
 
+#ifdef DEVDEBUG
+static void automap_debug_fill(automap_s *map)
+{
+    const u8 *am_data = (const u8 *)automap_bin;
+    const uint data_row_stride = WORLD_MATRIX_WIDTH * 2;
+
+    for (int y = 0; y < AUTOMAP_INNER_HEIGHT; ++y)
+    {
+        int dst_y = y + AUTOMAP_MARGIN_Y;
+        for (int x = 0; x < AUTOMAP_INNER_WIDTH; ++x)
+        {
+            int dst_x = x + AUTOMAP_MARGIN_X;
+
+            u8 v = am_data[y * data_row_stride + x];
+            if (v == 0xFF) continue;
+
+            map->scrmap[dst_y][dst_x] = v;
+            map->visited[y][x] = true;
+        }
+    }
+}
+#endif
+
 static void draw_sprite(gfx_draw_sprite_state_s *spr_state, uint spridx,
                         int cx, int cy)
 {
@@ -288,6 +311,11 @@ void automap_update_view(automap_s *map, gfx_draw_sprite_state_s *spr_state)
 
     if (key_held(KEY_UP))
         map->sy -= scroll_speed;
+
+#ifdef DEVDEBUG
+    if (key_hit(KEY_R))
+        automap_debug_fill(map);
+#endif
 
     automap_clamp_spos(map);
 
