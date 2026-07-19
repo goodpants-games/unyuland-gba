@@ -1888,6 +1888,7 @@ static void behavior_boss_update(entity_s *self)
 
     uint gfx_id = SPRID_GAME_BOSS_IDLE;
     bool clamp_position = true; // clamp position to bounds of arena
+    data->flags |= BOSS_FLAG_CONTACT_DAMAGE;
 
     switch (data->mode)
     {
@@ -1964,6 +1965,7 @@ static void behavior_boss_update(entity_s *self)
                 if (data->back_desired_dist > max_dist)
                     data->back_desired_dist = max_dist;
 
+                data->flags &= ~BOSS_FLAG_CONTACT_DAMAGE;
             }
             else
             {
@@ -2271,8 +2273,9 @@ static void behavior_boss_ent_touch(entity_s *self, entity_s *other,
     boss_data_s *data = (boss_data_s *)self->userdata;
     (void)data;
 
-    if (other->behavior && other->behavior->attacked)
-        other->behavior->attacked(other, self, SGN3(self->vel.x));
+    if (data->flags & BOSS_FLAG_CONTACT_DAMAGE)
+        if (other->behavior && other->behavior->attacked)
+            other->behavior->attacked(other, self, SGN3(self->vel.x));
 }
 
 static void behavior_boss_attacked(entity_s *self, entity_s *other, int dir)
