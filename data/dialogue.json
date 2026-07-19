@@ -222,6 +222,16 @@
         ]
     },
     {
+        "id": "sign_room11",
+        "pages": [
+            "Did you know?",
+            "I think this is a dead end! There's nowhere to go!",
+            "At least, I tried getting up that hole in the ceiling.",
+            "Nothing I tried doing with that ice block seemed to be useful.",
+            "I hope this information is useful!"
+        ]
+    },
+    {
         "id": "intro",
         "cols": 17,
         "rows": 6,
