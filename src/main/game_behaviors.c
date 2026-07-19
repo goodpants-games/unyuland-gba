@@ -79,7 +79,7 @@ static bool enemy_base_update(entity_s *self)
     enemy_base_s *data = (enemy_base_s *)&self->userdata;
 
     self->sprite.palette = ((data->hurt_flash >> 1) & 1)
-                           ? GFX_OBJPAL_USER2 : GFX_OBJPAL_MUL;
+                           ? GFX_OBJPAL_USER1 : GFX_OBJPAL_MUL;
 
     if (data->hurt_flash > 0)
         --data->hurt_flash;
@@ -200,7 +200,7 @@ void entity_player_init(entity_s *self)
 
     cursor->flags |= ENTITY_FLAG_KEEP_ON_ROOM_CHANGE;
     cursor->sprite.graphic_id = SPRID_GAME_PLATFORM_OUTLINE;
-    cursor->sprite.palette = GFX_OBJPAL_USER1;
+    cursor->sprite.palette = GFX_OBJPAL_USER0;
     cursor->sprite.ox = -1;
     cursor->sprite.zidx = -9;
 
@@ -561,7 +561,7 @@ static void behavior_player_update(entity_s *self)
                 (player_simulate_droplet(type, dir, x, y, &cursor->pos.x,
                                          &cursor->pos.y));
 
-            cursor->sprite.palette = valid_placement ? GFX_OBJPAL_USER1
+            cursor->sprite.palette = valid_placement ? GFX_OBJPAL_USER0
                                                      : GFX_OBJPAL_MUL;
         }
 
@@ -2158,7 +2158,7 @@ static void behavior_boss_update(entity_s *self)
         if (subf < 2)
             self->sprite.palette = GFX_OBJPAL_MUL;
         else
-            self->sprite.palette = GFX_OBJPAL_USER2;
+            self->sprite.palette = GFX_OBJPAL_USER1;
 
         if (data->wait_timer == 0)
         {

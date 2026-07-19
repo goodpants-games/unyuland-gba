@@ -213,6 +213,10 @@ static void apply_palette_multiply(FIXED factor)
     for (int i = 1; i < 16; ++i)
         pal_obj_bank[GFX_OBJPAL_MUL][i] = gfx_mul_palette[i];
 
+    /*
+        Don't need to apply to user palettes, as they are always updated on
+        every gfx_commit.
+    
     // apply to bg user palettes
     for (int p = 0; p < GFX_BGPAL_USER_COUNT; ++p)
     {
@@ -232,6 +236,7 @@ static void apply_palette_multiply(FIXED factor)
         for (int i = 1; i < 16; ++i)
             pal_obj_bank[GFX_OBJPAL_USER0+p][i] = pal[gfx_ctl.obj_userpal[p][i]];
     }
+    */
 }
 
 void gfx_set_palette_mode(gfx_pal_mode_e mode)
@@ -1127,17 +1132,34 @@ void gfx_init(void)
 
 void gfx_commit()
 {
-    for (int i = 0; i < 16; ++i)
+    if (gfx_ctl.palette_mul != last_palette_mul)
     {
-        pal_bg_bank[GFX_BGPAL_USER0][i] =
-            gfx_palette[gfx_ctl.bg_userpal[0][i]];
-        pal_bg_bank[GFX_BGPAL_USER1][i] =
-            gfx_mul_palette[gfx_ctl.bg_userpal[1][i]];
+        last_palette_mul = gfx_ctl.palette_mul;
+        apply_palette_multiply(gfx_ctl.palette_mul);
+    }
 
-        pal_obj_bank[GFX_OBJPAL_USER0][i] =
-            gfx_palette[gfx_ctl.obj_userpal[0][i]];
-        pal_obj_bank[GFX_OBJPAL_USER1][i] =
-            gfx_mul_palette[gfx_ctl.obj_userpal[1][i]];
+    // update bg palettes
+    for (int p = 0; p < GFX_BGPAL_USER_COUNT; ++p)
+    {
+        u16 *pal = (gfx_ctl.bg_userpal_mul & (1 << p))
+                   ? gfx_mul_palette : gfx_palette;
+        for (int i = 0; i < 16; ++i)
+        {
+            pal_bg_bank[GFX_BGPAL_USER0 + p][i] =
+                pal[gfx_ctl.bg_userpal[p][i]];
+        }
+    }
+
+    // update obj palettes
+    for (int p = 0; p < GFX_OBJPAL_USER_COUNT; ++p)
+    {
+        u16 *pal = (gfx_ctl.obj_userpal_mul & (1 << p))
+                   ? gfx_mul_palette : gfx_palette;   
+        for (int i = 0; i < 16; ++i)
+        {
+            pal_obj_bank[GFX_OBJPAL_USER0 + p][i] =
+                pal[gfx_ctl.obj_userpal[p][i]];
+        }
     }
 
     oam_copy(oam_mem, gfx_oam_buffer, 128);
@@ -1242,12 +1264,6 @@ void gfx_commit()
     REG_BG1CNT = bg_cnt[1];
     REG_BG2CNT = bg_cnt[2];
     REG_BG3CNT = bg_cnt[3];
-
-    if (gfx_ctl.palette_mul != last_palette_mul)
-    {
-        last_palette_mul = gfx_ctl.palette_mul;
-        apply_palette_multiply(gfx_ctl.palette_mul);
-    }
 }
 
 void gfx_new_frame(void)

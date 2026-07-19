@@ -82,7 +82,7 @@ static void update_rainbow_palette(void)
     int j = rainbow_shift;
     for (int i = 0; i < 16; ++i)
     {
-        gfx_ctl.obj_userpal[1][i] = rainbow_pal[j];
+        gfx_ctl.obj_userpal[0][i] = rainbow_pal[j];
         if (++j == RAINBOW_PALETTE_LENGTH) j = 0;
     }
 }
@@ -599,9 +599,15 @@ void game_init(void)
     player->pos.x = int2fx(16);
     player->pos.y = int2fx(16);
 
+    gfx_ctl.obj_userpal_mul = 0b111;
+
     // init hurt flash palette
     for (int i = 1; i < 16; ++i)
-        gfx_ctl.obj_userpal[2][i] = GFX_PAL_RED;
+        gfx_ctl.obj_userpal[1][i] = GFX_PAL_RED;
+
+    // init white flash palette
+    for (int i = 1; i < 16; ++i)
+        gfx_ctl.obj_userpal[2][i] = GFX_PAL_WHITE;
 }
 
 void game_deinit()
@@ -896,7 +902,7 @@ void game_render(void)
         // draw arrow
         draw_state.a0 = 0;
         draw_state.a1 = 0;
-        draw_state.a2 = ATTR2_PALBANK(GFX_OBJPAL_USER1) | ATTR2_PRIO(1);
+        draw_state.a2 = ATTR2_PALBANK(GFX_OBJPAL_USER0) | ATTR2_PRIO(1);
 
         FIXED pos_x = ent->pos.x + int2fx(ent->col.w) / 2;
         FIXED pos_y = ent->pos.y - int2fx(5) + dy;
