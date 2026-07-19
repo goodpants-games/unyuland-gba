@@ -7,7 +7,7 @@
 #include <data/mm_soundbank_bin.h>
 
 #define MM_MODCH_COUNT 8
-#define MM_MIXCH_COUNT 8
+#define MM_MIXCH_COUNT (8 + 4) // 4 extra for the jingle
 
 struct
 {
