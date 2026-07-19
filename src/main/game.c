@@ -1179,7 +1179,7 @@ static bool room_transition_phase1_update(entity_s *player)
     if (++g_game.room_trans.ticks < 30)
     {
         FIXED fac = g_game.room_trans.ticks * (FIX_ONE / 20);
-        gfx_set_palette_multiplied(FIX_ONE - fac);
+        gfx_ctl.palette_mul = FIX_ONE - fac;
         return true;
     }
 
@@ -1265,7 +1265,7 @@ static bool room_transition_phase1_update(entity_s *player)
 static void room_transition_phase2_update(entity_s *player)
 {
     FIXED fac = g_game.room_trans.ticks * (FIX_ONE / 20);
-    gfx_set_palette_multiplied(fac);
+    gfx_ctl.palette_mul = fac;
 
     ++g_game.room_trans.ticks;
 
@@ -1275,7 +1275,7 @@ static void room_transition_phase2_update(entity_s *player)
     if (g_game.room_trans.ticks == 30)
     {
         g_game.room_trans.phase = 0;
-        gfx_reset_palette();
+        gfx_ctl.palette_mul = FIX_ONE;
     }
 }
 

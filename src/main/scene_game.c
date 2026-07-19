@@ -172,7 +172,7 @@ static void open_map(void)
     gfx_ctl.enable_obj = false;
     gfx_commit();
 
-    gfx_set_palette_multiplied(FIX_ONE);
+    gfx_ctl.palette_mul = FIX_ONE;
 
     state.substate = SUBSTATE_MAP;
     automap_open_view(&state.automap, 1);
@@ -247,7 +247,7 @@ static void update_map(void)
     {
         close_map();
         state.substate = SUBSTATE_PAUSED;
-        gfx_set_palette_multiplied(PAUSE_PALETTE_MUL);
+        gfx_ctl.palette_mul = PAUSE_PALETTE_MUL;
         return;
     }
 
@@ -309,7 +309,7 @@ static void pause_game(void)
 
     open_pause_menu();
     mplay_set_volume((int)(1024 * 0.1));
-    gfx_set_palette_multiplied(PAUSE_PALETTE_MUL);
+    gfx_ctl.palette_mul = PAUSE_PALETTE_MUL;
 }
 
 static void unpause_game(void)
@@ -317,7 +317,7 @@ static void unpause_game(void)
     state.substate = SUBSTATE_NORMAL;
     close_pause_menu();
     mplay_set_volume((int)(1024 * 0.3));
-    gfx_set_palette_multiplied(FIX_ONE);
+    gfx_ctl.palette_mul = FIX_ONE;
 }
 
 static void update_pause_menu(void)
@@ -500,7 +500,7 @@ static void scene_unload(void)
     gfx_ctl.bg[3].enabled = false;
     gfx_text_bmap_dst_clear(0, SCREEN_HEIGHT_T);
     gfx_text_bmap_clear(0, 0, GFX_TEXT_BMP_COLS, GFX_TEXT_BMP_ROWS);
-    gfx_reset_palette();
+    gfx_ctl.palette_mul = FIX_ONE;
     obj_hide_multi(gfx_oam_buffer, GFX_OBJ_COUNT);
 }
 

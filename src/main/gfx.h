@@ -206,6 +206,8 @@ typedef struct gfx_display_control
     u8 bg_userpal_mul;
     u8 obj_userpal_mul;
     bool enable_obj;
+
+    s16 palette_mul;
 }
 gfx_display_control_s;
 
@@ -235,8 +237,6 @@ bool gfx_queue_memcpy(void *dst, const void *src, size_t size);
 bool gfx_queue_memset(void *dst, u8 value, size_t size);
 
 void gfx_set_palette_mode(gfx_pal_mode_e mode);
-void gfx_reset_palette(void);
-void gfx_set_palette_multiplied(FIXED factor);
 
 // gfx_text_bmap_fill written in asm. For funsies.
 void gfx_text_bmap_fill(uint oc, uint or_, uint cols, uint rows, u32 data[8]);

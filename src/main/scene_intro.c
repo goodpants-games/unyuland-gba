@@ -105,7 +105,7 @@ static void scene_unload(void)
 
     gfx_text_bmap_clear(0, 0, GFX_TEXT_BMP_COLS, GFX_TEXT_BMP_ROWS);
     gfx_text_bmap_dst_clear(0, SCREEN_HEIGHT_T);
-    gfx_reset_palette();
+    gfx_ctl.palette_mul = FIX_ONE;
 }
 
 static void text_tick(void)
@@ -235,7 +235,7 @@ static void scene_frame(void)
         switch (state.img_fade_stage)
         {
         case 1:
-            gfx_set_palette_multiplied(FIX_ONE - fade_t);
+            gfx_ctl.palette_mul = FIX_ONE - fade_t;
             if (++state.img_fade_ticks == IMG_FADE_STAGE_LEN)
             {
                 state.img_fade_stage = 2;
@@ -245,7 +245,7 @@ static void scene_frame(void)
             break;
 
         case 2:
-            gfx_set_palette_multiplied(fade_t);
+            gfx_ctl.palette_mul = fade_t;
             if (++state.img_fade_ticks == IMG_FADE_STAGE_LEN)
             {
                 state.img_fade_stage = 0;

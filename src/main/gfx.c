@@ -40,6 +40,7 @@ gfx_display_control_s gfx_ctl;
 OBJ_ATTR gfx_oam_buffer[128];
 static u16 gfx_mul_palette[16];
 
+EWRAM_BSS static s16 last_palette_mul;
 
 #pragma endregion
 
@@ -96,25 +97,7 @@ static const u16 gfx_palette_corrected[16] = {
     0x477f
 };
 
-void gfx_set_palette_mode(gfx_pal_mode_e mode)
-{
-    switch (mode)
-    {
-        case GFX_PAL_MODE_NORMAL:
-            memcpy16(gfx_palette, gfx_palette_normal, 16);
-            break;
-
-        case GFX_PAL_MODE_LCD_CORRECTED:
-            memcpy16(gfx_palette, gfx_palette_corrected, 16);
-            break;
-
-        default: return;
-    }
-
-    gfx_reset_palette();
-}
-
-void gfx_reset_palette(void)
+static void reset_palette(void)
 {
     for (int i = 0; i < 16; ++i)
         gfx_mul_palette[i] = gfx_palette[i];
@@ -187,7 +170,7 @@ void gfx_reset_palette(void)
 }
 
 ARM_FUNC NO_INLINE
-void gfx_set_palette_multiplied(FIXED factor)
+static void apply_palette_multiply(FIXED factor)
 {
     if      (factor < 0)       factor = 0;
     else if (factor > FIX_ONE) factor = FIX_ONE;
@@ -249,6 +232,25 @@ void gfx_set_palette_multiplied(FIXED factor)
         for (int i = 1; i < 16; ++i)
             pal_obj_bank[GFX_OBJPAL_USER0+p][i] = pal[gfx_ctl.obj_userpal[p][i]];
     }
+}
+
+void gfx_set_palette_mode(gfx_pal_mode_e mode)
+{
+    switch (mode)
+    {
+        case GFX_PAL_MODE_NORMAL:
+            memcpy16(gfx_palette, gfx_palette_normal, 16);
+            break;
+
+        case GFX_PAL_MODE_LCD_CORRECTED:
+            memcpy16(gfx_palette, gfx_palette_corrected, 16);
+            break;
+
+        default: return;
+    }
+
+    reset_palette();
+    apply_palette_multiply(gfx_ctl.palette_mul);
 }
 
 #pragma endregion
@@ -1088,13 +1090,16 @@ void* gfx_alloc_cpybuf(size_t size)
 
 void gfx_init(void)
 {
+    gfx_ctl.palette_mul = FIX_ONE;
+    last_palette_mul = FIX_ONE;
+
     gfx_ctl.bg_userpal_mul  = 0b01111111;
     gfx_ctl.obj_userpal_mul = 0b01111111;
 
     dma_cpypool_write = dma_cpypool;
     memcpy16(gfx_palette, gfx_palette_normal, 16);
     oam_init(gfx_oam_buffer, 128);
-    gfx_reset_palette();
+    reset_palette();
 
     for (uint i = 0; i < 4; ++i)
     {
@@ -1114,21 +1119,6 @@ void gfx_init(void)
     gfx_ctl.bg[2].priority = 2;
     gfx_ctl.bg[3].priority = 3;
     gfx_ctl.enable_obj = true;
-
-    // REG_DISPCNT = DCNT_OBJ_1D;
-
-    // REG_BG0CNT = BG_CBB(GFX_TEXT_BMP_BLOCK) | BG_SBB(GFX_BG0_INDEX) | BG_4BPP |
-    //              BG_REG_32x32 | BG_PRIO(0);
-    // REG_BG0HOFS = 0;
-    // REG_BG0VOFS = 0;
-
-    // REG_BG1CNT = BG_CBB(0) | BG_SBB(GFX_BG1_INDEX) | BG_8BPP | BG_REG_32x32 |
-    //              BG_PRIO(1);
-    // REG_BG1HOFS = 0;
-    // REG_BG1VOFS = 0;
-
-    // REG_BG2CNT = BG_SBB(GFX_BG2_INDEX) | BG_4BPP | BG_PRIO(2);
-    // REG_BG3CNT = BG_SBB(GFX_BG2_INDEX) | BG_4BPP | BG_PRIO(2);
 }
 
 void gfx_commit()
@@ -1150,7 +1140,7 @@ void gfx_commit()
 
     flush_dma_queue();
 
-    uint text_dma_copies = 0;
+    uint text_dma_count = 0; // in bytes
 
     for (uint r0 = 0; r0 < GFX_TEXT_BMP_ROWS;)
     {
@@ -1167,12 +1157,16 @@ void gfx_commit()
         const uint ofs = r0 * GFX_TEXT_BMP_COLS;
         const uint sz = ((r1 - r0) * GFX_TEXT_BMP_COLS) * sizeof(TILE);
         dma3_cpy(GFX_TEXT_BMP_VRAM + ofs, gfx_text_bmp_buf + ofs, sz);
-        ++text_dma_copies;
+        text_dma_count += sz;
         r0 = r1;
     }
 
-    if (text_dma_copies > 0)
-        LOG_DBG("text dma copies: %u", text_dma_copies);
+#ifdef DEVDEBUG
+    if (text_dma_count > 0)
+        LOG_DBG("text dma copies: %u", text_dma_count);
+#else
+    (void)text_dma_count;
+#endif
 
     memset(gfx_text_bmp_dirty_rows, 0, sizeof(gfx_text_bmp_dirty_rows));
 
@@ -1244,6 +1238,12 @@ void gfx_commit()
     REG_BG1CNT = bg_cnt[1];
     REG_BG2CNT = bg_cnt[2];
     REG_BG3CNT = bg_cnt[3];
+
+    if (gfx_ctl.palette_mul != last_palette_mul)
+    {
+        last_palette_mul = gfx_ctl.palette_mul;
+        apply_palette_multiply(gfx_ctl.palette_mul);
+    }
 }
 
 void gfx_new_frame(void)
