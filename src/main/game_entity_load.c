@@ -25,10 +25,12 @@ static bool get_property(const entity_load_s *load_data, const char *name,
 }
 
 static inline bool get_property_string(const entity_load_s *load_data,
-                                       const char *name, const char **out)
+                                       const char *name, const char **p_out)
 {
-    *out = NULL;
-    return get_property(load_data, name, ELPT_STRING, (uintptr_t *)out);
+    uintptr_t out = 0;
+    bool s = get_property(load_data, name, ELPT_STRING, &out);
+    *p_out = (const char *)out;
+    return s;
 }
 
 static inline bool get_property_decimal(const entity_load_s *load_data,
@@ -95,7 +97,11 @@ static const char* parse_sign_text(const entity_load_s *load_data)
     if (!get_property_string(load_data, "text", &id))
         return NULL;
 
-    return dlg_get_chat_by_name(id);
+    const char *chat = dlg_get_chat_by_name(id);
+    if (!chat)
+        LOG_ERR("sign: could not find chat '%s'", id);
+
+    return chat;
 }
 
 static void load_orb(entity_s *ent, const entity_load_s *load_data, bool blue)
