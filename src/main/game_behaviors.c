@@ -1522,25 +1522,31 @@ typedef struct stalactite_data
     bool falling;
     u8 times_hit;
     u8 shake_timer;
+    s8 sprite_ox;
 }
 stalactite_data_s;
 EDATA_SIZE_CHECK(stalactite_data_s)
 
+#define STALACTITE_EXTRA_WIDTH 4
+
 void entity_stalactite_init(entity_s *self, FIXED px, FIXED py, int gfx_variant)
 {
     self->flags |= ENTITY_FLAG_COLLIDE;
-    self->pos.x = px;
+    self->pos.x = px - FX(STALACTITE_EXTRA_WIDTH) / 2;
     self->pos.y = py;
-    self->col.w = 8;
+    self->col.w = 8 + STALACTITE_EXTRA_WIDTH;
     self->col.h = 16;
     self->col.group = 0;
     self->col.mask = COLGROUP_PROJECTILE;
     self->sprite.graphic_id = SPRID_GAME_STALACTITE;
     self->sprite.frame = gfx_variant - 1;
+    self->sprite.ox = STALACTITE_EXTRA_WIDTH / 2;
     self->behavior = &behavior_stalactite;
 
     stalactite_data_s *data = (stalactite_data_s *)self->userdata;
-    *data = (stalactite_data_s){0};
+    *data = (stalactite_data_s){
+        .sprite_ox = STALACTITE_EXTRA_WIDTH / 2
+    };
 }
 
 static bool stalactite_proj_touch(entity_s *self, projectile_s *proj)
@@ -1560,7 +1566,10 @@ static bool stalactite_proj_touch(entity_s *self, projectile_s *proj)
     self->flags |= ENTITY_FLAG_MOVING | ENTITY_FLAG_ACTOR;
     self->actor.flags |= ACTOR_FLAG_NO_VEL;
     self->col.mask = COLGROUP_DEFAULT;
+    self->col.w = 8;
+    self->pos.x += FX(STALACTITE_EXTRA_WIDTH) / 2;
     data->falling = true;
+    data->sprite_ox = 0;
 
     game_send_global_message(MSG_ID_BROKE_STALACTITE, self);
     return false;
@@ -1570,6 +1579,7 @@ static void stalactite_ent_touch(entity_s *self, entity_s *other, int nx, int ny
 {
     stalactite_data_s *data = (stalactite_data_s *)self->userdata;
     if (!data->falling) return;
+    if (!(other->col.group & COLGROUP_ACTOR)) return;
 
     if (other->behavior && other->behavior->message)
         other->behavior->message(other, MSG_ID_STALACTITE_ATTACK, self);
@@ -1588,15 +1598,15 @@ static void stalactite_update(entity_s *self)
     {
         uint anim_frame = data->shake_timer % 6;
         if (anim_frame < 3)
-            self->sprite.ox = 1;
+            self->sprite.ox = data->sprite_ox + 1;
         else
-            self->sprite.ox = -1;
+            self->sprite.ox = data->sprite_ox - 1;
 
         --data->shake_timer;
     }
     else
     {
-        self->sprite.ox = 0;
+        self->sprite.ox = data->sprite_ox;
     }
 
     if (!data->falling) return;
@@ -1632,6 +1642,9 @@ static behavior_def_s behavior_stalactite = {
 
 #define BOSS_STANDOFF_BASE_DIST_NORMAL FX(8 * 7)
 #define BOSS_STANDOFF_BASE_DIST_FAR    FX(8 * 9)
+
+#define BOSS_ARENA_LEFT  FX(16 * 8)
+#define BOSS_ARENA_RIGHT FX(40 * 8)
 
 #define BOSS_FLAG_CONTACT_DAMAGE (1 << 0)
 #define BOSS_FLAG_DID_JUMP       (1 << 1)
@@ -1874,6 +1887,7 @@ static void behavior_boss_update(entity_s *self)
     FIXED player_cy = player->pos.y + (FX(player->col.h) >> 1);
 
     uint gfx_id = SPRID_GAME_BOSS_IDLE;
+    bool clamp_position = true; // clamp position to bounds of arena
 
     switch (data->mode)
     {
@@ -1999,7 +2013,11 @@ static void behavior_boss_update(entity_s *self)
             self->actor.jump_trigger = 1;
         }
 
-        if ((self->actor.flags & ACTOR_FLAG_GROUNDED) && (self->actor.flags & ACTOR_FLAG_WALL))
+        FIXED self_l = self->pos.x;
+        FIXED self_r = self->pos.x + FX(self->col.w);
+
+        if ((self->actor.flags & ACTOR_FLAG_GROUNDED) &&
+            (self_l < BOSS_ARENA_LEFT || self_r > BOSS_ARENA_RIGHT))
         {
             LOG_DBG("backed into wall");
             boss_switch_mode(self, phase == 2 ? BOSS_MODE_SHOOT_JUMP_WARN : BOSS_MODE_SLIDE_WARN);
@@ -2033,11 +2051,12 @@ static void behavior_boss_update(entity_s *self)
     {
         if (self->actor.flags & ACTOR_FLAG_GROUNDED)
         {
-            self->vel.x = self->actor.move_x * FX(-0.5);
+            self->vel.x = self->actor.move_x * FX(-0.25);
             if (--data->wait_timer == 0)
                 boss_switch_mode(self, BOSS_MODE_SLIDE);
         }
         
+        clamp_position = false;
         break;
     }
 
@@ -2063,13 +2082,31 @@ static void behavior_boss_update(entity_s *self)
         {
             thresh = FX(8 * 2);
             --data->wait_timer;
-        }
+        }        
 
-        if (data->wait_timer == 0 || -player_dx * self->actor.move_x > thresh)
+        FIXED dist_to_edge;
+        if (self->actor.move_x == -1)
+            dist_to_edge = abs(self->pos.x - BOSS_ARENA_LEFT);
+        else
+            dist_to_edge = abs(BOSS_ARENA_RIGHT - (self->pos.x + FX(self->col.w)));
+
+        if (data->wait_timer == 0 || -player_dx * self->actor.move_x > thresh
+            || dist_to_edge < FX(8 * 4))
         {
             boss_switch_mode(self, BOSS_MODE_PHASE_DEFAULT);
+            break;
+        }
+
+        if (self->pos.x < BOSS_ARENA_LEFT)
+        {
+            self->pos.x = BOSS_ARENA_LEFT;
+            self->vel.x = FX(3);
+            self->vel.y = FX(-1);
+            boss_switch_mode(self, BOSS_MODE_PHASE_DEFAULT);
+            break;
         }
         
+        clamp_position = false;
         break;
     }
 
@@ -2105,6 +2142,7 @@ static void behavior_boss_update(entity_s *self)
         {
             boss_switch_mode(self, BOSS_MODE_PHASE_DEFAULT);
         }
+        
         break;
     }
 
@@ -2149,6 +2187,24 @@ static void behavior_boss_update(entity_s *self)
         self->sprite.accum = 0;
         self->sprite.frame = 0;
         self->sprite.flags |= SPRITE_FLAG_PLAYING;
+    }
+
+    if (clamp_position)
+    {
+        if (self->pos.x < BOSS_ARENA_LEFT)
+        {
+            self->pos.x = BOSS_ARENA_LEFT;
+            self->vel.x = 0;
+        }
+        else
+        {
+            FIXED self_w = FX(self->col.w);
+            if (self->pos.x + self_w > BOSS_ARENA_RIGHT)
+            {
+                self->pos.x = BOSS_ARENA_RIGHT - self_w;
+                self->vel.x = 0;
+            }
+        }
     }
 
     // if (self->actor.flags & ACTOR_FLAG_GROUNDED)

@@ -27,12 +27,14 @@
 b05: player scared to go down Hole.
 player should be able to do a jig when hold down (very important)
 
-room13:
+============================= Playtest Notes ===================================
+ROOM13:
 - Maybe make it so the player can't save after fetching the ice block?
 - also, player does have to restart because they will obviously kill the gun
   enemy first. maybe there's a way to design the room that doesn't require
   a restart.
 
+BOSS ...
 - boss camera autofollow
 - 3rd phase is kinda confusing... Even player might not figure out why the
   boss is backing up.
@@ -45,6 +47,20 @@ room13:
   places the goop will go telegraphed before theyre shot. because oh my GOD"
   (I probably won't do this because integrating bitmap graphics like that into
   the game scene is more effort than I think is worth)
+
+BOSS 07/19/26
+- bit hard to hit the stalactites when moving fast.
+- Still very difficult to time the stalactite hits. 
+- Player does not realize you need to wait until the boss comes closer to
+  you before luring it into a stalactite (phase 2). Eventually figured it out.
+  Took I think two or three minutes...
+- Player says it would be too frustrating if he were not a playtester
+- Expresses disbelief on phase 3 where boss decides to dodge projectiles.
+  "It's scared of the stalactities, what do I do!?"
+  He then tries shooting at it. (Maybe I can have shooting at it to .. .sdomo)
+- I had to tell him what to do in phase 3. (Maybe added water will make it more
+  obvious.)
+- Maybe I should show the boss remaining health...
 
 ==================================== Boss ======================================
 
