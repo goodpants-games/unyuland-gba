@@ -1,5 +1,5 @@
 {
-    "dir": "../work/gfx",
+    "dir": "../data/sprites/game",
     "sprites": [
         "player.ase",
         "crawler.ase",
