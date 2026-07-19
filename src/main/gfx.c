@@ -1187,7 +1187,7 @@ void gfx_commit()
         r0 = r1;
     }
 
-#ifdef DEVDEBUG
+#if false // #ifdef DEVDEBUG
     if (text_dma_count > 0)
         LOG_DBG("text dma copies: %u", text_dma_count);
 #else
