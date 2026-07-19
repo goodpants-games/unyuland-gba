@@ -96,7 +96,7 @@
             "height": 176,
             "width": 360,
             "x": 1200,
-            "y": -616
+            "y": -704
         },
         {
             "fileName": "room05.tmx",
@@ -114,10 +114,10 @@
         },
         {
             "fileName": "room07.tmx",
-            "height": 176,
+            "height": 264,
             "width": 240,
             "x": 720,
-            "y": -704
+            "y": -792
         },
         {
             "fileName": "room08.tmx",
@@ -150,8 +150,8 @@
         {
             "fileName": "testroom1.tmx",
             "height": 176,
-            "width": 240,
-            "x": -240,
+            "width": 360,
+            "x": -360,
             "y": -88
         },
         {
@@ -159,7 +159,7 @@
             "height": 176,
             "width": 480,
             "x": 960,
-            "y": -792
+            "y": -880
         }
     ],
     "onlyShowAdjacentMaps": false,
