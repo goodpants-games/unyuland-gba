@@ -280,7 +280,6 @@ typedef struct bg_scroll_data
 static EWRAM_BSS bg_scroll_data_s bg_scroll_data[4];
 static EWRAM_BSS map_write_scrblock_f scrblock_writers[MAX_SCRBLOCK_WRITER_COUNT];
 
-IWRAM_CODE
 static void update_map_scroll_t(uint bg_idx, uint size_shift, uint dst_shift,
                                 map_write_scrblock_f write_scr_block)
 {
@@ -302,11 +301,14 @@ static void update_map_scroll_t(uint bg_idx, uint size_shift, uint dst_shift,
 
     uint size_mod_mask = (256 >> size_shift) - 1;
 
+    const uint width_div = SCREEN_WIDTH >> size_shift;
+    const uint height_div = SCREEN_HEIGHT >> size_shift;
+
     if (scroll_data->screen_dirty)
     {
         scroll_data->screen_dirty = false;
-        uint ey = cam_ty + (SCREEN_HEIGHT >> size_shift) + 1;
-        uint ex = cam_tx + (SCREEN_WIDTH >> size_shift) + 1;
+        uint ey = cam_ty + height_div + 1;
+        uint ex = cam_tx + width_div + 1;
 
         for (uint y = cam_ty; y < ey; ++y)
         {
@@ -327,8 +329,8 @@ static void update_map_scroll_t(uint bg_idx, uint size_shift, uint dst_shift,
             uint sx, ex;
             if (cam_tx > prev_cam_tx)
             {
-                sx = prev_cam_tx + (SCREEN_WIDTH >> size_shift) + 1;
-                ex = cam_tx + (SCREEN_WIDTH >> size_shift);
+                sx = prev_cam_tx + width_div + 1;
+                ex = cam_tx + width_div;
             }
             else
             {
@@ -337,7 +339,7 @@ static void update_map_scroll_t(uint bg_idx, uint size_shift, uint dst_shift,
             }
 
             uint sy = cam_ty;
-            uint ey = cam_ty + (SCREEN_HEIGHT >> size_shift);
+            uint ey = cam_ty + height_div;
 
             for (uint x = sx; x <= ex; ++x)
             {
@@ -357,8 +359,8 @@ static void update_map_scroll_t(uint bg_idx, uint size_shift, uint dst_shift,
             uint sy, ey;
             if (cam_ty > prev_cam_ty)
             {
-                sy = prev_cam_ty + (SCREEN_HEIGHT >> size_shift) + 1;
-                ey = cam_ty + (SCREEN_HEIGHT >> size_shift);
+                sy = prev_cam_ty + height_div + 1;
+                ey = cam_ty + height_div;
             }
             else
             {
@@ -367,7 +369,7 @@ static void update_map_scroll_t(uint bg_idx, uint size_shift, uint dst_shift,
             }
 
             uint sx = cam_tx;
-            uint ex = cam_tx + (SCREEN_WIDTH >> size_shift);
+            uint ex = cam_tx + width_div;
 
             for (uint y = sy; y <= ey; ++y)
             {
@@ -383,6 +385,7 @@ static void update_map_scroll_t(uint bg_idx, uint size_shift, uint dst_shift,
     }
 }
 
+IWRAM_CODE
 static void write_scr_block16(const uint map_entry, u16 *p_dest)
 {
     // dest should always be 32-bit aligned, since dst stride is 2
@@ -395,8 +398,8 @@ static void write_scr_block16(const uint map_entry, u16 *p_dest)
         return;
     }
 
-    int gfx_id = (map_entry - 1) & 0xFF;
-    int v = gfx_id % 16 * 2 + gfx_id / 16 * 64;
+    uint gfx_id = (map_entry - 1) & 0xFF;
+    uint v = gfx_id % 16 * 2 + gfx_id / 16 * 64;
     v = GFX_CHAR_GAME_TILESET + v + 1;
 
     const u32 se_flags = SE_PALBANK(GFX_BGPAL_BLACK_MUL);
@@ -426,6 +429,7 @@ static void write_scr_block16(const uint map_entry, u16 *p_dest)
     *(dest + 16) = lower;
 }
 
+IWRAM_CODE
 static void write_scr_block8(const uint map_entry, u16 *dest)
 {
     *dest = (u16) map_entry;
