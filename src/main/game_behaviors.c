@@ -1258,7 +1258,7 @@ void entity_water_tank_init(entity_s *self, FIXED px, FIXED py)
     self->pos.x = px + int2fx(1);
     self->pos.y = py - int2fx(4);
     self->col.w = 6;
-    self->col.h = 16;
+    self->col.h = 12;
     self->col.flags = COL_FLAG_MONITOR_ONLY;
     self->sprite.graphic_id = SPRID_GAME_WATER_TANK_NORMAL_INACTIVE;
     self->sprite.ox = -1;
