@@ -1541,6 +1541,7 @@ void entity_stalactite_init(entity_s *self, FIXED px, FIXED py, int gfx_variant)
     self->sprite.graphic_id = SPRID_GAME_STALACTITE;
     self->sprite.frame = gfx_variant - 1;
     self->sprite.ox = STALACTITE_EXTRA_WIDTH / 2;
+    self->sprite.palette = GFX_OBJPAL_USER3;
     self->behavior = &behavior_stalactite;
 
     stalactite_data_s *data = (stalactite_data_s *)self->userdata;

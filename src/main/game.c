@@ -599,7 +599,7 @@ void game_init(void)
     player->pos.x = int2fx(16);
     player->pos.y = int2fx(16);
 
-    gfx_ctl.obj_userpal_mul = 0b111;
+    gfx_ctl.obj_userpal_mul = 0b1111;
 
     // init hurt flash palette
     for (int i = 1; i < 16; ++i)
@@ -608,6 +608,11 @@ void game_init(void)
     // init white flash palette
     for (int i = 1; i < 16; ++i)
         gfx_ctl.obj_userpal[2][i] = GFX_PAL_WHITE;
+
+    // palette but idx15 (peach) is replaced with black
+    for (int i = 0; i < 16; ++i)
+        gfx_ctl.obj_userpal[3][i] = i;
+    gfx_ctl.obj_userpal[3][15] = GFX_PAL_BLACK;
 }
 
 void game_deinit()
