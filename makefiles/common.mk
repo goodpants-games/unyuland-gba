@@ -313,7 +313,7 @@ endif
 # pointer to the map; the world matrix; and automap data.
 #---------------------------------------------------------------------------------
 data/world.c data/world.h data/automap.bin &:\
-    $(OFILES_MAPS) $(TOPLEVEL)/data/maps/unyuland.world\
+    $(MAPFILES) $(TOPLEVEL)/data/maps/unyuland.world\
 	$(TOPLEVEL)/data/room_list.txt $(TOPLEVEL)/tools/worldproc.py
 #---------------------------------------------------------------------------------
 	@mkdir -p $(dir $@)
