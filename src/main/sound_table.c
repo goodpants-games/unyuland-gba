@@ -127,7 +127,7 @@ static const snd_cmd sound_boss_land[] = {
     SNDCMD_SET_CH(SNDCMD_CH_SQR2, SNDCMD_CH_SQR_DUTY2),
     SNDCMD_PITCH(0, SNDCMD_KEY(A,4)),
     SNDCMD_PITCH(1, SNDCMD_KEY(C,2)),
-    SNDCMD_PLAY_ENV_SWP(4, 6, 6),
+    SNDCMD_PLAY_ENV_SWP(4, 7, 5),
     SNDCMD_END
 };
 
@@ -147,7 +147,7 @@ static const snd_cmd sound_boss_dash[] = {
     SNDCMD_PITCH(0, SNDCMD_KEY(A,4)),
     SNDCMD_PITCH(1, SNDCMD_KEY(C,2)),
     SNDCMD_ARP3(7, 12),
-    SNDCMD_PLAY_ENV_SWP(40, 7, 2),
+    SNDCMD_PLAY_ENV_SWP(40, 7, 3),
     SNDCMD_END
 };
 
@@ -168,7 +168,7 @@ static const snd_cmd sound_boss_jump[] = {
     SNDCMD_PITCH(1, SNDCMD_KEY(E,2)),
     // SNDCMD_ARP3(7, 12),
     SNDCMD_VIBRATO(5, 6),
-    SNDCMD_PLAY_ENV_SWP(40, 7, 2),
+    SNDCMD_PLAY_ENV_SWP(40, 7, 3),
     SNDCMD_END
 };
 

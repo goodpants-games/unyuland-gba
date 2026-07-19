@@ -30,6 +30,9 @@
 #define HUD_SPRITE_COUNT 16
 #define PAUSE_PALETTE_MUL FX(0.55)
 
+#define MUSIC_PAUSE_VOLUME (int)(1024 * 0.1)
+#define MUSIC_VOLUME       (int)(1024 * 0.25)
+
 #define PAUSE_MENU_OPTION_COUNT 5
 static const char *pause_menu_options[PAUSE_MENU_OPTION_COUNT] =
     {"RESUME", "RESPAWN", "MAP", "OPTIONS", "QUIT"};
@@ -308,7 +311,7 @@ static void pause_game(void)
     state.pause_menu.selected = 0;
 
     open_pause_menu();
-    mplay_set_volume((int)(1024 * 0.1));
+    mplay_set_volume(MUSIC_PAUSE_VOLUME);
     gfx_ctl.palette_mul = PAUSE_PALETTE_MUL;
 }
 
@@ -316,7 +319,7 @@ static void unpause_game(void)
 {
     state.substate = SUBSTATE_NORMAL;
     close_pause_menu();
-    mplay_set_volume((int)(1024 * 0.3));
+    mplay_set_volume(MUSIC_VOLUME);
     gfx_ctl.palette_mul = FIX_ONE;
 }
 
@@ -487,6 +490,8 @@ static void scene_load(uintptr_t data)
     
     gfx_ctl.bg[1].enabled = true;
     setup_game_hud();
+
+    mplay_set_volume(MUSIC_VOLUME);
 }
 
 static void scene_unload(void)
