@@ -15,8 +15,8 @@
 // to be 8x8.
 #define WORLD_TILE_SIZE 8
 #define MAX_ORB_COUNT   9
-#define GAME_OAM_START 64
-#define GAME_OAM_COUNT 64
+#define GAME_OAM_START 16
+#define GAME_OAM_COUNT (128 - GAME_OAM_START)
 
 #define ENTITY_FLAG_ENABLED              (1 << 0)
 #define ENTITY_FLAG_MOVING               (1 << 1)

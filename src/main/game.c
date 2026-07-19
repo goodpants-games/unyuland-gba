@@ -1005,7 +1005,7 @@ void game_render(void)
         if (draw_state.dst_obj_count == 0) break;
     }
 
-    int obj_index = 64 - draw_state.dst_obj_count;
+    int obj_index = GAME_OAM_COUNT - draw_state.dst_obj_count;
     int old_obj_count = last_obj_index;
     for (int i = obj_index; i < old_obj_count; ++i)
     {
