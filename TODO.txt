@@ -20,7 +20,7 @@
 - make it so pressing Start during dialogue will end the dialogue. (instead of.
   you know. bugging out the ui.)
 - I just realized i didn't add the open parenthesis to the character set :(
-- CAN'T READ SIGNS ON THE GBA BUILD. WHAT THE FUCK.
+- Add Reset Room Button
 
 - pc port: add frame time display
 
