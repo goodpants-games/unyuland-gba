@@ -98,13 +98,30 @@ static void unpause_game(void);
 #pragma region vram control
 
 ARM_FUNC NO_INLINE
+#ifdef __arm__
+__attribute__((naked))
+#endif
 static void se_copy_ofs(SCR_ENTRY *restrict dst_se,
                         const SCR_ENTRY *restrict src_se, size_t count,
                         uint ofs)
 {
-    // maybe write this in arm assembly so it can use ldm/stm?
+#ifndef __arm__
     for (; count; --count)
         *(dst_se++) = *(src_se++) + ofs;
+#else
+    // wait i'm stupid i forgot ldm and stm only work for words. and not
+    // halfwords. of course it wouldn't. well. i suppose i already wrote this.
+    asm (
+        "cmp r2, #0        \n"
+        "0:                \n\t"
+        "bxeq lr           \n\t"
+        "ldrh ip, [r1], #2 \n\t"
+        "add ip, r3        \n\t"
+        "strh ip, [r0], #2 \n\t"
+        "subs r2, #1       \n\t"
+        "b 0b              \n\t"
+    );
+#endif
 }
 
 // function to load either the sky bg tileset or the automap tileset into
