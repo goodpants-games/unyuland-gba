@@ -35,6 +35,7 @@
 #define LOG_WRN(fmt, ...)
 #define LOG_ERR(fmt, ...)
 #define DBG_CRASH()
+#define DBG_BREAK()
 
 #endif
 
