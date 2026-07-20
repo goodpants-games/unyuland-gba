@@ -158,8 +158,8 @@
     {
         "id": "sign_b05_hint",
         "pages": [
-            "Did you know? There's an ice block on the ceiling to the left.",
-            "Although, I don't know how to get it.",
+            "Did you know? There's a breakable red block on the ceiling to the left!",
+            "Oh, well, you probably already saw that coming in. It's pretty obvious.",
             "Oh! Did you know? There's an enemy below this platform!",
             "It holds up the ice block, and...",
             "Nevermind, I don't think I have any useful information. Sorry.",
@@ -228,6 +228,7 @@
             "I think this is a dead end! There's nowhere to go!",
             "At least, I tried getting up that hole in the ceiling.",
             "Nothing I tried doing with that ice block seemed to be useful.",
+            "Maybe I need to find something and come back later.",
             "I hope this information is useful!"
         ]
     },
