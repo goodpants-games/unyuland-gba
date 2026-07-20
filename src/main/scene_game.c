@@ -7,6 +7,7 @@
 #include <data/graphics/tileset_gfx.h>
 #include <data/graphics/automap_tiles_gfx.h>
 #include <data/graphics/sky_bg1_gfx.h>
+#include <data/graphics/sky_bg2_gfx.h>
 #include <data/music.h>
 #include <data/world.h>
 
@@ -136,6 +137,16 @@ static void setup_game_hud(void)
     update_hud_sprites(0, 0);
 }
 
+ARM_FUNC NO_INLINE
+static void se_copy_ofs(SCR_ENTRY *restrict dst_se,
+                        const SCR_ENTRY *restrict src_se, size_t count,
+                        uint ofs)
+{
+    // maybe write this in arm assembly so it can use ldm/stm?
+    for (; count; --count)
+        *(dst_se++) = *(src_se++) + ofs;
+}
+
 enum
 {
     VRAM_BANK1_TILESET_AUTOMAP,
@@ -150,13 +161,30 @@ static void vram_bank1_load(int id)
         // load automap tileset
         memcpy32(&tile_mem[1][0], automap_tiles_gfxTiles,
                  automap_tiles_gfxTilesLen / 4);
-    
-    } else if (id == VRAM_BANK1_TILESET_SKY) {
-        // copy sky_bg1 to bg 2 and 3. each half of the image contains 1024
-        // tiles.
-        memcpy32(&se_mem[GFX_BG2_INDEX], sky_bg1_gfxMap, 1024 * 2 / 4);
-        memcpy32(&se_mem[GFX_BG3_INDEX], sky_bg1_gfxMap + 1024, 1024 * 2 / 4);
+        
+        gfx_unload_map(2);
+    }
+    else if (id == VRAM_BANK1_TILESET_SKY)
+    {
+        uint sky_bg2_gfxTilesOfs = sky_bg1_gfxTilesLen / sizeof(TILE);
+        
+        // copy tiles
         memcpy32(&tile_mem[1][0], sky_bg1_gfxTiles, sky_bg1_gfxTilesLen / 4);
+        memcpy32(&tile_mem[1][sky_bg2_gfxTilesOfs], sky_bg2_gfxTiles,
+                 sky_bg2_gfxTilesLen / 4);
+        
+        // load sky_bg1 map
+        gfx_load_map(2, &(gfx_map_s)
+        {
+            .width = 48,
+            .height = 32,
+            .gfx_format = GFX_MAP_FORMAT_GBA,
+            .data = sky_bg1_gfxMap,
+        });
+
+        // load sky_bg2 map
+        se_copy_ofs(&se_mem[GFX_BG3_INDEX][0], sky_bg2_gfxMap,
+                    sky_bg2_gfxMapLen / sizeof(SCR_ENTRY), sky_bg2_gfxTilesOfs);
     }
 }
 
