@@ -19,6 +19,11 @@
 #include "math_util.h"
 #include "options_menu.h"
 
+//------------------------------------------------------------------------------
+// declarations
+//------------------------------------------------------------------------------
+#pragma region declarations
+
 #ifdef DEVDEBUG
 #define SPAWN_ROOM_INDEX 0
 #else
@@ -46,6 +51,13 @@ enum
     SUBSTATE_MAP,
 };
 
+enum
+{
+    VRAM_BANK1_TILESET_NONE,
+    VRAM_BANK1_TILESET_AUTOMAP,
+    VRAM_BANK1_TILESET_SKY,
+};
+
 struct scene_state
 {
     uint last_player_ammo;
@@ -61,84 +73,29 @@ struct scene_state
     menu_s pause_menu;
 } static state EWRAM_BSS;
 
-static void int_to_str(int n, char *buf)
-{
-    if (n < 0)
-    {
-        *(buf++) = '-';
-        n = -n;
-    }
-
-    // buf: start
-    // ch: end
-    char *ch = buf;
-    do
-    {
-        *(ch++) = (n % 10) + '0';
-    }
-    while ((n /= 10) != 0);
-    *ch = '\0';
-
-    // reverse output
-    do
-    {
-        char tmp = *buf;
-        *(buf++) = *(--ch);
-        *ch = tmp;
-    }
-    while (ch > buf);
-}
-
-static void update_game_bg_ctl(bool force);
-
 // DURING GAMEPLAY OR WHEN PAUSED:
 //   (0-7)  ->(0-7): pause menu
 //   (10-11)->(18->19): HUD
 // DURING DIALOGUE:
 //   everything: dialogue
 
-static void clear_game_hud(void)
-{
-    // gfx_text_bmap_fill_rect(0, HUD_Y_ORIGIN, SCREEN_WIDTH, 10, 1, 0);
-    u32 bg1[8] = {0x00000000, 0x00000000, 0x00000000, 0x00000000,
-                 0x00000000, 0x00000000, 0x11111111, 0x11111111};
-    u32 bg2[8] = {0x11111111, 0x11111111, 0x11111111, 0x11111111,
-                    0x11111111, 0x11111111, 0x11111111, 0x11111111};
-    gfx_text_bmap_fill(0, HUD_ROW_ORIGIN + 0, GFX_TEXT_BMP_COLS, 1, bg1);
-    gfx_text_bmap_fill(0, HUD_ROW_ORIGIN + 1, GFX_TEXT_BMP_COLS, 1, bg2);
-}
+static void pause_game(void);
+static void unpause_game(void);
 
-static void update_hud_sprites(uint face_frame, uint mode_frame)
-{
-    gfx_sprdb_s sprdb = gfx_get_sprdb((const gfx_root_header_s *)game_sprdb_bin);
-    gfx_draw_sprite_state_s state = (gfx_draw_sprite_state_s)
-    {
-        .sprdb = &sprdb,
-        .dst_obj = &gfx_oam_buffer[HUD_SPRITE_BASE],
-        .dst_obj_count = HUD_SPRITE_COUNT,
-        .a1 = ATTR2_PRIO(0),
-        .a2 = ATTR2_PALBANK(GFX_OBJPAL_MUL),
-    };
+#pragma endregion declarations
 
-    const int ypos = SCREEN_HEIGHT - 10;
-    gfx_draw_sprite(&state, SPRID_GAME_UI_ICONS, 0, 0, ypos);
-    gfx_draw_sprite(&state, SPRID_GAME_UI_ICONS, 5 + face_frame, 48, ypos);
-    gfx_draw_sprite(&state, SPRID_GAME_UI_ICONS, 3 + mode_frame, 62, ypos);
 
-    gfx_draw_sprite(&state, SPRID_GAME_UI_ICONS, 1, 240 - 48, ypos);
-    gfx_draw_sprite(&state, SPRID_GAME_UI_ICONS, 2, 240 - 24, ypos);
-}
 
-static void setup_game_hud(void)
-{
-    // set up pause menu display
-    gfx_text_bmap_dst_assign(0, 10, 0, GFX_TEXTPAL_NORMAL);
-    // set up HUD display
-    gfx_text_bmap_dst_assign(18, 2, HUD_ROW_ORIGIN, GFX_TEXTPAL_MUL);
 
-    clear_game_hud();
-    update_hud_sprites(0, 0);
-}
+
+
+
+
+
+//------------------------------------------------------------------------------
+// vram control
+//------------------------------------------------------------------------------
+#pragma region vram control
 
 ARM_FUNC NO_INLINE
 static void se_copy_ofs(SCR_ENTRY *restrict dst_se,
@@ -150,12 +107,6 @@ static void se_copy_ofs(SCR_ENTRY *restrict dst_se,
         *(dst_se++) = *(src_se++) + ofs;
 }
 
-enum
-{
-    VRAM_BANK1_TILESET_NONE,
-    VRAM_BANK1_TILESET_AUTOMAP,
-    VRAM_BANK1_TILESET_SKY,
-};
 // function to load either the sky bg tileset or the automap tileset into
 // tile_mem bank 1
 static void vram_bank1_load(int id)
@@ -205,10 +156,176 @@ static void vram_bank1_load(int id)
     }
 }
 
-// TODO: maybe reorganize the code so these forward declarations are not
-// necessary
-static void unpause_game(void);
-static void update_hud(bool force_dirty);
+static void update_game_bg_ctl(bool force)
+{
+    uint bg_id = g_game.room->map->bg_id;
+
+    bool enable_bg = bg_id == 1;
+
+    gfx_ctl.bg[0].enabled = true;
+    gfx_ctl.bg[1].enabled = true;
+    gfx_ctl.bg[2].enabled = enable_bg;
+    gfx_ctl.bg[3].enabled = enable_bg;
+    gfx_ctl.enable_obj = true;
+
+    if (force || bg_id != state.last_bg_id)
+    {
+        state.last_bg_id = bg_id;
+
+        if (bg_id == 1)
+            vram_bank1_load(VRAM_BANK1_TILESET_SKY);
+        else
+            vram_bank1_load(VRAM_BANK1_TILESET_NONE);
+    }
+}
+
+#pragma endregion vram control
+
+
+
+
+
+
+
+
+
+//------------------------------------------------------------------------------
+// hud
+//------------------------------------------------------------------------------
+#pragma region hud
+
+static void int_to_str(int n, char *buf)
+{
+    if (n < 0)
+    {
+        *(buf++) = '-';
+        n = -n;
+    }
+
+    // buf: start
+    // ch: end
+    char *ch = buf;
+    do
+    {
+        *(ch++) = (n % 10) + '0';
+    }
+    while ((n /= 10) != 0);
+    *ch = '\0';
+
+    // reverse output
+    do
+    {
+        char tmp = *buf;
+        *(buf++) = *(--ch);
+        *ch = tmp;
+    }
+    while (ch > buf);
+}
+
+static void clear_game_hud(void)
+{
+    // gfx_text_bmap_fill_rect(0, HUD_Y_ORIGIN, SCREEN_WIDTH, 10, 1, 0);
+    u32 bg1[8] = {0x00000000, 0x00000000, 0x00000000, 0x00000000,
+                 0x00000000, 0x00000000, 0x11111111, 0x11111111};
+    u32 bg2[8] = {0x11111111, 0x11111111, 0x11111111, 0x11111111,
+                    0x11111111, 0x11111111, 0x11111111, 0x11111111};
+    gfx_text_bmap_fill(0, HUD_ROW_ORIGIN + 0, GFX_TEXT_BMP_COLS, 1, bg1);
+    gfx_text_bmap_fill(0, HUD_ROW_ORIGIN + 1, GFX_TEXT_BMP_COLS, 1, bg2);
+}
+
+static void update_hud_sprites(uint face_frame, uint mode_frame)
+{
+    gfx_sprdb_s sprdb = gfx_get_sprdb((const gfx_root_header_s *)game_sprdb_bin);
+    gfx_draw_sprite_state_s state = (gfx_draw_sprite_state_s)
+    {
+        .sprdb = &sprdb,
+        .dst_obj = &gfx_oam_buffer[HUD_SPRITE_BASE],
+        .dst_obj_count = HUD_SPRITE_COUNT,
+        .a1 = ATTR2_PRIO(0),
+        .a2 = ATTR2_PALBANK(GFX_OBJPAL_MUL),
+    };
+
+    const int ypos = SCREEN_HEIGHT - 10;
+    gfx_draw_sprite(&state, SPRID_GAME_UI_ICONS, 0, 0, ypos);
+    gfx_draw_sprite(&state, SPRID_GAME_UI_ICONS, 5 + face_frame, 48, ypos);
+    gfx_draw_sprite(&state, SPRID_GAME_UI_ICONS, 3 + mode_frame, 62, ypos);
+
+    gfx_draw_sprite(&state, SPRID_GAME_UI_ICONS, 1, 240 - 48, ypos);
+    gfx_draw_sprite(&state, SPRID_GAME_UI_ICONS, 2, 240 - 24, ypos);
+}
+
+static void setup_game_hud(void)
+{
+    // set up pause menu display
+    gfx_text_bmap_dst_assign(0, 10, 0, GFX_TEXTPAL_NORMAL);
+    // set up HUD display
+    gfx_text_bmap_dst_assign(18, 2, HUD_ROW_ORIGIN, GFX_TEXTPAL_MUL);
+
+    clear_game_hud();
+    update_hud_sprites(0, 0);
+}
+
+static void update_hud(bool force_dirty)
+{
+    char buf[8];
+
+    if (force_dirty || g_game.player_ammo != state.last_player_ammo)
+    {
+        state.last_player_ammo = g_game.player_ammo;
+        
+        int_to_str(g_game.player_ammo, buf);
+        gfx_text_bmap_print(12, HUD_Y_ORIGIN, "\x7F\x7F\x7F", TEXT_COLOR_BLACK);
+        gfx_text_bmap_print(12, HUD_Y_ORIGIN, buf, TEXT_COLOR_WHITE);
+    }
+
+    if (force_dirty || g_game.collected_rorbs != state.last_rorbs)
+    {
+        state.last_rorbs = g_game.collected_rorbs;
+        int_to_str(g_game.collected_rorbs, buf);
+
+        gfx_text_bmap_print(240 - 36, HUD_Y_ORIGIN, "\x7F", TEXT_COLOR_BLACK);
+        gfx_text_bmap_print(240 - 36, HUD_Y_ORIGIN, buf, TEXT_COLOR_WHITE);
+    }
+
+    if (force_dirty || g_game.collected_borbs != state.last_borbs)
+    {
+        state.last_borbs = g_game.collected_borbs;
+        int_to_str(g_game.collected_borbs, buf);
+
+        gfx_text_bmap_print(240 - 12, HUD_Y_ORIGIN, "\x7F", TEXT_COLOR_BLACK);
+        gfx_text_bmap_print(240 - 12, HUD_Y_ORIGIN, buf, TEXT_COLOR_WHITE);
+    }
+
+    uint face_frame = 0;
+    if (g_game.player_spit_mode == PLAYER_SPIT_MODE_BULLET)
+        face_frame = 1;
+
+    if (state.blink_timer <= 4)
+        face_frame = 2;
+
+    if (--state.blink_timer == 0)
+        state.blink_timer = 150;
+
+    if (g_game.player_is_dead)
+        face_frame = 3;
+    
+    update_hud_sprites(face_frame, g_game.player_spit_mode);
+}
+
+#pragma endregion hud
+
+
+
+
+
+
+
+
+
+//------------------------------------------------------------------------------
+// automap
+//------------------------------------------------------------------------------
+#pragma region automap
 
 static void open_map(void)
 {
@@ -315,30 +432,25 @@ static void update_map(void)
     automap_update_view(&state.automap, &sprdraw_state);
 }
 
+#pragma endregion automap
+
+
+
+
+
+
+
+
+
+//------------------------------------------------------------------------------
+// pause menu
+//------------------------------------------------------------------------------
+#pragma region pause menu
+
 static void open_pause_menu(void)
 {
     // background fill
     gfx_text_bmap_fill_rect(2, 2, 98, 74, 1, 0);
-    // u32 bg_t[8] =  {0x00000000, 0x00000000, 0x11111111, 0x11111111,
-    //                 0x11111111, 0x11111111, 0x11111111, 0x11111111};
-    // u32 bg_r[8] =  {0x00001111, 0x00001111, 0x00001111, 0x00001111,
-    //                 0x00001111, 0x00001111, 0x00001111, 0x00001111};
-    // u32 bg_tr[8] = {0x00000000, 0x00000000, 0x00001111, 0x00001111,
-    //                 0x00001111, 0x00001111, 0x00001111, 0x00001111};
-    // u32 bg_l[8] =  {0x11111100, 0x11111100, 0x11111100, 0x11111100,
-    //                 0x11111100, 0x11111100, 0x11111100, 0x11111100};
-    // u32 bg_tl[8] = {0x00000000, 0x00000000, 0x11111100, 0x11111100,
-    //                 0x11111100, 0x11111100, 0x11111100, 0x11111100};
-    // u32 bg_f[8] =  {0x11111111, 0x11111111, 0x11111111, 0x11111111,
-    //                 0x11111111, 0x11111111, 0x11111111, 0x11111111};
-    // gfx_text_bmap_fill(1, 1, 11, 7, bg_f);
-    // gfx_text_bmap_fill(0, 0, 12, 1, bg_t);
-    // gfx_text_bmap_fill(12, 0, 1, 1, bg_tr);
-    // gfx_text_bmap_fill(12, 1, 1, 7, bg_r);
-    // gfx_text_bmap_fill(0, 1, 1, 7, bg_l);
-    // gfx_text_bmap_fill(0, 0, 1, 1, bg_tl);
-
-    // print text
     gfx_text_bmap_print(4, 0 + 4, "PAUSED", TEXT_COLOR_BLUE);
     menu_show(&state.pause_menu);
 }
@@ -420,75 +532,20 @@ static void update_pause_menu(void)
     }
 }
 
-static void update_hud(bool force_dirty)
-{
-    char buf[8];
+#pragma endregion pause menu
 
-    if (force_dirty || g_game.player_ammo != state.last_player_ammo)
-    {
-        state.last_player_ammo = g_game.player_ammo;
-        
-        int_to_str(g_game.player_ammo, buf);
-        gfx_text_bmap_print(12, HUD_Y_ORIGIN, "\x7F\x7F\x7F", TEXT_COLOR_BLACK);
-        gfx_text_bmap_print(12, HUD_Y_ORIGIN, buf, TEXT_COLOR_WHITE);
-    }
 
-    if (force_dirty || g_game.collected_rorbs != state.last_rorbs)
-    {
-        state.last_rorbs = g_game.collected_rorbs;
-        int_to_str(g_game.collected_rorbs, buf);
 
-        gfx_text_bmap_print(240 - 36, HUD_Y_ORIGIN, "\x7F", TEXT_COLOR_BLACK);
-        gfx_text_bmap_print(240 - 36, HUD_Y_ORIGIN, buf, TEXT_COLOR_WHITE);
-    }
 
-    if (force_dirty || g_game.collected_borbs != state.last_borbs)
-    {
-        state.last_borbs = g_game.collected_borbs;
-        int_to_str(g_game.collected_borbs, buf);
 
-        gfx_text_bmap_print(240 - 12, HUD_Y_ORIGIN, "\x7F", TEXT_COLOR_BLACK);
-        gfx_text_bmap_print(240 - 12, HUD_Y_ORIGIN, buf, TEXT_COLOR_WHITE);
-    }
 
-    uint face_frame = 0;
-    if (g_game.player_spit_mode == PLAYER_SPIT_MODE_BULLET)
-        face_frame = 1;
 
-    if (state.blink_timer <= 4)
-        face_frame = 2;
 
-    if (--state.blink_timer == 0)
-        state.blink_timer = 150;
 
-    if (g_game.player_is_dead)
-        face_frame = 3;
-    
-    update_hud_sprites(face_frame, g_game.player_spit_mode);
-}
-
-static void update_game_bg_ctl(bool force)
-{
-    uint bg_id = g_game.room->map->bg_id;
-
-    bool enable_bg = bg_id == 1;
-
-    gfx_ctl.bg[0].enabled = true;
-    gfx_ctl.bg[1].enabled = true;
-    gfx_ctl.bg[2].enabled = enable_bg;
-    gfx_ctl.bg[3].enabled = enable_bg;
-    gfx_ctl.enable_obj = true;
-
-    if (force || bg_id != state.last_bg_id)
-    {
-        state.last_bg_id = bg_id;
-
-        if (bg_id == 1)
-            vram_bank1_load(VRAM_BANK1_TILESET_SKY);
-        else
-            vram_bank1_load(VRAM_BANK1_TILESET_NONE);
-    }
-}
+//------------------------------------------------------------------------------
+// lifecycle
+//------------------------------------------------------------------------------
+#pragma region lifecycle
 
 static void scene_load(uintptr_t data)
 {
@@ -630,3 +687,5 @@ const scene_desc_s scene_desc_game = {
     .unload = scene_unload,
     .frame = scene_frame
 };
+
+#pragma endregion lifecycle
