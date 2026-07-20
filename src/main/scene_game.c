@@ -52,6 +52,7 @@ struct scene_state
     uint last_rorbs;
     uint last_borbs;
     uint blink_timer;
+    uint last_bg_id;
     automap_s automap;
     FIXED map_sx;
     FIXED map_sy;
@@ -87,6 +88,8 @@ static void int_to_str(int n, char *buf)
     }
     while (ch > buf);
 }
+
+static void update_game_bg_ctl(bool force);
 
 // DURING GAMEPLAY OR WHEN PAUSED:
 //   (0-7)  ->(0-7): pause menu
@@ -149,6 +152,7 @@ static void se_copy_ofs(SCR_ENTRY *restrict dst_se,
 
 enum
 {
+    VRAM_BANK1_TILESET_NONE,
     VRAM_BANK1_TILESET_AUTOMAP,
     VRAM_BANK1_TILESET_SKY,
 };
@@ -156,15 +160,20 @@ enum
 // tile_mem bank 1
 static void vram_bank1_load(int id)
 {
-    if (id == VRAM_BANK1_TILESET_AUTOMAP)
+    LOG_DBG("vram_bank1_load: %i", id);
+
+    switch (id)
+    {
+    case VRAM_BANK1_TILESET_AUTOMAP:
     {
         // load automap tileset
         memcpy32(&tile_mem[1][0], automap_tiles_gfxTiles,
-                 automap_tiles_gfxTilesLen / 4);
-        
+                 automap_tiles_gfxTilesLen / 4);    
         gfx_unload_map(2);
+        break;
     }
-    else if (id == VRAM_BANK1_TILESET_SKY)
+
+    case VRAM_BANK1_TILESET_SKY:
     {
         uint sky_bg2_gfxTilesOfs = sky_bg1_gfxTilesLen / sizeof(TILE);
         
@@ -185,6 +194,14 @@ static void vram_bank1_load(int id)
         // load sky_bg2 map
         se_copy_ofs(&se_mem[GFX_BG3_INDEX][0], sky_bg2_gfxMap,
                     sky_bg2_gfxMapLen / sizeof(SCR_ENTRY), sky_bg2_gfxTilesOfs);
+        break;
+    }
+
+    case VRAM_BANK1_TILESET_NONE:
+    {
+        gfx_unload_map(2);
+        break;
+    }
     }
 }
 
@@ -250,8 +267,8 @@ static void close_map(void)
     gfx_ctl.bg[1].char_block = 0;
     // gfx_ctl.bg[1].bpp = GFX_BG_8BPP;
     gfx_load_map(1, &g_game.gfx_map);
-
-    vram_bank1_load(VRAM_BANK1_TILESET_SKY);
+    
+    update_game_bg_ctl(true);
 
     // reset pause menu display
     gfx_text_bmap_dst_assign(0, 10, 0, GFX_TEXTPAL_NORMAL);
@@ -450,14 +467,27 @@ static void update_hud(bool force_dirty)
     update_hud_sprites(face_frame, g_game.player_spit_mode);
 }
 
-static void update_game_bg_ctl(void)
+static void update_game_bg_ctl(bool force)
 {
-    bool enable_bg = g_game.room->map->bg_id == 1;
+    uint bg_id = g_game.room->map->bg_id;
+
+    bool enable_bg = bg_id == 1;
+
     gfx_ctl.bg[0].enabled = true;
     gfx_ctl.bg[1].enabled = true;
     gfx_ctl.bg[2].enabled = enable_bg;
     gfx_ctl.bg[3].enabled = enable_bg;
     gfx_ctl.enable_obj = true;
+
+    if (force || bg_id != state.last_bg_id)
+    {
+        state.last_bg_id = bg_id;
+
+        if (bg_id == 1)
+            vram_bank1_load(VRAM_BANK1_TILESET_SKY);
+        else
+            vram_bank1_load(VRAM_BANK1_TILESET_NONE);
+    }
 }
 
 static void scene_load(uintptr_t data)
@@ -468,6 +498,7 @@ static void scene_load(uintptr_t data)
         .last_rorbs = UINT_MAX,
         .last_borbs = UINT_MAX,
         .blink_timer = 150,
+        .last_bg_id = (uint)-1,
         .substate = SUBSTATE_NORMAL,
         .pause_menu = (menu_s)
         {
@@ -509,8 +540,6 @@ static void scene_load(uintptr_t data)
     gfx_ctl.bg[1].offset_y = 0;
     gfx_ctl.bg[1].enabled = true;
 
-    vram_bank1_load(VRAM_BANK1_TILESET_SKY);
-
     // load game tileset
     memset(&tile_mem[0][0] + GFX_CHAR_GAME_TILESET, 0, sizeof(TILE));
     memcpy32(&tile_mem[0][0] + GFX_CHAR_GAME_TILESET + 1,
@@ -530,6 +559,7 @@ static void scene_unload(void)
     game_deinit();
     automap_deinit();
     gfx_unload_map(1);
+    gfx_unload_map(2);
     gfx_ctl.bg[1].offset_x = 0;
     gfx_ctl.bg[1].offset_y = 0;
     gfx_ctl.bg[2].enabled = false;
@@ -559,7 +589,7 @@ static void scene_frame(void)
     {
     case SUBSTATE_NORMAL:
     {
-        update_game_bg_ctl();
+        update_game_bg_ctl(false);
         game_update();
 
         const entity_s *player = &g_game.entities[0];
@@ -573,7 +603,7 @@ static void scene_frame(void)
     }
     
     case SUBSTATE_PAUSED:
-        update_game_bg_ctl();
+        update_game_bg_ctl(false);
         update_pause_menu();
         break;
     
