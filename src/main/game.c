@@ -52,9 +52,9 @@ typedef struct game_state
 }
 game_state_s;
 
-game_s g_game;
+EWRAM_BSS game_s g_game;
 EWRAM_BSS game_state_s game_saved_state;
-EWRAM_BSS static u8 game_room_collision[GAME_COLLISION_MAP_SIZE];
+static u8 game_room_collision[GAME_COLLISION_MAP_SIZE];
 
 static uint render_object_count = 0;
 static render_obj_s render_objects[MAX_RENDER_OBJS];
@@ -256,46 +256,49 @@ static void update_entities(void)
             entity->behavior->update(entity);
         }
 
-        if (entity->flags & ENTITY_FLAG_ACTOR)
+        // "cached" entity
+        entity_s v_ent = *entity;
+
+        if (v_ent.flags & ENTITY_FLAG_ACTOR)
         {
-            entity->actor.flags &= ~ACTOR_FLAG_DID_JUMP;
-            const int actor_flags = (int) entity->actor.flags;
-            int move_x = (int) entity->actor.move_x;
+            v_ent.actor.flags &= ~ACTOR_FLAG_DID_JUMP;
+            const int actor_flags = (int) v_ent.actor.flags;
+            int move_x = (int) v_ent.actor.move_x;
 
             if (!(actor_flags & ACTOR_FLAG_NO_VEL))
             {
                 if (move_x != 0)
                 {
-                    entity->actor.face_dir = (s8) sgn(move_x);
-                    entity->vel.x += fxmul(entity->actor.move_accel,
-                                        int2fx(move_x));
+                    v_ent.actor.face_dir = (s8) sgn(move_x);
+                    v_ent.vel.x += fxmul(v_ent.actor.move_accel,
+                                         int2fx(move_x));
                     
-                    if (ABS(entity->vel.x) > entity->actor.move_speed)
+                    if (ABS(v_ent.vel.x) > v_ent.actor.move_speed)
                     {
-                        entity->vel.x = fxmul(entity->actor.move_speed,
-                                            int2fx(SGN(entity->vel.x)));
+                        v_ent.vel.x = fxmul(v_ent.actor.move_speed,
+                                            int2fx(SGN(v_ent.vel.x)));
                     }
                 }
                 else
                 {
-                    int sign = SGN3(entity->vel.x);
-                    entity->vel.x += fxmul(entity->actor.move_accel,
-                                        int2fx(-sign));
+                    int sign = SGN3(v_ent.vel.x);
+                    v_ent.vel.x += fxmul(v_ent.actor.move_accel,
+                                         int2fx(-sign));
                     
-                    if (SGN3(entity->vel.x) != sign)
-                        entity->vel.x = 0;
+                    if (SGN3(v_ent.vel.x) != sign)
+                        v_ent.vel.x = 0;
                 }
             }
 
-            uint jump_trigger = (uint) entity->actor.jump_trigger;
+            uint jump_trigger = (uint) v_ent.actor.jump_trigger;
             if (jump_trigger > 0)
             {
                 if (actor_flags & ACTOR_FLAG_GROUNDED &&
                     actor_flags & ACTOR_FLAG_CAN_MOVE)
                 {
-                    entity->vel.y = -entity->actor.jump_velocity;
+                    v_ent.vel.y = -v_ent.actor.jump_velocity;
                     jump_trigger = 0;
-                    entity->actor.flags |= ACTOR_FLAG_DID_JUMP;
+                    v_ent.actor.flags |= ACTOR_FLAG_DID_JUMP;
                 }
                 else
                 {
@@ -303,33 +306,33 @@ static void update_entities(void)
                 }
             }
 
-            entity->actor.jump_trigger = (u8) jump_trigger;
+            v_ent.actor.jump_trigger = (u8) jump_trigger;
         }
 
-        if (entity->flags & ENTITY_FLAG_DAMPING)
+        if (v_ent.flags & ENTITY_FLAG_DAMPING)
         {
-            FIXED vx = entity->vel.x;
-            entity->vel.x = fxmul(vx, entity->damp);
+            FIXED vx = v_ent.vel.x;
+            v_ent.vel.x = fxmul(vx, v_ent.damp);
 
             // integer rounding is towards negative infinity, so add +1 when
             // negative to make it round to zero. otherwise it will approach
             // some negative number rather than zero.
-            if (entity->vel.x < 0) ++entity->vel.x;
+            if (v_ent.vel.x < 0) ++v_ent.vel.x;
         }
 
-        if (entity->flags & ENTITY_FLAG_MOVING)
+        if (v_ent.flags & ENTITY_FLAG_MOVING)
         {
-            FIXED g = fxmul(WORLD_GRAVITY, entity->gmult);
-            entity->vel.y += g;
+            FIXED g = fxmul(WORLD_GRAVITY, v_ent.gmult);
+            v_ent.vel.y += g;
 
             // water buoyancy
-            if (entity->flags & ENTITY_FLAG_COLLIDE)
+            if (v_ent.flags & ENTITY_FLAG_COLLIDE)
             {
-                int cflags = entity->col.flags;
+                int cflags = v_ent.col.flags;
                 cflags &= ~COL_FLAG_IN_WATER;
 
-                FIXED cx = entity->pos.x + int2fx(entity->col.w) / 2;
-                FIXED cy = entity->pos.y + int2fx(entity->col.h) / 2;
+                FIXED cx = v_ent.pos.x + int2fx(v_ent.col.w) / 2;
+                FIXED cy = v_ent.pos.y + int2fx(v_ent.col.h) / 2;
                 int tx = cx / (WORLD_TILE_SIZE * FIX_ONE);
                 int ty = cy / (WORLD_TILE_SIZE * FIX_ONE);
 
@@ -339,30 +342,32 @@ static void update_entities(void)
                     int ty2 = (cy - int2fx(1)) / (WORLD_TILE_SIZE * FIX_ONE);
 
                     if (game_get_col_clamped(tx, ty2) != 2 &&
-                        abs(entity->vel.y) < TO_FIXED(0.125))
+                        abs(v_ent.vel.y) < TO_FIXED(0.125))
                     {
-                        entity->vel.y = 0;
+                        v_ent.vel.y = 0;
                     }
                     else
                     {
-                        entity->vel.y = fxmul(entity->vel.y, TO_FIXED(0.8));
-                        entity->vel.y -= g + TO_FIXED(0.09375) / entity->mass;
+                        v_ent.vel.y = fxmul(v_ent.vel.y, TO_FIXED(0.8));
+                        v_ent.vel.y -= g + TO_FIXED(0.09375) / v_ent.mass;
                     }
                 }
 
-                entity->col.flags = cflags;
+                v_ent.col.flags = cflags;
             }
 
-            if (entity->vel.y > terminal_vel)
-                entity->vel.y = terminal_vel;
+            if (v_ent.vel.y > terminal_vel)
+                v_ent.vel.y = terminal_vel;
 
             // if this entity can collide, movement is done in update-physics
-            if (!(entity->flags & ENTITY_FLAG_COLLIDE))
+            if (!(v_ent.flags & ENTITY_FLAG_COLLIDE))
             {
-                entity->pos.x += entity->vel.x;
-                entity->pos.y += entity->vel.y;
+                v_ent.pos.x += v_ent.vel.x;
+                v_ent.pos.y += v_ent.vel.y;
             }
         }
+
+        *entity = v_ent;
     }
 }
 
