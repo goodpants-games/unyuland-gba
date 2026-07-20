@@ -29,7 +29,7 @@ typedef struct automap
     FIXED sx, sy;
     const world_room_s *cur_room;
 
-    map_header_s scrmap_header;
+    gfx_map_s scrmap_header;
     u16 scrmap[AUTOMAP_HEIGHT][AUTOMAP_WIDTH];
     bool visited[AUTOMAP_INNER_HEIGHT][AUTOMAP_INNER_WIDTH];
 }

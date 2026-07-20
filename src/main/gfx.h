@@ -26,7 +26,7 @@
 #include <tonc_core.h>
 #include <platutil.h>
 #include <log.h>
-#include "map_data.h"
+#include <stddef.h>
 
 #define SCRW_T16 (SCREEN_WIDTH / 16)
 #define SCRH_T16 (SCREEN_HEIGHT / 16)
@@ -152,6 +152,33 @@ typedef struct gfx_draw_sprite_state
 }
 gfx_draw_sprite_state_s;
 
+typedef void (*gfx_map_write_f)(uint map_entry, u16 *dest);
+
+typedef enum gfx_map_format
+{
+    GFX_MAP_FORMAT_GBA,      // hardware GBA screen-entry format
+    GFX_MAP_FORMAT_MAPC16,   // 16x16 tile screen-entry format used by mapc
+    GFX_MAP_FORMAT_CUSTOM16, // custom 16x16 tile format
+} gfx_map_format_e;
+
+typedef enum gfx_map_border
+{
+    GFX_MAP_BORDER_CLAMP,
+    GFX_MAP_BORDER_WRAP,
+} gfx_map_border_e;
+
+typedef struct gfx_map
+{
+    u16 width;
+    u16 height;
+    u8  gfx_format;
+    u8  border_x;
+    u8  border_y;
+
+    gfx_map_write_f custom_write;
+    const void *data;
+} gfx_map_s;
+
 typedef struct gfx_bg
 {
     bool enabled;
@@ -164,7 +191,7 @@ typedef struct gfx_bg
     s16 offset_x;
     s16 offset_y;
 
-    const map_header_s *map;
+    const gfx_map_s *map;
     uint map_width;
     uint map_height;
 }
@@ -220,17 +247,14 @@ extern u16 gfx_palette[16];
 void gfx_init(void);
 void gfx_new_frame(void);
 void gfx_commit(void);
-void gfx_load_map(uint bg_idx, const map_header_s *map);
+void gfx_load_map(uint bg_idx, const gfx_map_s *map);
 void gfx_mark_scroll_dirty(uint bg_idx);
-INLINE void gfx_unload_map(uint bg_idx)
+static inline void gfx_unload_map(uint bg_idx)
 {
     gfx_ctl.bg[bg_idx].map = NULL;
     gfx_ctl.bg[bg_idx].map_width = 0;
     gfx_ctl.bg[bg_idx].map_height = 0;
 }
-
-uint gfx_alloc_scrblock_writer(map_write_scrblock_f func);
-void gfx_free_scrblock_writer(uint id);
 
 void* gfx_alloc_cpybuf(size_t size);
 bool gfx_queue_memcpy(void *dst, const void *src, size_t size);

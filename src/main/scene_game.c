@@ -221,7 +221,7 @@ static void close_map(void)
 
     gfx_ctl.bg[1].char_block = 0;
     // gfx_ctl.bg[1].bpp = GFX_BG_8BPP;
-    gfx_load_map(1, g_game.room->map);
+    gfx_load_map(1, &g_game.gfx_map);
 
     vram_bank1_load(VRAM_BANK1_TILESET_SKY);
 
@@ -434,10 +434,6 @@ static void update_game_bg_ctl(void)
 
 static void scene_load(uintptr_t data)
 {
-    gfx_ctl.bg[1].bpp = GFX_BG_4BPP;
-    gfx_ctl.bg[1].char_block = 0;
-    gfx_ctl.bg[1].enabled = false; // will be enabled on subsequent frame
-
     state = (struct scene_state)
     {
         .last_player_ammo = UINT_MAX,
@@ -455,13 +451,10 @@ static void scene_load(uintptr_t data)
         },
     };
 
-    automap_init(&state.automap);
-
-    const world_room_s *room = &world_rooms[SPAWN_ROOM_INDEX];
-    gfx_load_map(1, room->map);
-    gfx_ctl.bg[1].offset_x = 0;
-    gfx_ctl.bg[1].offset_y = 0;
-    game_init();
+    // disable display while game is loading
+    gfx_ctl.bg[1].bpp = GFX_BG_4BPP;
+    gfx_ctl.bg[1].char_block = 0;
+    gfx_ctl.bg[1].enabled = false;
 
     gfx_ctl.bg[2].bpp = GFX_BG_4BPP;
     gfx_ctl.bg[2].char_block = 1;
@@ -471,11 +464,22 @@ static void scene_load(uintptr_t data)
     gfx_ctl.bg[3].char_block = 1;
     gfx_ctl.bg[3].enabled = false;
 
+    gfx_commit();
+
+    game_init();
+    automap_init(&state.automap);
+
+    const world_room_s *room = &world_rooms[SPAWN_ROOM_INDEX];
+
     game_load_room(room);
     game_reset_player_pos();
     game_save_state(); // fix respawn function before first checkpoint
 
-    gfx_commit();
+    // load map into vram
+    gfx_load_map(1, &g_game.gfx_map);
+    gfx_ctl.bg[1].offset_x = 0;
+    gfx_ctl.bg[1].offset_y = 0;
+    gfx_ctl.bg[1].enabled = true;
 
     vram_bank1_load(VRAM_BANK1_TILESET_SKY);
 
@@ -488,7 +492,6 @@ static void scene_load(uintptr_t data)
     memcpy32(tile_mem_obj[0][0].data, game_sprdb_gfxTiles,
              game_sprdb_gfxTilesLen / 4);
     
-    gfx_ctl.bg[1].enabled = true;
     setup_game_hud();
 
     mplay_set_volume(MUSIC_VOLUME);

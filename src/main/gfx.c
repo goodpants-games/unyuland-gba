@@ -283,18 +283,17 @@ typedef struct bg_scroll_data
 } bg_scroll_data_s;
 
 static EWRAM_BSS bg_scroll_data_s bg_scroll_data[4];
-static EWRAM_BSS map_write_scrblock_f scrblock_writers[MAX_SCRBLOCK_WRITER_COUNT];
 
-static inline int calc_srcpos(int pos, int size, map_border_e border_mode)
+static inline int calc_srcpos(int pos, int size, gfx_map_border_e border_mode)
 {
     switch (border_mode)
     {
-    case MAP_BORDER_CLAMP:
+    case GFX_MAP_BORDER_CLAMP:
         if (pos < 0) pos = 0;
         else if (pos >= size) pos = size - 1;
         break;
 
-    case MAP_BORDER_WRAP:
+    case GFX_MAP_BORDER_WRAP:
         while (pos < 0) pos += size;
         while (pos >= size) pos -= size;
         break;
@@ -304,7 +303,7 @@ static inline int calc_srcpos(int pos, int size, map_border_e border_mode)
 }
 
 static void update_map_scroll_t(uint bg_idx, uint size_shift, uint dst_shift,
-                                map_write_scrblock_f write_scr_block)
+                                gfx_map_write_f write_scr_block)
 {
     static const uint gfx_bg_indices[4] = {
         GFX_BG0_INDEX, GFX_BG1_INDEX, GFX_BG2_INDEX, GFX_BG3_INDEX
@@ -313,7 +312,7 @@ static void update_map_scroll_t(uint bg_idx, uint size_shift, uint dst_shift,
     gfx_bg_s *bg = gfx_ctl.bg + bg_idx;
     bg_scroll_data_s *scroll_data = bg_scroll_data + bg_idx;
 
-    const u16 *map_data = map_graphics_data(bg->map);
+    const u16 *map_data = bg->map->data;
     SCR_ENTRY *se16 = se_mem[gfx_bg_indices[bg_idx]];
 
     int prev_cam_tx = scroll_data->old_offset_x >> size_shift;
@@ -329,8 +328,8 @@ static void update_map_scroll_t(uint bg_idx, uint size_shift, uint dst_shift,
 
     const uint map_width = bg->map_width;
     const uint map_height = bg->map_height;
-    const map_border_e border_x = bg->map->border_x;
-    const map_border_e border_y = bg->map->border_y;
+    const gfx_map_border_e border_x = bg->map->border_x;
+    const gfx_map_border_e border_y = bg->map->border_y;
 
     #define CALC_SRCPOS_X(x) calc_srcpos(x, map_width, border_x)
     #define CALC_SRCPOS_Y(y) calc_srcpos(y, map_height, border_y)
@@ -487,19 +486,17 @@ static void update_map_scroll(uint bg_idx)
     {
         switch (bg->map->gfx_format)
         {
-        case MAP_GFX_FORMAT_GBA:
+        case GFX_MAP_FORMAT_GBA:
             update_map_scroll_t(bg_idx, 3, 0, write_scr_block8);
             break;
 
-        case MAP_GFX_FORMAT_MAPC16:
+        case GFX_MAP_FORMAT_MAPC16:
             update_map_scroll_t(bg_idx, 4, 1, write_scr_block16);
             break;
 
-        case MAP_GFX_FORMAT_CUSTOM16:
+        case GFX_MAP_FORMAT_CUSTOM16:
         {
-            map_write_scrblock_f writer =
-                scrblock_writers[bg->map->custom_scrblock_write - 1];
-            update_map_scroll_t(bg_idx, 4, 1, writer);
+            update_map_scroll_t(bg_idx, 4, 1, bg->map->custom_write);
             break;
         }
         
@@ -519,7 +516,7 @@ void gfx_mark_scroll_dirty(uint bg_idx)
     bg_scroll_data[bg_idx].screen_dirty = true;
 }
 
-void gfx_load_map(uint bg_idx, const map_header_s *map)
+void gfx_load_map(uint bg_idx, const gfx_map_s *map)
 {
     gfx_bg_s *bg = gfx_ctl.bg + bg_idx;
     bg_scroll_data_s *sdata = bg_scroll_data + bg_idx;
@@ -528,34 +525,6 @@ void gfx_load_map(uint bg_idx, const map_header_s *map)
     bg->map_width = map->width;
     bg->map_height = map->height;
     sdata->screen_dirty = true;
-}
-
-uint gfx_alloc_scrblock_writer(map_write_scrblock_f func)
-{
-    if (func == NULL) return 0;
-
-    for (uint i = 0; i < MAX_SCRBLOCK_WRITER_COUNT; ++i)
-    {
-        if (scrblock_writers[i]) continue;
-        scrblock_writers[i] = func;
-        return i + 1;
-    }
-
-    return 0;
-}
-
-void gfx_free_scrblock_writer(uint id)
-{
-    if (id == 0) return;
-    --id;
-
-    if (id >= MAX_SCRBLOCK_WRITER_COUNT)
-    {
-        LOG_ERR("gfx_free_scrblock_writer: invalid id");
-        return;
-    }
-
-    scrblock_writers[id] = NULL;
 }
 
 #pragma endregion

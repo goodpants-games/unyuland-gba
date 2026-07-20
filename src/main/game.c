@@ -692,15 +692,15 @@ void game_update(void)
 
 void game_load_room(const world_room_s *room)
 {
-    const map_header_s *map = room->map;
+    const mapc_header_s *map = room->map;
 
     g_game.room = room;
     g_game.room_collision = game_room_collision;
     g_game.room_width = (int) map->width;
     g_game.room_height = (int) map->height;
 
-    const u8 *col_data = map_collision_data(map);
-    const int col_data_size = map_collision_data_size(map);
+    const u8 *col_data = mapc_collision_data(map);
+    const int col_data_size = mapc_collision_data_size(map);
     if (CEIL_DIV(col_data_size, 4) > GAME_COLLISION_MAP_SIZE)
     {
         LOG_ERR("map collision too large to copy to iwram!");
@@ -709,9 +709,17 @@ void game_load_room(const world_room_s *room)
 
     memcpy32(game_room_collision, col_data, CEIL_DIV(col_data_size, 4));
 
+    g_game.gfx_map = (gfx_map_s)
+    {
+        .width = map->width,
+        .height = map->height,
+        .gfx_format = GFX_MAP_FORMAT_MAPC16,
+        .data = mapc_graphics_data(map),
+    };
+
     u32 accum;
 
-    const u8 *data_ptr = map_entity_data(map);
+    const u8 *data_ptr = mapc_entity_data(map);
     int ent_count = data_ptr ? READ16(data_ptr, accum) : 0;
     
     for (int i = 0; i < ent_count; ++i)
@@ -1094,7 +1102,7 @@ static void change_room(const world_room_s *new_room)
     }
 
     game_load_room(new_room);
-    gfx_load_map(GAME_BG_IDX, new_room->map);
+    gfx_load_map(GAME_BG_IDX, &g_game.gfx_map);
     reset_camera(&g_game.entities[0]);
 
     bool enable_bg = new_room->map->bg_id == 1;

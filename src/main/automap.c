@@ -2,6 +2,7 @@
 #include <string.h>
 #include <tonc_video.h>
 #include <tonc_input.h>
+#include <tonc_math.h>
 #include <log.h>
 
 #include <data/graphics/automap_tiles_gfx.h>
@@ -10,8 +11,8 @@
 #include <data/world.h>
 
 #include "automap.h"
-#include "tonc_math.h"
 #include "gfx.h"
+#include "math_util.h"
 
 #define TILE_STRIDE 100
 #define HIGHLIGHT_TILE_OFFSET 48
@@ -20,8 +21,6 @@
 #define ICON_MAX_X ((SCREEN_WIDTH / 2) - 15)
 #define ICON_MIN_Y 7
 #define ICON_MAX_Y ((SCREEN_HEIGHT / 2) - 15 - 5)
-
-static uint scrblock_writer_handle;
 
 static void scrblock_write(uint map_entry, u16 *dest)
 {
@@ -49,17 +48,13 @@ void automap_init(automap_s *map)
         ((start_room->y * MAP_SCREEN_HEIGHT + home_ly)) * 16 / MAP_SCREEN_HEIGHT
         + AUTOMAP_MARGIN_Y * 8;
 
-    // initialize scrollmap data as empty (i.e. grid pattern)
-    scrblock_writer_handle = gfx_alloc_scrblock_writer(scrblock_write);
-
-    map->scrmap_header = (map_header_s)
+    map->scrmap_header = (gfx_map_s)
     {
-        .gfx_format = MAP_GFX_FORMAT_CUSTOM16,
+        .gfx_format = GFX_MAP_FORMAT_CUSTOM16,
         .width = AUTOMAP_WIDTH,
         .height = AUTOMAP_HEIGHT,
-        .custom_scrblock_write = scrblock_writer_handle,
-        .gfx_data_offset = offsetof(automap_s, scrmap)
-                           - offsetof(automap_s, scrmap_header)
+        .custom_write = scrblock_write,
+        .data = &map->scrmap
     };
 
     for (uint y = 0; y < AUTOMAP_HEIGHT; ++y)
@@ -86,7 +81,7 @@ void automap_init(automap_s *map)
 
 void automap_deinit(void)
 {
-    gfx_free_scrblock_writer(scrblock_writer_handle);
+    // gfx_free_scrblock_writer(scrblock_writer_handle);
 }
 
 static inline void automap_clamp_spos(automap_s *map)
