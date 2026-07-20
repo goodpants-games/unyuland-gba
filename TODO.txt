@@ -27,6 +27,23 @@
 b05: player scared to go down Hole.
 player should be able to do a jig when hold down (very important)
 
+=========================== Spatial Partition ==================================
+
+Rewrite code to use a spatial partitioning scheme with fixed-size cells. The
+idea is that, well, Sweep and Prune probably kind of sucks. On every substep, it
+must sync the positions of each entity edge, even if it didn't move. With spatial
+partitioning, it only needs to sync whenever an entity moves, which would
+theoretically be more performant since most entities don't move after the first
+substep of an iteration.
+
+Of course, however, the sync of the spatial partition is more expensive than the
+sync of the sweep and prune: it has to calculate the old grid bounds, remove the
+entity reference from the linked list in each intersecting cell, and then insert
+entity references to the linked list of each cell intersecting the new bounds.
+This is in contrast to sweep and prune, which simply syncs the edge position
+with the left or right edge of the referenced entity, and then does an O(n)
+average-case sort after all the edges have been synced.
+
 ============================= Playtest Notes ===================================
 ROOM13:
 - Maybe make it so the player can't save after fetching the ice block?
