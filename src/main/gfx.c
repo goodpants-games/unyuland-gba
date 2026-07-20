@@ -277,13 +277,31 @@ void gfx_set_palette_mode(gfx_pal_mode_e mode)
 
 typedef struct bg_scroll_data
 {
-    uint old_offset_x;
-    uint old_offset_y;
+    int old_offset_x;
+    int old_offset_y;
     bool screen_dirty;
 } bg_scroll_data_s;
 
 static EWRAM_BSS bg_scroll_data_s bg_scroll_data[4];
 static EWRAM_BSS map_write_scrblock_f scrblock_writers[MAX_SCRBLOCK_WRITER_COUNT];
+
+static inline int calc_srcpos(int pos, int size, map_border_e border_mode)
+{
+    switch (border_mode)
+    {
+    case MAP_BORDER_CLAMP:
+        if (pos < 0) pos = 0;
+        else if (pos >= size) pos = size - 1;
+        break;
+
+    case MAP_BORDER_WRAP:
+        while (pos < 0) pos += size;
+        while (pos >= size) pos -= size;
+        break;
+    }
+
+    return pos;
+}
 
 static void update_map_scroll_t(uint bg_idx, uint size_shift, uint dst_shift,
                                 map_write_scrblock_f write_scr_block)
@@ -298,28 +316,40 @@ static void update_map_scroll_t(uint bg_idx, uint size_shift, uint dst_shift,
     const u16 *map_data = map_graphics_data(bg->map);
     SCR_ENTRY *se16 = se_mem[gfx_bg_indices[bg_idx]];
 
-    uint prev_cam_tx = scroll_data->old_offset_x >> size_shift;
-    uint cam_tx = bg->offset_x >> size_shift;
+    int prev_cam_tx = scroll_data->old_offset_x >> size_shift;
+    int cam_tx = bg->offset_x >> size_shift;
 
-    uint prev_cam_ty = scroll_data->old_offset_y >> size_shift;
-    uint cam_ty = bg->offset_y >> size_shift;
+    int prev_cam_ty = scroll_data->old_offset_y >> size_shift;
+    int cam_ty = bg->offset_y >> size_shift;
 
     uint size_mod_mask = (256 >> size_shift) - 1;
 
     const uint width_div = SCREEN_WIDTH >> size_shift;
     const uint height_div = SCREEN_HEIGHT >> size_shift;
 
+    const uint map_width = bg->map_width;
+    const uint map_height = bg->map_height;
+    const map_border_e border_x = bg->map->border_x;
+    const map_border_e border_y = bg->map->border_y;
+
+    #define CALC_SRCPOS_X(x) calc_srcpos(x, map_width, border_x)
+    #define CALC_SRCPOS_Y(y) calc_srcpos(y, map_height, border_y)
+
     if (scroll_data->screen_dirty)
     {
         scroll_data->screen_dirty = false;
-        uint ey = cam_ty + height_div + 1;
-        uint ex = cam_tx + width_div + 1;
+        int ey = cam_ty + height_div + 1;
+        int ex = cam_tx + width_div + 1;
 
-        for (uint y = cam_ty; y < ey; ++y)
+        int srcx, srcy;
+        for (int y = cam_ty; y < ey; ++y)
         {
-            for (uint x = cam_tx; x < ex; ++x)
+            srcy = CALC_SRCPOS_Y(y);
+            for (int x = cam_tx; x < ex; ++x)
             {
-                uint ii = y * bg->map_width + x;
+                srcx = CALC_SRCPOS_X(x);
+
+                uint ii = srcy * map_width + srcx;
                 uint oi = ((y & size_mod_mask) << 5) + (x & size_mod_mask);
                 uint entry = (uint) map_data[ii];
                 write_scr_block(entry, se16 + (oi << dst_shift));
@@ -331,7 +361,7 @@ static void update_map_scroll_t(uint bg_idx, uint size_shift, uint dst_shift,
         // x scrolling (also handles corners)
         if (cam_tx != prev_cam_tx)
         {
-            uint sx, ex;
+            int sx, ex;
             if (cam_tx > prev_cam_tx)
             {
                 sx = prev_cam_tx + width_div + 1;
@@ -343,14 +373,18 @@ static void update_map_scroll_t(uint bg_idx, uint size_shift, uint dst_shift,
                 ex = prev_cam_tx;
             }
 
-            uint sy = cam_ty;
-            uint ey = cam_ty + height_div;
+            int sy = cam_ty;
+            int ey = cam_ty + height_div;
 
-            for (uint x = sx; x <= ex; ++x)
+            int srcx, srcy;
+            for (int x = sx; x <= ex; ++x)
             {
-                for (uint y = sy; y <= ey; ++y)
+                srcx = CALC_SRCPOS_X(x);
+                for (int y = sy; y <= ey; ++y)
                 {
-                    uint ii = y * bg->map_width + x;
+                    srcy = CALC_SRCPOS_Y(y);
+
+                    uint ii = srcy * bg->map_width + srcx;
                     uint oi = ((y & size_mod_mask) << 5) + (x & size_mod_mask);
                     uint entry = (uint) map_data[ii];
                     write_scr_block(entry, se16 + (oi << dst_shift));
@@ -361,7 +395,7 @@ static void update_map_scroll_t(uint bg_idx, uint size_shift, uint dst_shift,
         // y scrolling
         if (cam_ty != prev_cam_ty)
         {
-            uint sy, ey;
+            int sy, ey;
             if (cam_ty > prev_cam_ty)
             {
                 sy = prev_cam_ty + height_div + 1;
@@ -373,14 +407,18 @@ static void update_map_scroll_t(uint bg_idx, uint size_shift, uint dst_shift,
                 ey = prev_cam_ty == 0 ? 0 : prev_cam_ty - 1;
             }
 
-            uint sx = cam_tx;
-            uint ex = cam_tx + width_div;
+            int sx = cam_tx;
+            int ex = cam_tx + width_div;
 
-            for (uint y = sy; y <= ey; ++y)
+            int srcx, srcy;
+            for (int y = sy; y <= ey; ++y)
             {
-                for (uint x = sx; x <= ex; ++x)
+                srcy = CALC_SRCPOS_Y(y);
+                for (int x = sx; x <= ex; ++x)
                 {
-                    uint ii = y * bg->map_width + x;
+                    srcx = CALC_SRCPOS_X(x);
+
+                    uint ii = srcy * bg->map_width + srcx;
                     uint oi = ((y & size_mod_mask) << 5) + (x & size_mod_mask);
                     uint entry = (uint) map_data[ii];
                     write_scr_block(entry, se16 + (oi << dst_shift));

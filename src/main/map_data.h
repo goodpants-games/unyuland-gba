@@ -6,9 +6,18 @@
 #include <stddef.h>
 #include "math_util.h"
 
-#define MAP_GFX_FORMAT_GBA      0 // hardware GBA screen-entry format
-#define MAP_GFX_FORMAT_MAPC16   1 // 16x16 tile screen-entry format used by mapc
-#define MAP_GFX_FORMAT_CUSTOM16 2 // custom 16x16 tile format
+typedef enum map_gfx_format
+{
+    MAP_GFX_FORMAT_GBA,      // hardware GBA screen-entry format
+    MAP_GFX_FORMAT_MAPC16,   // 16x16 tile screen-entry format used by mapc
+    MAP_GFX_FORMAT_CUSTOM16, // custom 16x16 tile format
+} map_gfx_format_e;
+
+typedef enum map_border
+{
+    MAP_BORDER_CLAMP,
+    MAP_BORDER_WRAP,
+} map_border_e;
 
 typedef void (*map_write_scrblock_f)(uint map_entry, u16 *dest);
 
@@ -18,8 +27,9 @@ typedef struct map_header
     u16 height;
     u8  gfx_format;
     u8  bg_id; // 0: black; 1: outdoors
-
-    // 2 bytes of padding
+    
+    u8  border_x;
+    u8  border_y;    
 
     // writer func: used with custom16
     // this is actually a 32-bit number representing an abstract handle to the

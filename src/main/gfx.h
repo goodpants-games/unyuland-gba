@@ -161,8 +161,8 @@ typedef struct gfx_bg
     u8 priority;
     u8 char_block;
 
-    u16 offset_x;
-    u16 offset_y;
+    s16 offset_x;
+    s16 offset_y;
 
     const map_header_s *map;
     uint map_width;
