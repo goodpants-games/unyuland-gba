@@ -303,7 +303,7 @@ static inline int calc_srcpos(int pos, int size, gfx_map_border_e border_mode)
 }
 
 static void update_map_scroll_t(uint bg_idx, uint size_shift, uint dst_shift,
-                                gfx_map_write_f write_scr_block)
+                                gfx_map_write_f writer)
 {
     static const uint gfx_bg_indices[4] = {
         GFX_BG0_INDEX, GFX_BG1_INDEX, GFX_BG2_INDEX, GFX_BG3_INDEX
@@ -312,7 +312,7 @@ static void update_map_scroll_t(uint bg_idx, uint size_shift, uint dst_shift,
     gfx_bg_s *bg = gfx_ctl.bg + bg_idx;
     bg_scroll_data_s *scroll_data = bg_scroll_data + bg_idx;
 
-    const u16 *map_data = bg->map->data;
+    const u16 *map_data = bg->map.data;
     SCR_ENTRY *se16 = se_mem[gfx_bg_indices[bg_idx]];
 
     int prev_cam_tx = scroll_data->old_offset_x >> size_shift;
@@ -328,11 +328,11 @@ static void update_map_scroll_t(uint bg_idx, uint size_shift, uint dst_shift,
 
     const uint map_width = bg->map_width;
     const uint map_height = bg->map_height;
-    const gfx_map_border_e border_x = bg->map->border_x;
-    const gfx_map_border_e border_y = bg->map->border_y;
+    const gfx_map_border_e border_x = bg->map.border_x;
+    const gfx_map_border_e border_y = bg->map.border_y;
 
-    #define CALC_SRCPOS_X(x) calc_srcpos(x, map_width, border_x)
-    #define CALC_SRCPOS_Y(y) calc_srcpos(y, map_height, border_y)
+#define CALC_SRCPOS_X(x) calc_srcpos(x, map_width, border_x)
+#define CALC_SRCPOS_Y(y) calc_srcpos(y, map_height, border_y)
 
     if (scroll_data->screen_dirty)
     {
@@ -351,7 +351,7 @@ static void update_map_scroll_t(uint bg_idx, uint size_shift, uint dst_shift,
                 uint ii = srcy * map_width + srcx;
                 uint oi = ((y & size_mod_mask) << 5) + (x & size_mod_mask);
                 uint entry = (uint) map_data[ii];
-                write_scr_block(entry, se16 + (oi << dst_shift));
+                writer(entry, se16 + (oi << dst_shift));
             }
         }
     }
@@ -386,7 +386,7 @@ static void update_map_scroll_t(uint bg_idx, uint size_shift, uint dst_shift,
                     uint ii = srcy * bg->map_width + srcx;
                     uint oi = ((y & size_mod_mask) << 5) + (x & size_mod_mask);
                     uint entry = (uint) map_data[ii];
-                    write_scr_block(entry, se16 + (oi << dst_shift));
+                    writer(entry, se16 + (oi << dst_shift));
                 }
             }
         }
@@ -420,15 +420,18 @@ static void update_map_scroll_t(uint bg_idx, uint size_shift, uint dst_shift,
                     uint ii = srcy * bg->map_width + srcx;
                     uint oi = ((y & size_mod_mask) << 5) + (x & size_mod_mask);
                     uint entry = (uint) map_data[ii];
-                    write_scr_block(entry, se16 + (oi << dst_shift));
+                    writer(entry, se16 + (oi << dst_shift));
                 }
             }
         }
     }
+
+#undef CALC_SRCPOS_X
+#undef CALC_SRCPOS_Y
 }
 
 IWRAM_CODE
-static void write_scr_block16(const uint map_entry, u16 *p_dest)
+static void write_se_mapc(const uint map_entry, u16 *p_dest)
 {
     // dest should always be 32-bit aligned, since dst stride is 2
     u32 *dest = (u32 *)p_dest;
@@ -472,7 +475,7 @@ static void write_scr_block16(const uint map_entry, u16 *p_dest)
 }
 
 IWRAM_CODE
-static void write_scr_block8(const uint map_entry, u16 *dest)
+static void write_se_gba(const uint map_entry, u16 *dest)
 {
     *dest = (u16) map_entry;
 }
@@ -482,26 +485,26 @@ static void update_map_scroll(uint bg_idx)
     gfx_bg_s *bg = gfx_ctl.bg + bg_idx;
     bg_scroll_data_s *scroll_data = bg_scroll_data + bg_idx;
 
-    if (bg->map)
+    if (bg->map.data)
     {
-        switch (bg->map->gfx_format)
+        switch (bg->map.gfx_format)
         {
         case GFX_MAP_FORMAT_GBA:
-            update_map_scroll_t(bg_idx, 3, 0, write_scr_block8);
+            update_map_scroll_t(bg_idx, 3, 0, write_se_gba);
             break;
 
         case GFX_MAP_FORMAT_MAPC16:
-            update_map_scroll_t(bg_idx, 4, 1, write_scr_block16);
+            update_map_scroll_t(bg_idx, 4, 1, write_se_mapc);
             break;
 
         case GFX_MAP_FORMAT_CUSTOM16:
         {
-            update_map_scroll_t(bg_idx, 4, 1, bg->map->custom_write);
+            update_map_scroll_t(bg_idx, 4, 1, bg->map.custom_write);
             break;
         }
         
         default:
-            LOG_ERR("invalid map gfx format %u", bg->map->gfx_format);
+            LOG_ERR("invalid map gfx format %u", bg->map.gfx_format);
             ASM_BREAK();
             break;
         }
@@ -521,7 +524,7 @@ void gfx_load_map(uint bg_idx, const gfx_map_s *map)
     gfx_bg_s *bg = gfx_ctl.bg + bg_idx;
     bg_scroll_data_s *sdata = bg_scroll_data + bg_idx;
 
-    bg->map = map;
+    bg->map = *map;
     bg->map_width = map->width;
     bg->map_height = map->height;
     sdata->screen_dirty = true;

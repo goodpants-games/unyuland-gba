@@ -191,7 +191,7 @@ typedef struct gfx_bg
     s16 offset_x;
     s16 offset_y;
 
-    const gfx_map_s *map;
+    gfx_map_s map;
     uint map_width;
     uint map_height;
 }
@@ -251,7 +251,7 @@ void gfx_load_map(uint bg_idx, const gfx_map_s *map);
 void gfx_mark_scroll_dirty(uint bg_idx);
 static inline void gfx_unload_map(uint bg_idx)
 {
-    gfx_ctl.bg[bg_idx].map = NULL;
+    gfx_ctl.bg[bg_idx].map = (gfx_map_s){0};
     gfx_ctl.bg[bg_idx].map_width = 0;
     gfx_ctl.bg[bg_idx].map_height = 0;
 }
