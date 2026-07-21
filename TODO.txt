@@ -21,6 +21,9 @@
   you know. bugging out the ui.)
 - I just realized i didn't add the open parenthesis to the character set :(
 - Add Reset Room Button
+- Add configurable window scale
+- make breakable block brown or peach (people keep thinking it's a switch)
+- 
 
 - pc port: add frame time display
 
@@ -61,6 +64,25 @@ BOSS 07/19/26
 - I had to tell him what to do in phase 3. (Maybe added water will make it more
   obvious.)
 - Maybe I should show the boss remaining health...
+
+BOSS 07/20/26
+- Player thinks you're supposed to push boss into water in first phase. So maybe
+  make the boss not overhang a little on the edge + remove pushback from player
+  projectiles. Also make stalactite shake more obvious.
+- Ehh should i make L fire and R shoot?
+- Player thinks he needs to make platforms for the 2nd Phase?
+  Also it is taking way longer than expected. First phase is still a bit difficult
+  to execute. Maybe make the big projectile spew attack easier. like have it shoot out less often.
+- WHY DOES HE MOVE IN A ZIGZAG PATTERN IN PHASE 2. WHAT'S THE THOUGHT PROCESS.
+- okay he just cheesed the boss by making a platform on the left side so that
+  he could jump up and shoot the stalactites. and then . basically spammed it
+  until the boss died.
+
+okay. i guess the boss is just not working. i suppose i shoul go back and remove
+phase 2.
+
+room01: maybe make the setpiece more obvious like a "statue" rather than a
+        mushroom
 
 ==================================== Boss ======================================
 
