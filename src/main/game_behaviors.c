@@ -1555,7 +1555,8 @@ static bool stalactite_proj_touch(entity_s *self, projectile_s *proj)
     stalactite_data_s *data = (stalactite_data_s *)self->userdata;
     if (data->falling) return true;
 
-    data->shake_timer = 8;
+    if (data->shake_timer == 0)
+        data->shake_timer = 8;
 
     // only player projectiles may cause it to fall
     if (proj->kind != PROJ_KIND_PLAYER) return true;
@@ -1597,12 +1598,10 @@ static void stalactite_update(entity_s *self)
 
     if (data->shake_timer != 0)
     {
-        uint anim_frame = data->shake_timer % 6;
-        if (anim_frame < 3)
-            self->sprite.ox = data->sprite_ox + 1;
-        else
-            self->sprite.ox = data->sprite_ox - 1;
+        static const int shake_offsets[] = { 0, 1, 0, 1 };
 
+        uint anim_frame = (data->shake_timer / 2) % 4;
+        self->sprite.ox = data->sprite_ox + shake_offsets[anim_frame];
         --data->shake_timer;
     }
     else
@@ -1639,7 +1638,7 @@ static behavior_def_s behavior_stalactite = {
 
 #define BOSS_JUMP_VEL           FX(2.5)
 #define BOSS_ENT_FLAG_MASK      ENTITY_FLAG_DAMPING
-#define BOSS_HEALTH             4
+#define BOSS_HEALTH             3
 
 #define BOSS_STANDOFF_BASE_DIST_NORMAL FX(8 * 7)
 #define BOSS_STANDOFF_BASE_DIST_FAR    FX(8 * 9)
@@ -1667,6 +1666,7 @@ typedef enum boss_mode
 {
     BOSS_MODE_BACK,
     BOSS_MODE_PHASE0_IDLE,
+    BOSS_MODE_SLIDE_PREADJUST,
     BOSS_MODE_SLIDE_WARN,
     BOSS_MODE_SLIDE,
     BOSS_MODE_SHOOT_JUMP_WARN,
@@ -1692,6 +1692,7 @@ typedef struct boss_data
         s16 sub_timer;
         u8 phase_on_hurt;
         s16 back_desired_dist;
+        bool did_preadjust_for_slide;
     };
 
     s16 standoff_base_dist;
@@ -1749,10 +1750,7 @@ static inline uint boss_get_phase(entity_s *self)
     boss_data_s *const data = (boss_data_s *)self->userdata;
 
     // normal standoff
-    if (data->hits >= 2) return 2;
-
-    // standoff, but won't back off if player approaches or breaks a stalactite
-    if (data->hits >= 1) return 1;
+    if (data->hits >= 1) return 2;
 
     // very aggressive
     return 0;
@@ -1827,6 +1825,13 @@ static void boss_switch_mode(entity_s *self, boss_mode_e mode)
 
         data->wait_timer = 4;
         snd_play(SND_ID_BOSS_JUMP);
+        break;
+    }
+
+    case BOSS_MODE_SLIDE_PREADJUST:
+    {
+        data->mode = BOSS_MODE_SLIDE_PREADJUST;
+        data->did_preadjust_for_slide = false;
         break;
     }
 
@@ -1992,7 +1997,7 @@ static void behavior_boss_update(entity_s *self)
         if (phase == 1)
             fire_wait = 45;
         else
-            fire_wait = data->hits == BOSS_HEALTH - 1 ? 37 : 42;
+            fire_wait = data->hits == BOSS_HEALTH - 1 ? 33 : 42;
 
         if (data->wait_timer == fire_wait)
         {
@@ -2044,9 +2049,36 @@ static void behavior_boss_update(entity_s *self)
             else
             {
                 ++data->global_counter;
-                boss_switch_mode(self, BOSS_MODE_SLIDE_WARN);
+                boss_switch_mode(self, BOSS_MODE_SLIDE_PREADJUST);
             }
         }
+        break;
+    }
+
+    case BOSS_MODE_SLIDE_PREADJUST:
+    {
+        FIXED dist_left = abs(self->pos.x - BOSS_ARENA_LEFT);;
+        FIXED dist_right = abs(BOSS_ARENA_RIGHT - (self->pos.x + FX(self->col.w)));
+
+        if (dist_left < FX(8) || dist_right < FX(8))
+        {
+            self->actor.flags &= ~ACTOR_FLAG_NO_VEL;
+
+            if (dist_left < dist_right)
+                self->actor.move_x = 1;
+            else
+                self->actor.move_x = -1;
+
+            data->did_preadjust_for_slide = true;
+        }
+        else
+        {
+            if (data->did_preadjust_for_slide)
+                self->actor.move_x = -self->actor.move_x;
+
+            boss_switch_mode(self, BOSS_MODE_SLIDE_WARN);
+        }
+
         break;
     }
 
@@ -2138,7 +2170,7 @@ static void behavior_boss_update(entity_s *self)
             boss_shoot(self, self_cx, self_cy, -FX(COS45), -FX(COS45), spd);
             snd_play_no_overlap(SND_ID_ENEMY_SPIT);
 
-            data->wait_timer = 14;
+            data->wait_timer = 15;
         }
 
         if (self->actor.flags & ACTOR_FLAG_GROUNDED)
@@ -2245,24 +2277,13 @@ static bool behavior_boss_proj_touch(entity_s *self, projectile_s *proj)
         FIXED cy = self->pos.y + (FX(self->col.h) >> 1);
         FIXED dx = cx - proj->px;
         FIXED dy = cy - proj->py;
-        // FIXED dlen = fxsqrt(fxmul(dx, dx) + fxmul(dy, dy));
-        // dx = fxdiv(dx, dlen);
-        // dy = fxdiv(dy, dlen);
 
         FIXED dot = fxmul(dx, proj->vx) + fxmul(dy, proj->vy);
         if (dot > 0 && proj->g == 0)
         {
-            self->pos.x += proj->vx / 32;
-            self->pos.y += proj->vy / 32;
-
             proj->vx = SGN(proj->vx) * FX(-0.5);
             proj->vy = FX(-1);
             proj->g = FX(0.2);
-
-            // proj->vx -= fxmul(dx, dot) * 2;
-            // proj->vy -= fxmul(dy, dot) * 2;
-            // proj->vx += self->vel.x;
-            // proj->vy += self->vel.y;
         }
     }
 
