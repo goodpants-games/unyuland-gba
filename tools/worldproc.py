@@ -369,8 +369,8 @@ def calc_room_automap_occupancy(room_path: str) -> Array2D:
     with open('data/maps/' + room_path + '.map', 'rb') as map_file:
         map_data = map_file.read()
     
-    (room_width, room_height, _, _, col_data_offset, _, _) = \
-        struct.unpack('<HHBxxxIIII', map_data[0:24])
+    (room_width, room_height, _, col_data_offset, _, _) = \
+        struct.unpack('<HHBxxxIII', map_data[0:20])
     
     col_data = bytearray(int_ceil_div(room_width * room_height, 4) * 4)
     j = 0
