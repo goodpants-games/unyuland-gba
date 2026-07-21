@@ -23,8 +23,9 @@
 - Add Reset Room Button
 - Add configurable window scale
 - make breakable block brown or peach (people keep thinking it's a switch)
-- Make L shoot and R shoot platform
+- Make L fire and R shoot platform
   (Maybe also make a setting which toggles control modes)
+- Show locations of collected orbs on map
 
 - pc port: add frame time display
 
