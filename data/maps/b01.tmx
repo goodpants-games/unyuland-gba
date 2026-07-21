@@ -14,7 +14,7 @@
     <property name="text" value="tut1"/>
    </properties>
   </object>
-  <object id="4" name="sign" type="entity" x="224" y="64" width="8" height="8">
+  <object id="4" name="sign" type="entity" x="216" y="64" width="8" height="8">
    <properties>
     <property name="text" value="tut_water"/>
    </properties>
