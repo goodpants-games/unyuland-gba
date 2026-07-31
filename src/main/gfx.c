@@ -36,9 +36,9 @@ typedef enum text_queue_action
 }
 text_queue_action_e;
 
-gfx_display_control_s gfx_ctl;
-OBJ_ATTR gfx_oam_buffer[128];
-static u16 gfx_mul_palette[16];
+EWRAM_BSS gfx_display_control_s gfx_ctl;
+EWRAM_BSS OBJ_ATTR gfx_oam_buffer[128];
+EWRAM_BSS static u16 gfx_mul_palette[16];
 
 EWRAM_BSS static s16 last_palette_mul;
 
