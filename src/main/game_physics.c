@@ -1368,8 +1368,7 @@ void game_physics_update(void)
     #ifdef PHYS_PROFILE
     PROFILE_LOG("e detection time", detection_ent_t);
     PROFILE_LOG("t detection time", detection_tile_t);
-    PROFILE_LOG("resolution ", resolution_t);
-    PROFILE_LOG("start time", start_t);
+    PROFILE_LOG("resolution time", resolution_t);
     // PROFILE_LOG("ent move time", move_t)
     // PROFILE_LOG("proj move time", projectiles_t)
     #endif
