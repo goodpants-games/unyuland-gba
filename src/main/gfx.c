@@ -620,7 +620,6 @@ static void blit_tile_colored(uint x, uint y, const TILE4 *src_tile,
     // }
 }
 
-ARM_FUNC NO_INLINE
 void gfx_text_bmap_dst_clear(uint row, uint row_count)
 {
     gfx_queue_memset(&se_mem[GFX_BG0_INDEX][row * 32], 0,
