@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <alloca.h>
 #include <tonc_math.h>
 #include <tonc_types.h>
 #include <log.h>
@@ -51,7 +52,12 @@ struct phys_profile
     } while (false)
 #endif
 
-// static pqueue_entry_s contact_queue[MAX_CONTACT_COUNT];
+typedef struct aabb
+{
+    int left, top;
+    int right, bottom;
+}
+aabb_s;
 
 #pragma endregion declarations
 
@@ -66,16 +72,12 @@ struct phys_profile
 //------------------------------------------------------------------------------
 #pragma region entity physics
 
-#define ENTITY_PAIR_SIZE \
-    IALIGN(CEIL_DIV(UPAIR2U(MAX_ENTITY_COUNT - 1, MAX_ENTITY_COUNT - 1), 8), 4)
-#define ENTITY_PAIR_GET(pairs, pkey) \
-    ((pairs[(pkey) >> 3] >> ((pkey) & 0x7)) & 0x1)
-#define ENTITY_PAIR_SET(pairs, pkey) \
-    (pairs[(pkey) >> 3] |= (1 << ((pkey) & 0x7)))
-#define ENTITY_PAIR_CLEAR(pairs, pkey) \
-    (pairs[(pkey) >> 3] &= ~(1 << ((pkey) & 0x7)))
-
-#define EDGE_LIST_MAX_COUNT ((MAX_ENTITY_COUNT * 2))
+// in world units (8 units per tile)
+#define ENT_PGRID_CELL_W 32
+#define ENT_PGRID_CELL_H 32
+#define ENT_PGRID_COLS  16
+#define ENT_PGRID_ROWS  16
+#define ENT_PGRID_NODE_POOL_SIZE 128
 
 // collision-processing data for each active entity
 typedef struct entity_coldata
@@ -88,6 +90,7 @@ typedef struct entity_coldata
     bool head_bump;
     s8 x_anchor;
     s8 y_anchor;
+    aabb_s pgrid_bounds;
 }
 entity_coldata_s;
 
@@ -100,27 +103,32 @@ typedef struct col_contact
 }
 col_contact_s;
 
-// edge structure for sweep and prune
-typedef struct col_bp_edge
-{
-    u16 eid;
-    bool left;
-    FIXED pos;
-}
-col_bp_edge_s;
-
-// overlap on an axis calculated by sweep and prune
-typedef struct col_bp_overlap
-{
-    u16 eid_a, eid_b;
-}
-col_bp_overlap_s;
-
 // narrow-phase collision detection. contains penetration vector.
 typedef struct col_overlap_res {
     bool overlap;
     FIXED nx, ny, pd;
 } col_overlap_res_s;
+
+typedef struct ent_pgrid_node
+{
+    entity_coldata_s *cent;
+
+    // if active (i.e. cent != NULL), this points to the next node
+    // in the partition cell linked list. if inactive, this instead points to
+    // the next unallocated node in the pool.
+    union
+    {
+        struct ent_pgrid_node *next;
+        struct ent_pgrid_node *next_free;
+    };
+}
+ent_pgrid_node_s;
+
+typedef ent_pgrid_node_s *ent_pgrid_cell_t;
+
+static ent_pgrid_node_s ent_pgrid_node_pool[ENT_PGRID_NODE_POOL_SIZE];
+static ent_pgrid_node_s *ent_pgrid_node_pool_ffree; // first free
+static ent_pgrid_cell_t ent_pgrid[ENT_PGRID_ROWS][ENT_PGRID_COLS];
 
 static int col_ent_count = 0;
 static entity_coldata_s col_ent_map[MAX_ENTITY_COUNT];
@@ -128,19 +136,6 @@ static entity_coldata_s *col_ents[MAX_ENTITY_COUNT];
 
 static uint col_contact_count = 0;
 static col_contact_s col_contacts[MAX_CONTACT_COUNT];
-// static u8 contact_pairs[ENTITY_PAIR_SIZE];
-
-static col_bp_overlap_s x_overlaps[MAX_ENTITY_COUNT * 2];
-static int x_overlap_count = 0;
-
-static int x_edge_count = 0;
-static col_bp_edge_s x_edges[EDGE_LIST_MAX_COUNT];
-
-static int y_edge_count = 0;
-static col_bp_edge_s y_edges[EDGE_LIST_MAX_COUNT];
-
-static u8 x_contact_pairs[ENTITY_PAIR_SIZE];
-static u8 y_contact_pairs[ENTITY_PAIR_SIZE];
 
 
 
@@ -183,175 +178,183 @@ static inline col_overlap_res_s rect_collision(FIXED x0, FIXED y0, FIXED hw0,
         return res;
 }
 
+ARM_FUNC NO_INLINE
+static ent_pgrid_node_s* ent_pgrid_node_alloc(entity_coldata_s *cent)
+{
+    ent_pgrid_node_s *node = ent_pgrid_node_pool_ffree;
+    if (!node)
+    {
+        LOG_ERR("ent_pgrid_node_pool full!");
+        return NULL;
+    }
+
+    ent_pgrid_node_pool_ffree = node->next_free;
+
+    *node = (ent_pgrid_node_s)
+    {
+        .cent = cent,
+    };
+
+    return node;
+}
+
+ARM_FUNC NO_INLINE
+static void ent_pgrid_node_free(ent_pgrid_node_s *node)
+{
+    if (!node) return;
+
+    node->cent = NULL;
+    node->next_free = ent_pgrid_node_pool_ffree;
+    ent_pgrid_node_pool_ffree = node;
+}
+
+ARM_FUNC NO_INLINE
+static void ent_pgrid_cell_insert(ent_pgrid_cell_t *cell,
+                                  ent_pgrid_node_s *new_node)
+{
+    new_node->next = *cell;
+    *cell = new_node;
+}
+
+ARM_FUNC NO_INLINE
+static ent_pgrid_node_s* ent_pgrid_cell_remove(ent_pgrid_cell_t *cell,
+                                               const entity_coldata_s *cent)
+{
+    if (!(*cell)) return NULL;
+
+    if ((*cell)->cent == cent)
+    {
+        ent_pgrid_node_s *node = *cell;
+        *cell = node->next;
+        return node;
+    }
+
+    ent_pgrid_node_s *node = *cell;
+    ent_pgrid_node_s *next = node->next;
+    while (next)
+    {
+        if (next->cent == cent)
+        {
+            node->next = next->next;
+            next->next = NULL;
+            return next;
+        }
+
+        node = next;
+        next = next->next;
+    }
+
+    return NULL;
+}
+
+ARM_FUNC NO_INLINE
+static bool ent_pgrid_add(entity_coldata_s *cent, const aabb_s *aabb)
+{
+    const int left = aabb->left;
+    const int top = aabb->top;
+    const int right = aabb->right;
+    const int bottom = aabb->bottom;
+
+    // allocate all nodes upfront
+    size_t node_count = (right - left + 1) * (bottom - top + 1);
+#ifdef DEVDEBUG
+    // something is seriously wrong...
+    if (node_count >= 20) DBG_CRASH();
+#endif
+    ent_pgrid_node_s **nodes = alloca(node_count * sizeof(void*));
+
+#ifdef PLATFORM_GBA
+    memset32(nodes, 0, node_count);
+#else
+    memset(nodes, 0, node_count * sizeof(void*));
+#endif
+
+    size_t nodeidx = 0;
+    for (; nodeidx < node_count; ++nodeidx)
+    {
+        ent_pgrid_node_s *node = ent_pgrid_node_alloc(cent);
+        if (!node)
+        {
+            // allocation error. abort!
+            for (size_t i = 0; i < nodeidx; ++i)
+                ent_pgrid_node_free(nodes[i]);
+            return false;
+        }
+
+        nodes[nodeidx] = node;
+    }
+    nodeidx = 0;
+
+    // add each node to each cell
+    for (uint y = top; y <= bottom; ++y)
+    for (uint x = left; x <= right; ++x)
+        ent_pgrid_cell_insert(&ent_pgrid[y][x], nodes[nodeidx++]);
+
+    // NOLINTNEXTLINE(readability-misleading-indentation)
+    return true;
+}
+
+ARM_FUNC NO_INLINE
+static aabb_s calc_ent_pgrid_bounds(const entity_s *ent)
+{
+    int l = ent->pos.x / (FIX_ONE * ENT_PGRID_CELL_W);
+    l = clamp(l, 0, ENT_PGRID_COLS);
+    int t = ent->pos.y / (FIX_ONE * ENT_PGRID_CELL_H);
+    t = clamp(t, 0, ENT_PGRID_ROWS);
+    int r = (ent->pos.x + FX(ent->col.w)) / (FIX_ONE * ENT_PGRID_CELL_W);
+    r = clamp(r, 0, ENT_PGRID_COLS);
+    int b = (ent->pos.y + FX(ent->col.h)) / (FIX_ONE * ENT_PGRID_CELL_H);
+    b = clamp(b, 0, ENT_PGRID_ROWS);
+
+    return (aabb_s)
+    {
+        .left = l,
+        .top = t,
+        .right = r,
+        .bottom = b
+    };
+}
+
+ARM_FUNC NO_INLINE
+static void ent_pgrid_remove(entity_coldata_s *cent, const aabb_s *aabb)
+{
+    const int left = aabb->left;
+    const int top = aabb->top;
+    const int right = aabb->right;
+    const int bottom = aabb->bottom;
+
+    for (uint y = top; y <= bottom; ++y)
+    for (uint x = left; x <= right; ++x)
+    {
+        ent_pgrid_node_s *node = ent_pgrid_cell_remove(&ent_pgrid[y][x], cent);
+        ent_pgrid_node_free(node);
+    }
+}
+
+static inline bool aabb_equal(const aabb_s *a, const aabb_s *b)
+{
+    return a->left == b->left && a->right == b->right &&
+           a->bottom == b->bottom && a->top == b->top;
+}
+
 static void col_ent_added(int col_ent_idx)
 {
     LOG_DBG("col_ent_added %i", col_ent_idx);
+    entity_coldata_s *cent = col_ent_map + col_ent_idx;
 
-    x_edges[x_edge_count++] = (col_bp_edge_s)
-    {
-        .eid = (u16) col_ent_idx,
-        .left = true
-    };
-    x_edges[x_edge_count++] = (col_bp_edge_s)
-    {
-        .eid = (u16) col_ent_idx,
-        .left = false
-    };
-
-    y_edges[y_edge_count++] = (col_bp_edge_s)
-    {
-        .eid = (u16) col_ent_idx,
-        .left = true
-    };
-    y_edges[y_edge_count++] = (col_bp_edge_s)
-    {
-        .eid = (u16) col_ent_idx,
-        .left = false
-    };
+    aabb_s aabb = calc_ent_pgrid_bounds(cent->ent);
+    cent->pgrid_bounds = aabb;
+    ent_pgrid_add(cent, &aabb);
 }
 
 static void col_ent_removed(int col_ent_idx)
 {
     LOG_DBG("col_ent_removed");
 
-    // remove x edge
-    for (int i = x_edge_count - 1; i >= 0; --i)
-    {
-        if (x_edges[i].eid == col_ent_idx)
-            DYNARR_REMOVE(x_edges, x_edge_count, i);
-    }
+    entity_coldata_s *cent = col_ent_map + col_ent_idx;
 
-    // remove x overlaps
-    for (int i = x_overlap_count - 1; i >= 0; --i)
-    {
-        col_bp_overlap_s *const overlap = &x_overlaps[i];
-        if (overlap->eid_a == col_ent_idx ||
-            overlap->eid_b == col_ent_idx)
-        {
-            uint pair = upair2u(overlap->eid_a, overlap->eid_b);
-            ENTITY_PAIR_CLEAR(x_contact_pairs, pair);
-            DYNARR_REMOVE(x_overlaps, x_overlap_count, i);
-        }
-    }
-
-    // remove y edge
-    for (int i = y_edge_count - 1; i >= 0; --i)
-    {
-        if (y_edges[i].eid == col_ent_idx)
-            DYNARR_REMOVE(y_edges, y_edge_count, i);
-    }
-
-    // remove y overlaps umm
-    for (int i = 0; i < MAX_ENTITY_COUNT; ++i)
-    {
-        uint pair = upair2u(col_ent_idx, i);
-        ENTITY_PAIR_CLEAR(y_contact_pairs, pair);
-    }
-}
-
-// sweep and prune
-ARM_FUNC
-static void sort_edge_list(col_bp_edge_s *const list,
-                           const int list_count,
-                           u8 contact_pairs[ENTITY_PAIR_SIZE],
-                           col_bp_overlap_s *overlaps, int *overlap_count)
-{   
-    for (int i = 0; i < list_count - 1; ++i)
-    {
-        int j = i;
-        while (list[j].pos > list[j+1].pos)
-        {
-            // LOG_DBG("swap %i%s %i%s",
-            //         (int) list[j].eid, list[j].left ? "L" : "R",
-            //         (int) list[j+1].eid, list[j+1].left ? "L" : "R");
-            {
-                col_bp_edge_s temp;
-                SWAP3(list[j], list[j+1], temp);
-            }
-
-            col_bp_edge_s *const edge1 = &list[j];
-            col_bp_edge_s *const edge2 = &list[j+1];
-
-            int eid1 = edge1->eid;
-            int eid2 = edge2->eid;
-
-            uint pair_key = upair2u(eid1, eid2);
-
-            // R-L -> L-R (add overlap)
-            if (edge1->left && !edge2->left)
-            {
-                ENTITY_PAIR_SET(contact_pairs, pair_key);
-
-                if (overlaps)
-                {
-                    overlaps[(*overlap_count)++] = (col_bp_overlap_s)
-                    {
-                        .eid_a = eid1,
-                        .eid_b = eid2
-                    };
-                }
-            }
-            // L-R -> R-L (remove overlap)
-            else if (!edge1->left && edge2->left)
-            {
-                ENTITY_PAIR_CLEAR(contact_pairs, pair_key);
-
-                if (overlaps)
-                {
-                    int count = *overlap_count;
-                    for (int k = 0; k < count; ++k)
-                    {
-                        if ((overlaps[k].eid_a == eid1 && overlaps[k].eid_b == eid2) ||
-                            (overlaps[k].eid_a == eid2 && overlaps[k].eid_b == eid1))
-                        {
-                            DYNARR_REMOVE(overlaps, *overlap_count, k);
-                            goto overlap_found;
-                        }
-                    }
-                    LOG_ERR("overlap not found in list!");
-                    overlap_found:;
-                }
-            }
-
-            if (j == 0) break;
-            --j;
-        }
-    }
-}
-
-ARM_FUNC NO_INLINE
-static void update_edge_lists(void)
-{
-    // sync x edges
-    for (int i = 0; i < x_edge_count; ++i)
-    {
-        col_bp_edge_s *edge = x_edges + i;
-        const entity_coldata_s *col = col_ent_map + edge->eid;
-        const entity_s *ent = col->ent;
-
-        if (edge->left)
-            edge->pos = ent->pos.x;
-        else
-            edge->pos = ent->pos.x + col->width;
-    }
-
-    // sync y edges
-    for (int i = 0; i < y_edge_count; ++i)
-    {
-        col_bp_edge_s *edge = y_edges + i;
-        const entity_coldata_s *col = col_ent_map + edge->eid;
-        const entity_s *ent = col->ent;
-
-        if (edge->left)
-            edge->pos = ent->pos.y;
-        else
-            edge->pos = ent->pos.y + col->height;
-    }
-
-    // perform sweep and prune
-    sort_edge_list(x_edges, x_edge_count, x_contact_pairs, x_overlaps,
-                   &x_overlap_count);
-    sort_edge_list(y_edges, y_edge_count, y_contact_pairs, NULL, NULL);
+    aabb_s aabb = calc_ent_pgrid_bounds(cent->ent);
+    ent_pgrid_remove(cent, &aabb);
 }
 
 // a body is anchored if:
@@ -367,99 +370,146 @@ static inline bool is_body_anchored(entity_coldata_s *col_ent, FIXED nx,
     return false;
 }
 
+ARM_FUNC
+static bool physics_substep_process_contact(entity_coldata_s *col_ent,
+                                            entity_coldata_s *entc2)
+{
+    // make sure that the second entity is the static one
+    if (entc2->ent->flags & ENTITY_FLAG_MOVING)
+    {
+        entity_coldata_s *temp;
+        SWAP3(col_ent, entc2, temp);
+    }
+
+    entity_s *entity = col_ent->ent;
+    entity_s *ent2 = entc2->ent;
+
+    // don't handle collision if one of the entities is queued to be
+    // freed
+    if ((entity->flags & ENTITY_FLAG_QFREE) ||
+        (ent2->flags & ENTITY_FLAG_QFREE))
+    {
+        return true;
+    }
+
+    // if both entities are static objects, collision cannot happen
+    // between them.
+    if (!(entity->flags & ENTITY_FLAG_MOVING) &&
+        !(ent2->flags & ENTITY_FLAG_MOVING))
+    {
+        return true;
+    }
+
+    if (col_ent == entc2)
+    {
+        LOG_WRN("entity contact is with itself? how tf?");
+        return true;
+    }
+
+    // narrow-phase collision. also calculates penetration vector.
+    const FIXED hw0 = col_ent->half_width;
+    const FIXED hh0 = col_ent->half_height;
+    const FIXED hw1 = entc2->half_width;
+    const FIXED hh1 = entc2->half_height;
+    
+    col_overlap_res_s overlap_res =
+        rect_collision(entity->pos.x, entity->pos.y, hw0, hh0,
+                        ent2->pos.x, ent2->pos.y, hw1, hh1);
+
+    if (!overlap_res.overlap)
+        return true;
+    if (overlap_res.ny <= 0 && ent2->col.flags & COL_FLAG_FLOOR_ONLY)
+        return true;
+    if (overlap_res.ny >= 0 && entity->col.flags & COL_FLAG_FLOOR_ONLY)
+        return true;
+
+    // add contact to contact list
+    if (col_contact_count >= MAX_CONTACT_COUNT)
+    {
+        LOG_WRN("max contacts exceeded!");
+        return false;
+    }
+
+    col_contacts[col_contact_count] = (col_contact_s)
+    {
+        .nx = overlap_res.nx,
+        .ny = overlap_res.ny,
+        .pd = overlap_res.pd,
+        .ent_a = col_ent,
+        .ent_b = entc2,
+        .priority = (entity->flags & ENTITY_FLAG_MOVING) ||
+                    (ent2->flags & ENTITY_FLAG_MOVING)
+    };
+    ++col_contact_count;
+
+    // run behavior callbacks
+    int nx_int = sgn3(overlap_res.nx);
+    int ny_int = sgn3(overlap_res.ny);
+
+    if (entity->behavior && entity->behavior->ent_touch)
+        entity->behavior->ent_touch(entity, ent2, nx_int, ny_int);
+    if (ent2->behavior && ent2->behavior->ent_touch)
+        ent2->behavior->ent_touch(ent2, entity, -nx_int, -ny_int);
+
+    return true;
+}
+
 ARM_FUNC NO_INLINE
-static void physics_substeps_collect_contacts(void)
+static void physics_substep_collect_contacts(void)
 {
     PROFILE_START();
 
-    update_edge_lists();
+    // update spatial partition
+    for (int i = 0; i < col_ent_count; ++i)
+    {
+        entity_coldata_s *const col_ent = col_ents[i];
+        entity_s *entity = col_ent->ent;
+        
+        if (!col_ent->dirty)
+            continue;
+
+        aabb_s new_aabb = calc_ent_pgrid_bounds(entity);
+        if (!aabb_equal(&col_ent->pgrid_bounds, &new_aabb))
+        {
+            ent_pgrid_remove(col_ent, &col_ent->pgrid_bounds);
+            ent_pgrid_add(col_ent, &new_aabb);
+            col_ent->pgrid_bounds = new_aabb;
+        }
+
+        if (!(entity->flags & ENTITY_FLAG_MOVING))
+            col_ent->dirty = false;
+    }
+
     col_contact_count = 0;
 
     // collect entity contacts
-    for (int i = 0; i < x_overlap_count; ++i)
+    for (int i = 0; i < col_ent_count; ++i)
     {
-        if (col_contact_count >= MAX_CONTACT_COUNT)
-        {
-            LOG_WRN("max contacts exceeded!");
-            return;
-        }
-
-        // check if this X overlap between two entities also exists on the Y
-        // axis
-        const col_bp_overlap_s *x_overlap = x_overlaps + i;
-        uint pkey = upair2u(x_overlap->eid_a, x_overlap->eid_b);
-        if (!ENTITY_PAIR_GET(y_contact_pairs, pkey)) continue;
-
-        entity_coldata_s *col_ent = col_ent_map + x_overlap->eid_a;
-        entity_coldata_s *entc2 = col_ent_map + x_overlap->eid_b;
-
-        // make sure that the second entity is the static one
-        if (entc2->ent->flags & ENTITY_FLAG_MOVING)
-        {
-            entity_coldata_s *temp;
-            SWAP3(col_ent, entc2, temp);
-        }
-
-        entity_s *entity = col_ent->ent;
-        entity_s *ent2 = entc2->ent;
-
-        // don't handle collision if one of the entities is queued to be
-        // freed
-        if ((entity->flags & ENTITY_FLAG_QFREE) ||
-            (ent2->flags & ENTITY_FLAG_QFREE))
-        {
-            continue;   
-        }
-
-        // if both entities are static objects, collision cannot happen
-        // between them.
-        if (!(entity->flags & ENTITY_FLAG_MOVING) &&
-            !(ent2->flags & ENTITY_FLAG_MOVING))
+        entity_coldata_s *col_ent = col_ents[i];
+        if (!col_ent->dirty)
+            continue;
+        if (!(col_ent->ent->flags & ENTITY_FLAG_MOVING))
             continue;
 
-        if (col_ent == entc2)
+        aabb_s pgrid_bounds = col_ent->pgrid_bounds;
+        for (uint y = pgrid_bounds.top; y <= pgrid_bounds.bottom; ++y)
+        for (uint x = pgrid_bounds.left; x <= pgrid_bounds.right; ++x)
         {
-            LOG_WRN("entity contact is with itself? how tf?");
-            continue;
+            for (ent_pgrid_node_s *node = ent_pgrid[y][x]; node;
+                 node = node->next)
+            {
+                if (col_ent == node->cent)
+                    continue;
+
+                bool s = physics_substep_process_contact(col_ent, node->cent);
+                if (!s)
+                {
+                    PROFILE_END(detection_ent_t);
+                    goto end;
+                }
+            }
+            
         }
-
-        // narrow-phase collision. also calculates penetration vector.
-        const FIXED hw0 = col_ent->half_width;
-        const FIXED hh0 = col_ent->half_height;
-        const FIXED hw1 = entc2->half_width;
-        const FIXED hh1 = entc2->half_height;
-        
-        col_overlap_res_s overlap_res =
-            rect_collision(entity->pos.x, entity->pos.y, hw0, hh0,
-                            ent2->pos.x, ent2->pos.y, hw1, hh1);
-
-        if (!overlap_res.overlap) continue;
-        if (overlap_res.ny <= 0 && ent2->col.flags & COL_FLAG_FLOOR_ONLY)
-            continue;
-        if (overlap_res.ny >= 0 && entity->col.flags & COL_FLAG_FLOOR_ONLY)
-            continue;
-
-        // add contact to contact list
-        col_contacts[col_contact_count] = (col_contact_s)
-        {
-            .nx = overlap_res.nx,
-            .ny = overlap_res.ny,
-            .pd = overlap_res.pd,
-            .ent_a = col_ent,
-            .ent_b = entc2,
-            .priority = (entity->flags & ENTITY_FLAG_MOVING) ||
-                        (ent2->flags & ENTITY_FLAG_MOVING)
-        };
-        ++col_contact_count;
-
-        // run behavior callbacks
-        int nx_int = sgn3(overlap_res.nx);
-        int ny_int = sgn3(overlap_res.ny);
-
-        if (entity->behavior && entity->behavior->ent_touch)
-            entity->behavior->ent_touch(entity, ent2, nx_int, ny_int);
-        if (ent2->behavior && ent2->behavior->ent_touch)
-            ent2->behavior->ent_touch(ent2, entity, -nx_int, -ny_int);
     }
 
     PROFILE_END(detection_ent_t);
@@ -472,7 +522,8 @@ static void physics_substeps_collect_contacts(void)
         if (col_contact_count >= MAX_CONTACT_COUNT)
         {
             LOG_WRN("max contacts exceeded!");
-            return;
+            PROFILE_END(detection_tile_t);
+            goto end;
         }
 
         entity_coldata_s *const col_ent = col_ents[i];
@@ -557,6 +608,7 @@ static void physics_substeps_collect_contacts(void)
 
     PROFILE_END(detection_tile_t);
 
+    end:;
     // sort contacts such that those with the most penetration will be
     // processed first. also, i want contacts containing static bodies to
     // be processed first as well.
@@ -596,9 +648,10 @@ static bool physics_substep(FIXED vel_mult)
             FIXED s_vy = fxmul(entity->vel.y, vel_mult);
             entity->pos.x += s_vx;
             entity->pos.y += s_vy;
+
+            col_ent->dirty = true;
         }
 
-        col_ent->dirty = true;
         col_ent->head_bump = entity->col.flags & COL_FLAG_HEAD_BUMP;
         col_ent->x_anchor = 0;
         col_ent->y_anchor = 0;
@@ -617,7 +670,7 @@ static bool physics_substep(FIXED vel_mult)
             break;
         }
 
-        physics_substeps_collect_contacts();
+        physics_substep_collect_contacts();
 
         PROFILE_START();
         bool break_substep = true;
@@ -894,13 +947,13 @@ static bool physics_substep(FIXED vel_mult)
 #pragma region projectile physics
 
 // in world units (8 units per tile)
-#define PARTGRID_CEL_W 64
-#define PARTGRID_CEL_H 64
-#define PARTGRID_COLS  8
-#define PARTGRID_ROWS  8
-#define PARTGRID_NODE_POOL_SIZE 128
+#define PROJ_PGRID_CELL_W 64
+#define PROJ_PGRID_CELL_H 64
+#define PROJ_PGRID_COLS  8
+#define PROJ_PGRID_ROWS  8
+#define PROJ_PGRID_NODE_POOL_SIZE 128
 
-typedef struct partgrid_node
+typedef struct proj_pgrid_node
 {
     projectile_s *projectile;
 
@@ -909,42 +962,42 @@ typedef struct partgrid_node
     // the next unallocated node in the pool.
     union
     {
-        struct partgrid_node *next;
-        struct partgrid_node *next_free;
+        struct proj_pgrid_node *next;
+        struct proj_pgrid_node *next_free;
     };
-} partgrid_node_s;
+} proj_pgrid_node_s;
 
-typedef partgrid_node_s *part_cell_t;
+typedef proj_pgrid_node_s *proj_pgrid_cell_t;
 
-typedef struct proj_part_data
+typedef struct proj_pgrid_data
 {
-    part_cell_t *part_cell;
+    proj_pgrid_cell_t *part_cell;
 }
-proj_part_data_s;
+proj_pgrid_data_s;
 
-static proj_part_data_s proj_data[MAX_PROJECTILE_COUNT];
-static partgrid_node_s partgrid_node_pool[PARTGRID_NODE_POOL_SIZE];
-static partgrid_node_s *partgrid_node_pool_ffree; // first free
-static part_cell_t partgrid[PARTGRID_ROWS][PARTGRID_COLS];
-
-
+static proj_pgrid_data_s proj_data[MAX_PROJECTILE_COUNT];
+static proj_pgrid_node_s proj_pgrid_node_pool[PROJ_PGRID_NODE_POOL_SIZE];
+static proj_pgrid_node_s *proj_pgrid_node_pool_ffree; // first free
+static proj_pgrid_cell_t proj_pgrid[PROJ_PGRID_ROWS][PROJ_PGRID_COLS];
 
 
 
 
 
-static partgrid_node_s* partgrid_node_alloc(projectile_s *proj)
+
+
+static proj_pgrid_node_s* proj_pgrid_node_alloc(projectile_s *proj)
 {
-    partgrid_node_s *node = partgrid_node_pool_ffree;
+    proj_pgrid_node_s *node = proj_pgrid_node_pool_ffree;
     if (!node)
     {
-        LOG_ERR("partgrid_node_pool full!");
+        LOG_ERR("proj_pgrid_node_pool full!");
         return NULL;
     }
 
-    partgrid_node_pool_ffree = node->next_free;
+    proj_pgrid_node_pool_ffree = node->next_free;
 
-    *node = (partgrid_node_s)
+    *node = (proj_pgrid_node_s)
     {
         .projectile = proj,
     };
@@ -952,27 +1005,27 @@ static partgrid_node_s* partgrid_node_alloc(projectile_s *proj)
     return node;
 }
 
-static void partgrid_node_free(partgrid_node_s *node)
+static void proj_pgrid_node_free(proj_pgrid_node_s *node)
 {
     node->projectile = NULL;
-    node->next_free = partgrid_node_pool_ffree;
-    partgrid_node_pool_ffree = node;
+    node->next_free = proj_pgrid_node_pool_ffree;
+    proj_pgrid_node_pool_ffree = node;
 }
 
-static partgrid_node_s* partgrid_cell_remove(partgrid_node_s **cell,
-                                             const projectile_s *proj)
+static proj_pgrid_node_s* proj_pgrid_cell_remove(proj_pgrid_node_s **cell,
+                                                 const projectile_s *proj)
 {
     if (!(*cell)) return NULL;
 
     if ((*cell)->projectile == proj)
     {
-        partgrid_node_s *node = *cell;
+        proj_pgrid_node_s *node = *cell;
         *cell = node->next;
         return node;
     }
 
-    partgrid_node_s *node = *cell;
-    partgrid_node_s *next = node->next;
+    proj_pgrid_node_s *node = *cell;
+    proj_pgrid_node_s *next = node->next;
     while (next)
     {
         if (next->projectile == proj)
@@ -989,8 +1042,8 @@ static partgrid_node_s* partgrid_cell_remove(partgrid_node_s **cell,
     return NULL;
 }
 
-static void partgrid_cell_insert(partgrid_node_s **cell,
-                                 partgrid_node_s *new_node)
+static void proj_pgrid_cell_insert(proj_pgrid_node_s **cell,
+                                 proj_pgrid_node_s *new_node)
 {
     new_node->next = *cell;
     *cell = new_node;
@@ -1002,7 +1055,7 @@ static void game_physics_move_projs(FIXED vel_mult)
     for (uint i = 0; i < MAX_PROJECTILE_COUNT; ++i)
     {
         projectile_s *proj = g_game.projectiles + i;
-        proj_part_data_s *pdata = proj_data + i;
+        proj_pgrid_data_s *pdata = proj_data + i;
         if (!IS_PROJ_ACTIVE(proj) || (proj->flags & PROJ_FLAG_QFREE)) continue;
 
         proj->px += fxmul(proj->vx, vel_mult);
@@ -1022,35 +1075,35 @@ static void game_physics_move_projs(FIXED vel_mult)
             continue;
         }
 
-        int new_px = proj->px / (FIX_ONE * PARTGRID_CEL_W);
-        int new_py = proj->py / (FIX_ONE * PARTGRID_CEL_H);
+        int new_px = proj->px / (FIX_ONE * PROJ_PGRID_CELL_W);
+        int new_py = proj->py / (FIX_ONE * PROJ_PGRID_CELL_H);
 
         // clamp position to partition grid
-        if      (new_px < 0)              new_px = 0;
-        else if (new_px >= PARTGRID_COLS) new_px = PARTGRID_COLS - 1;
+        if      (new_px < 0)                new_px = 0;
+        else if (new_px >= PROJ_PGRID_COLS) new_px = PROJ_PGRID_COLS - 1;
 
-        if      (new_py < 0)              new_py = 0;
-        else if (new_py >= PARTGRID_ROWS) new_py = PARTGRID_ROWS - 1;
+        if      (new_py < 0)                new_py = 0;
+        else if (new_py >= PROJ_PGRID_ROWS) new_py = PROJ_PGRID_ROWS - 1;
         
         // location in partition grid changed?
-        part_cell_t *new_part_cell = &partgrid[new_py][new_px];
+        proj_pgrid_cell_t *new_part_cell = &proj_pgrid[new_py][new_px];
         if (pdata->part_cell != new_part_cell)
         {
             // LOG_DBG("location in partition grid changed");
 
             // remove from linked list of old cell
-            partgrid_node_s *node = pdata->part_cell
-                ? partgrid_cell_remove(pdata->part_cell, proj)
+            proj_pgrid_node_s *node = pdata->part_cell
+                ? proj_pgrid_cell_remove(pdata->part_cell, proj)
                 : NULL;
             if (!node)
             {
                 // LOG_DBG("old partition cell had no data");
-                node = partgrid_node_alloc(proj);
+                node = proj_pgrid_node_alloc(proj);
                 if (!node) DBG_CRASH();
             }
 
             // move node to new cell (or create a new node if not exists)
-            partgrid_cell_insert(new_part_cell, node);
+            proj_pgrid_cell_insert(new_part_cell, node);
             pdata->part_cell = new_part_cell;
         }
     }
@@ -1072,29 +1125,29 @@ static void game_physics_move_projs(FIXED vel_mult)
         const int er = (entity->pos.x + col_w);
         const int eb = (entity->pos.y + col_h);
 
-        int min_px = el / (FIX_ONE * PARTGRID_CEL_W);
-        int min_py = et / (FIX_ONE * PARTGRID_CEL_H);
-        int max_px = er / (FIX_ONE * PARTGRID_CEL_W);
-        int max_py = eb / (FIX_ONE * PARTGRID_CEL_H);
+        int min_px = el / (FIX_ONE * PROJ_PGRID_CELL_W);
+        int min_py = et / (FIX_ONE * PROJ_PGRID_CELL_H);
+        int max_px = er / (FIX_ONE * PROJ_PGRID_CELL_W);
+        int max_py = eb / (FIX_ONE * PROJ_PGRID_CELL_H);
 
         // clamp bounds to partition grid
-        if      (min_px < 0)              min_px = 0;
-        else if (min_px >= PARTGRID_COLS) min_px = PARTGRID_COLS - 1;
-        if      (max_px < 0)              max_px = 0;
-        else if (max_px >= PARTGRID_COLS) max_px = PARTGRID_COLS - 1;
+        if      (min_px < 0)                min_px = 0;
+        else if (min_px >= PROJ_PGRID_COLS) min_px = PROJ_PGRID_COLS - 1;
+        if      (max_px < 0)                max_px = 0;
+        else if (max_px >= PROJ_PGRID_COLS) max_px = PROJ_PGRID_COLS - 1;
 
-        if      (min_py < 0)              min_py = 0;
-        else if (min_py >= PARTGRID_ROWS) min_py = PARTGRID_ROWS - 1;
-        if      (max_py < 0)              max_py = 0;
-        else if (max_py >= PARTGRID_ROWS) max_py = PARTGRID_ROWS - 1;
+        if      (min_py < 0)                min_py = 0;
+        else if (min_py >= PROJ_PGRID_ROWS) min_py = PROJ_PGRID_ROWS - 1;
+        if      (max_py < 0)                max_py = 0;
+        else if (max_py >= PROJ_PGRID_ROWS) max_py = PROJ_PGRID_ROWS - 1;
 
         for (int y = min_py; y <= max_py; ++y)
         {
             for (int x = min_px; x <= max_px; ++x)
             {
                 // traverse linked list
-                for (partgrid_node_s *node = partgrid[y][x]; node;
-                    node = node->next)
+                for (proj_pgrid_node_s *node = proj_pgrid[y][x]; node;
+                     node = node->next)
                 {
                     projectile_s *proj = node->projectile;
 
@@ -1148,27 +1201,35 @@ void game_physics_init(void)
 {
     col_ent_count = 0;
     col_contact_count = 0;
-    x_overlap_count = 0;
-    x_edge_count = 0;
-    y_edge_count = 0;
     
     for (int i = 0; i < MAX_ENTITY_COUNT; ++i)
         col_ent_map[i] = (entity_coldata_s){0};
 
-    for (int i = 0; i < PARTGRID_NODE_POOL_SIZE - 1; ++i)
-        partgrid_node_pool[i] = (partgrid_node_s)
+    // initialize entity partition-grid
+    for (int i = 0; i < ENT_PGRID_NODE_POOL_SIZE - 1; ++i)
+        ent_pgrid_node_pool[i] = (ent_pgrid_node_s)
         {
-            .next_free = partgrid_node_pool + i + 1
+            .next_free = ent_pgrid_node_pool + i + 1
         };
 
-    partgrid_node_pool[PARTGRID_NODE_POOL_SIZE - 1] = (partgrid_node_s){0};
-    partgrid_node_pool_ffree = partgrid_node_pool;
+    ent_pgrid_node_pool[ENT_PGRID_NODE_POOL_SIZE - 1] = (ent_pgrid_node_s){0};
+    ent_pgrid_node_pool_ffree = ent_pgrid_node_pool;
 
-    for (int i = 0; i < PARTGRID_COLS * PARTGRID_ROWS; ++i)
-        ((part_cell_t *)partgrid)[i] = NULL;
+    for (int i = 0; i < ENT_PGRID_COLS * ENT_PGRID_ROWS; ++i)
+        ((ent_pgrid_cell_t *)ent_pgrid)[i] = NULL;
 
-    memset32(x_contact_pairs, 0, ENTITY_PAIR_SIZE / 4);
-    memset32(y_contact_pairs, 0, ENTITY_PAIR_SIZE / 4);
+    // initialize projectile partition-grid
+    for (int i = 0; i < PROJ_PGRID_NODE_POOL_SIZE - 1; ++i)
+        proj_pgrid_node_pool[i] = (proj_pgrid_node_s)
+        {
+            .next_free = proj_pgrid_node_pool + i + 1
+        };
+
+    proj_pgrid_node_pool[PROJ_PGRID_NODE_POOL_SIZE - 1] = (proj_pgrid_node_s){0};
+    proj_pgrid_node_pool_ffree = proj_pgrid_node_pool;
+
+    for (int i = 0; i < PROJ_PGRID_COLS * PROJ_PGRID_ROWS; ++i)
+        ((proj_pgrid_cell_t *)proj_pgrid)[i] = NULL;
 }
 
 void game_physics_on_entity_alloc(entity_s *ent) {}
@@ -1317,7 +1378,7 @@ void game_physics_update(void)
 void game_physics_on_proj_alloc(projectile_s *proj)
 {
     intptr_t idx = proj - g_game.projectiles; // does this do division??
-    proj_data[idx] = (proj_part_data_s)
+    proj_data[idx] = (proj_pgrid_data_s)
     {
         .part_cell = NULL
     };
@@ -1326,20 +1387,20 @@ void game_physics_on_proj_alloc(projectile_s *proj)
 void game_physics_on_proj_free(projectile_s *proj)
 {
     intptr_t idx = proj - g_game.projectiles; // does this do division??
-    proj_part_data_s *data = proj_data + idx;
+    proj_pgrid_data_s *data = proj_data + idx;
 
     if (data->part_cell)
     {
-        partgrid_node_s *cell = partgrid_cell_remove(data->part_cell, proj);
-        *data = (proj_part_data_s){0};
+        proj_pgrid_node_s *cell = proj_pgrid_cell_remove(data->part_cell, proj);
+        *data = (proj_pgrid_data_s){0};
 
         if (!cell)
         {
-            LOG_WRN("game_physics_on_proj_free: projectile is not in partgrid?");
+            LOG_WRN("game_physics_on_proj_free: projectile is not in proj_pgrid?");
             return;
         }
 
-        partgrid_node_free(cell);
+        proj_pgrid_node_free(cell);
     }
 }
 
