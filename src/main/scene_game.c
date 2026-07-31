@@ -7,6 +7,7 @@
 #include <data/graphics/tileset_gfx.h>
 #include <data/graphics/automap_tiles_gfx.h>
 #include <data/graphics/sky_bg1_gfx.h>
+#include <data/graphics/sky_bg2_gfx.h>
 #include <data/music.h>
 #include <data/world.h>
 
@@ -17,6 +18,11 @@
 #include "automap.h"
 #include "math_util.h"
 #include "options_menu.h"
+
+//------------------------------------------------------------------------------
+// declarations
+//------------------------------------------------------------------------------
+#pragma region declarations
 
 #ifdef DEVDEBUG
 #define SPAWN_ROOM_INDEX 0
@@ -45,12 +51,20 @@ enum
     SUBSTATE_MAP,
 };
 
+enum
+{
+    VRAM_BANK1_TILESET_NONE,
+    VRAM_BANK1_TILESET_AUTOMAP,
+    VRAM_BANK1_TILESET_SKY,
+};
+
 struct scene_state
 {
     uint last_player_ammo;
     uint last_rorbs;
     uint last_borbs;
     uint blink_timer;
+    uint last_bg_id;
     automap_s automap;
     FIXED map_sx;
     FIXED map_sy;
@@ -58,6 +72,144 @@ struct scene_state
     u8 substate;
     menu_s pause_menu;
 } static state EWRAM_BSS;
+
+// DURING GAMEPLAY OR WHEN PAUSED:
+//   (0-7)  ->(0-7): pause menu
+//   (10-11)->(18->19): HUD
+// DURING DIALOGUE:
+//   everything: dialogue
+
+static void pause_game(void);
+static void unpause_game(void);
+
+#pragma endregion declarations
+
+
+
+
+
+
+
+
+
+//------------------------------------------------------------------------------
+// vram control
+//------------------------------------------------------------------------------
+#pragma region vram control
+
+ARM_FUNC NO_INLINE
+#ifdef __arm__
+__attribute__((naked))
+#endif
+static void se_copy_ofs(SCR_ENTRY *restrict dst_se,
+                        const SCR_ENTRY *restrict src_se, size_t count,
+                        uint ofs)
+{
+#ifndef __arm__
+    for (; count; --count)
+        *(dst_se++) = *(src_se++) + ofs;
+#else
+    // wait i'm stupid i forgot ldm and stm only work for words. and not
+    // halfwords. of course it wouldn't. well. i suppose i already wrote this.
+    asm (
+        "cmp r2, #0        \n"
+        "0:                \n\t"
+        "bxeq lr           \n\t"
+        "ldrh ip, [r1], #2 \n\t"
+        "add ip, r3        \n\t"
+        "strh ip, [r0], #2 \n\t"
+        "subs r2, #1       \n\t"
+        "b 0b              \n\t"
+    );
+#endif
+}
+
+// function to load either the sky bg tileset or the automap tileset into
+// tile_mem bank 1
+static void vram_bank1_load(int id)
+{
+    LOG_DBG("vram_bank1_load: %i", id);
+
+    switch (id)
+    {
+    case VRAM_BANK1_TILESET_AUTOMAP:
+    {
+        // load automap tileset
+        memcpy32(&tile_mem[1][0], automap_tiles_gfxTiles,
+                 automap_tiles_gfxTilesLen / 4);    
+        gfx_unload_map(2);
+        break;
+    }
+
+    case VRAM_BANK1_TILESET_SKY:
+    {
+        uint sky_bg2_gfxTilesOfs = sky_bg1_gfxTilesLen / sizeof(TILE);
+        
+        // copy tiles
+        memcpy32(&tile_mem[1][0], sky_bg1_gfxTiles, sky_bg1_gfxTilesLen / 4);
+        memcpy32(&tile_mem[1][sky_bg2_gfxTilesOfs], sky_bg2_gfxTiles,
+                 sky_bg2_gfxTilesLen / 4);
+        
+        // load sky_bg1 map
+        gfx_load_map(2, &(gfx_map_s)
+        {
+            .width = 48,
+            .height = 32,
+            .gfx_format = GFX_MAP_FORMAT_GBA,
+            .data = sky_bg1_gfxMap,
+        });
+
+        // load sky_bg2 map
+        se_copy_ofs(&se_mem[GFX_BG3_INDEX][0], sky_bg2_gfxMap,
+                    sky_bg2_gfxMapLen / sizeof(SCR_ENTRY), sky_bg2_gfxTilesOfs);
+        break;
+    }
+
+    case VRAM_BANK1_TILESET_NONE:
+    {
+        gfx_unload_map(2);
+        break;
+    }
+    }
+}
+
+static void update_game_bg_ctl(bool force)
+{
+    uint bg_id = g_game.room->map->bg_id;
+
+    bool enable_bg = bg_id == 1;
+
+    gfx_ctl.bg[0].enabled = true;
+    gfx_ctl.bg[1].enabled = true;
+    gfx_ctl.bg[2].enabled = enable_bg;
+    gfx_ctl.bg[3].enabled = enable_bg;
+    gfx_ctl.enable_obj = true;
+
+    if (force || bg_id != state.last_bg_id)
+    {
+        state.last_bg_id = bg_id;
+
+        if (bg_id == 1)
+            vram_bank1_load(VRAM_BANK1_TILESET_SKY);
+        else
+            vram_bank1_load(VRAM_BANK1_TILESET_NONE);
+    }
+}
+
+#pragma endregion vram control
+
+
+
+
+
+
+
+
+
+//------------------------------------------------------------------------------
+// hud
+//------------------------------------------------------------------------------
+#pragma region hud
 
 static void int_to_str(int n, char *buf)
 {
@@ -86,12 +238,6 @@ static void int_to_str(int n, char *buf)
     }
     while (ch > buf);
 }
-
-// DURING GAMEPLAY OR WHEN PAUSED:
-//   (0-7)  ->(0-7): pause menu
-//   (10-11)->(18->19): HUD
-// DURING DIALOGUE:
-//   everything: dialogue
 
 static void clear_game_hud(void)
 {
@@ -136,34 +282,67 @@ static void setup_game_hud(void)
     update_hud_sprites(0, 0);
 }
 
-enum
+static void update_hud(bool force_dirty)
 {
-    VRAM_BANK1_TILESET_AUTOMAP,
-    VRAM_BANK1_TILESET_SKY,
-};
-// function to load either the sky bg tileset or the automap tileset into
-// tile_mem bank 1
-static void vram_bank1_load(int id)
-{
-    if (id == VRAM_BANK1_TILESET_AUTOMAP)
+    char buf[8];
+
+    if (force_dirty || g_game.player_ammo != state.last_player_ammo)
     {
-        // load automap tileset
-        memcpy32(&tile_mem[1][0], automap_tiles_gfxTiles,
-                 automap_tiles_gfxTilesLen / 4);
-    
-    } else if (id == VRAM_BANK1_TILESET_SKY) {
-        // copy sky_bg1 to bg 2 and 3. each half of the image contains 1024
-        // tiles.
-        memcpy32(&se_mem[GFX_BG2_INDEX], sky_bg1_gfxMap, 1024 * 2 / 4);
-        memcpy32(&se_mem[GFX_BG3_INDEX], sky_bg1_gfxMap + 1024, 1024 * 2 / 4);
-        memcpy32(&tile_mem[1][0], sky_bg1_gfxTiles, sky_bg1_gfxTilesLen / 4);
+        state.last_player_ammo = g_game.player_ammo;
+        
+        int_to_str(g_game.player_ammo, buf);
+        gfx_text_bmap_print(12, HUD_Y_ORIGIN, "\x7F\x7F\x7F", TEXT_COLOR_BLACK);
+        gfx_text_bmap_print(12, HUD_Y_ORIGIN, buf, TEXT_COLOR_WHITE);
     }
+
+    if (force_dirty || g_game.collected_rorbs != state.last_rorbs)
+    {
+        state.last_rorbs = g_game.collected_rorbs;
+        int_to_str(g_game.collected_rorbs, buf);
+
+        gfx_text_bmap_print(240 - 36, HUD_Y_ORIGIN, "\x7F", TEXT_COLOR_BLACK);
+        gfx_text_bmap_print(240 - 36, HUD_Y_ORIGIN, buf, TEXT_COLOR_WHITE);
+    }
+
+    if (force_dirty || g_game.collected_borbs != state.last_borbs)
+    {
+        state.last_borbs = g_game.collected_borbs;
+        int_to_str(g_game.collected_borbs, buf);
+
+        gfx_text_bmap_print(240 - 12, HUD_Y_ORIGIN, "\x7F", TEXT_COLOR_BLACK);
+        gfx_text_bmap_print(240 - 12, HUD_Y_ORIGIN, buf, TEXT_COLOR_WHITE);
+    }
+
+    uint face_frame = 0;
+    if (g_game.player_spit_mode == PLAYER_SPIT_MODE_BULLET)
+        face_frame = 1;
+
+    if (state.blink_timer <= 4)
+        face_frame = 2;
+
+    if (--state.blink_timer == 0)
+        state.blink_timer = 150;
+
+    if (g_game.player_is_dead)
+        face_frame = 3;
+    
+    update_hud_sprites(face_frame, g_game.player_spit_mode);
 }
 
-// TODO: maybe reorganize the code so these forward declarations are not
-// necessary
-static void unpause_game(void);
-static void update_hud(bool force_dirty);
+#pragma endregion hud
+
+
+
+
+
+
+
+
+
+//------------------------------------------------------------------------------
+// automap
+//------------------------------------------------------------------------------
+#pragma region automap
 
 static void open_map(void)
 {
@@ -221,9 +400,9 @@ static void close_map(void)
 
     gfx_ctl.bg[1].char_block = 0;
     // gfx_ctl.bg[1].bpp = GFX_BG_8BPP;
-    gfx_load_map(1, g_game.room->map);
-
-    vram_bank1_load(VRAM_BANK1_TILESET_SKY);
+    gfx_load_map(1, &g_game.gfx_map);
+    
+    update_game_bg_ctl(true);
 
     // reset pause menu display
     gfx_text_bmap_dst_assign(0, 10, 0, GFX_TEXTPAL_NORMAL);
@@ -270,30 +449,25 @@ static void update_map(void)
     automap_update_view(&state.automap, &sprdraw_state);
 }
 
+#pragma endregion automap
+
+
+
+
+
+
+
+
+
+//------------------------------------------------------------------------------
+// pause menu
+//------------------------------------------------------------------------------
+#pragma region pause menu
+
 static void open_pause_menu(void)
 {
     // background fill
     gfx_text_bmap_fill_rect(2, 2, 98, 74, 1, 0);
-    // u32 bg_t[8] =  {0x00000000, 0x00000000, 0x11111111, 0x11111111,
-    //                 0x11111111, 0x11111111, 0x11111111, 0x11111111};
-    // u32 bg_r[8] =  {0x00001111, 0x00001111, 0x00001111, 0x00001111,
-    //                 0x00001111, 0x00001111, 0x00001111, 0x00001111};
-    // u32 bg_tr[8] = {0x00000000, 0x00000000, 0x00001111, 0x00001111,
-    //                 0x00001111, 0x00001111, 0x00001111, 0x00001111};
-    // u32 bg_l[8] =  {0x11111100, 0x11111100, 0x11111100, 0x11111100,
-    //                 0x11111100, 0x11111100, 0x11111100, 0x11111100};
-    // u32 bg_tl[8] = {0x00000000, 0x00000000, 0x11111100, 0x11111100,
-    //                 0x11111100, 0x11111100, 0x11111100, 0x11111100};
-    // u32 bg_f[8] =  {0x11111111, 0x11111111, 0x11111111, 0x11111111,
-    //                 0x11111111, 0x11111111, 0x11111111, 0x11111111};
-    // gfx_text_bmap_fill(1, 1, 11, 7, bg_f);
-    // gfx_text_bmap_fill(0, 0, 12, 1, bg_t);
-    // gfx_text_bmap_fill(12, 0, 1, 1, bg_tr);
-    // gfx_text_bmap_fill(12, 1, 1, 7, bg_r);
-    // gfx_text_bmap_fill(0, 1, 1, 7, bg_l);
-    // gfx_text_bmap_fill(0, 0, 1, 1, bg_tl);
-
-    // print text
     gfx_text_bmap_print(4, 0 + 4, "PAUSED", TEXT_COLOR_BLUE);
     menu_show(&state.pause_menu);
 }
@@ -375,75 +549,30 @@ static void update_pause_menu(void)
     }
 }
 
-static void update_hud(bool force_dirty)
-{
-    char buf[8];
+#pragma endregion pause menu
 
-    if (force_dirty || g_game.player_ammo != state.last_player_ammo)
-    {
-        state.last_player_ammo = g_game.player_ammo;
-        
-        int_to_str(g_game.player_ammo, buf);
-        gfx_text_bmap_print(12, HUD_Y_ORIGIN, "\x7F\x7F\x7F", TEXT_COLOR_BLACK);
-        gfx_text_bmap_print(12, HUD_Y_ORIGIN, buf, TEXT_COLOR_WHITE);
-    }
 
-    if (force_dirty || g_game.collected_rorbs != state.last_rorbs)
-    {
-        state.last_rorbs = g_game.collected_rorbs;
-        int_to_str(g_game.collected_rorbs, buf);
 
-        gfx_text_bmap_print(240 - 36, HUD_Y_ORIGIN, "\x7F", TEXT_COLOR_BLACK);
-        gfx_text_bmap_print(240 - 36, HUD_Y_ORIGIN, buf, TEXT_COLOR_WHITE);
-    }
 
-    if (force_dirty || g_game.collected_borbs != state.last_borbs)
-    {
-        state.last_borbs = g_game.collected_borbs;
-        int_to_str(g_game.collected_borbs, buf);
 
-        gfx_text_bmap_print(240 - 12, HUD_Y_ORIGIN, "\x7F", TEXT_COLOR_BLACK);
-        gfx_text_bmap_print(240 - 12, HUD_Y_ORIGIN, buf, TEXT_COLOR_WHITE);
-    }
 
-    uint face_frame = 0;
-    if (g_game.player_spit_mode == PLAYER_SPIT_MODE_BULLET)
-        face_frame = 1;
 
-    if (state.blink_timer <= 4)
-        face_frame = 2;
 
-    if (--state.blink_timer == 0)
-        state.blink_timer = 150;
 
-    if (g_game.player_is_dead)
-        face_frame = 3;
-    
-    update_hud_sprites(face_frame, g_game.player_spit_mode);
-}
-
-static void update_game_bg_ctl(void)
-{
-    bool enable_bg = g_game.room->map->bg_id == 1;
-    gfx_ctl.bg[0].enabled = true;
-    gfx_ctl.bg[1].enabled = true;
-    gfx_ctl.bg[2].enabled = enable_bg;
-    gfx_ctl.bg[3].enabled = enable_bg;
-    gfx_ctl.enable_obj = true;
-}
+//------------------------------------------------------------------------------
+// lifecycle
+//------------------------------------------------------------------------------
+#pragma region lifecycle
 
 static void scene_load(uintptr_t data)
 {
-    gfx_ctl.bg[1].bpp = GFX_BG_4BPP;
-    gfx_ctl.bg[1].char_block = 0;
-    gfx_ctl.bg[1].enabled = false; // will be enabled on subsequent frame
-
     state = (struct scene_state)
     {
         .last_player_ammo = UINT_MAX,
         .last_rorbs = UINT_MAX,
         .last_borbs = UINT_MAX,
         .blink_timer = 150,
+        .last_bg_id = (uint)-1,
         .substate = SUBSTATE_NORMAL,
         .pause_menu = (menu_s)
         {
@@ -455,13 +584,10 @@ static void scene_load(uintptr_t data)
         },
     };
 
-    automap_init(&state.automap);
-
-    const world_room_s *room = &world_rooms[SPAWN_ROOM_INDEX];
-    gfx_load_map(1, room->map);
-    gfx_ctl.bg[1].offset_x = 0;
-    gfx_ctl.bg[1].offset_y = 0;
-    game_init();
+    // disable display while game is loading
+    gfx_ctl.bg[1].bpp = GFX_BG_4BPP;
+    gfx_ctl.bg[1].char_block = 0;
+    gfx_ctl.bg[1].enabled = false;
 
     gfx_ctl.bg[2].bpp = GFX_BG_4BPP;
     gfx_ctl.bg[2].char_block = 1;
@@ -471,13 +597,22 @@ static void scene_load(uintptr_t data)
     gfx_ctl.bg[3].char_block = 1;
     gfx_ctl.bg[3].enabled = false;
 
+    gfx_commit();
+
+    game_init();
+    automap_init(&state.automap);
+
+    const world_room_s *room = &world_rooms[SPAWN_ROOM_INDEX];
+
     game_load_room(room);
     game_reset_player_pos();
     game_save_state(); // fix respawn function before first checkpoint
 
-    gfx_commit();
-
-    vram_bank1_load(VRAM_BANK1_TILESET_SKY);
+    // load map into vram
+    gfx_load_map(1, &g_game.gfx_map);
+    gfx_ctl.bg[1].offset_x = 0;
+    gfx_ctl.bg[1].offset_y = 0;
+    gfx_ctl.bg[1].enabled = true;
 
     // load game tileset
     memset(&tile_mem[0][0] + GFX_CHAR_GAME_TILESET, 0, sizeof(TILE));
@@ -488,7 +623,6 @@ static void scene_load(uintptr_t data)
     memcpy32(tile_mem_obj[0][0].data, game_sprdb_gfxTiles,
              game_sprdb_gfxTilesLen / 4);
     
-    gfx_ctl.bg[1].enabled = true;
     setup_game_hud();
 
     mplay_set_volume(MUSIC_VOLUME);
@@ -499,6 +633,7 @@ static void scene_unload(void)
     game_deinit();
     automap_deinit();
     gfx_unload_map(1);
+    gfx_unload_map(2);
     gfx_ctl.bg[1].offset_x = 0;
     gfx_ctl.bg[1].offset_y = 0;
     gfx_ctl.bg[2].enabled = false;
@@ -528,7 +663,7 @@ static void scene_frame(void)
     {
     case SUBSTATE_NORMAL:
     {
-        update_game_bg_ctl();
+        update_game_bg_ctl(false);
         game_update();
 
         const entity_s *player = &g_game.entities[0];
@@ -542,7 +677,7 @@ static void scene_frame(void)
     }
     
     case SUBSTATE_PAUSED:
-        update_game_bg_ctl();
+        update_game_bg_ctl(false);
         update_pause_menu();
         break;
     
@@ -569,3 +704,5 @@ const scene_desc_s scene_desc_game = {
     .unload = scene_unload,
     .frame = scene_frame
 };
+
+#pragma endregion lifecycle

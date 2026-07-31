@@ -225,7 +225,7 @@ def generate_c_source(rooms: list[str], room_data: dict[str, RoomData],
         fh.write(f"""#ifndef WORLD_H
 #define WORLD_H
 #include <tonc_types.h>
-#include <map_data.h>
+#include <mapc.h>
 
 #define WORLD_MATRIX_GRID_WIDTH 15
 #define WORLD_MATRIX_GRID_HEIGHT 11
@@ -237,7 +237,7 @@ typedef struct world_room
 {{
     u8 x, y;
     u8 music;
-    const map_header_s *map;
+    const mapc_header_s *map;
 }}
 world_room_s;
 
@@ -267,7 +267,7 @@ const world_room_s world_rooms[WORLD_ROOM_COUNT] = {{""")
 
             fc.write(f"\n    {{ .x = {room_x}, .y = {room_y}, ")
             fc.write(f".music = MOD_{room_music}, ")
-            fc.write(".map = (const map_header_s *)")
+            fc.write(".map = (const mapc_header_s *)")
             fc.write(name)
             fc.write("_map },")
         
@@ -369,8 +369,8 @@ def calc_room_automap_occupancy(room_path: str) -> Array2D:
     with open('data/maps/' + room_path + '.map', 'rb') as map_file:
         map_data = map_file.read()
     
-    (room_width, room_height, _, _, col_data_offset, _, _) = \
-        struct.unpack('<HHBxxxIIII', map_data[0:24])
+    (room_width, room_height, _, col_data_offset, _, _) = \
+        struct.unpack('<HHBxxxIII', map_data[0:20])
     
     col_data = bytearray(int_ceil_div(room_width * room_height, 4) * 4)
     j = 0

@@ -21,8 +21,9 @@ LIBS         := -sUSE_SDL=3
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
-CFLAGS      := -DPLATFORM_PC -DPLATFORM_WEB -O2 $(LIBS) $(CFLAGS)
+CFLAGS      := -DPLATFORM_PC -DPLATFORM_WEB -O2 $(CFLAGS)
 ASFLAGS     := -DPLATFORM_PC -DPLATFORM_WEB $(ASFLAGS)
+LDFLAGS     := $(LIBS) $(LDFLAGS)
 BIN2S_FLAGS += --arch wasm
 
 

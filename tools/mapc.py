@@ -77,8 +77,8 @@ def parse(ifile_path: str, output_file: BinaryIO, tileset: Tileset):
     data = base64.b64decode(data_base64.text.strip())
 
     room_name = path.splitext(path.basename(ifile_path))[0]
-    output_file.write(struct.pack('<HHBBxxI', map_width, map_height, 1,
-                                  1 if is_outdoors else 0, 0))
+    output_file.write(struct.pack('<HHBxxx', map_width, map_height,
+                                  1 if is_outdoors else 0))
 
     # get collision matrix
     col_data: list[int] = []
@@ -219,7 +219,7 @@ def parse(ifile_path: str, output_file: BinaryIO, tileset: Tileset):
             ent_data += struct.pack('<H', len(odata))
             ent_data += odata
     
-    section_offset = 24
+    section_offset = 20
     output_file.write(struct.pack('<I', section_offset)) # col offset
     section_offset += align(len(col_bytes), 4)
     output_file.write(struct.pack('<I', section_offset)) # gfx offset

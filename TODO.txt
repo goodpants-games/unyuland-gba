@@ -20,9 +20,21 @@
 - make it so pressing Start during dialogue will end the dialogue. (instead of.
   you know. bugging out the ui.)
 - I just realized i didn't add the open parenthesis to the character set :(
-- CAN'T READ SIGNS ON THE GBA BUILD. WHAT THE FUCK.
+- Add Reset Room Button
+- Add configurable window scale
+- make breakable block brown or peach (people keep thinking it's a switch)
+- Make L fire and R shoot platform
+  (Maybe also make a setting which toggles control modes)
+- Show locations of collected orbs on map
 
 - pc port: add frame time display
+
+boss:
+- boss camera autofollow
+
+room01:
+- maybe make the setpiece more obvious like a "statue" rather than a
+  mushroom
 
 b05: player scared to go down Hole.
 player should be able to do a jig when hold down (very important)
@@ -45,26 +57,6 @@ with the left or right edge of the referenced entity, and then does an O(n)
 average-case sort after all the edges have been synced.
 
 ============================= Playtest Notes ===================================
-ROOM13:
-- Maybe make it so the player can't save after fetching the ice block?
-- also, player does have to restart because they will obviously kill the gun
-  enemy first. maybe there's a way to design the room that doesn't require
-  a restart.
-
-BOSS ...
-- boss camera autofollow
-- 3rd phase is kinda confusing... Even player might not figure out why the
-  boss is backing up.
-- ok maybe timing the stalactite hits are pretty hard.
-- how tf do i make the boss easier
-- Players struggle to figure out that you're supposed to push the boss forward
-  (Not sure how to convey this... Maybe just if the boss doesn't move towards
-   you if you're too far, it'd make more sense?)
-- "that attack where it jumps and spews out 4 sets of goop orbs. make all the
-  places the goop will go telegraphed before theyre shot. because oh my GOD"
-  (I probably won't do this because integrating bitmap graphics like that into
-  the game scene is more effort than I think is worth)
-
 BOSS 07/19/26
 - bit hard to hit the stalactites when moving fast.
 - Still very difficult to time the stalactite hits. 
@@ -78,6 +70,19 @@ BOSS 07/19/26
 - I had to tell him what to do in phase 3. (Maybe added water will make it more
   obvious.)
 - Maybe I should show the boss remaining health...
+
+BOSS 07/20/26
+- Player thinks you're supposed to push boss into water in first phase. So maybe
+  make the boss not overhang a little on the edge + remove pushback from player
+  projectiles. Also make stalactite shake more obvious.
+- Ehh should i make L fire and R shoot?
+- Player thinks he needs to make platforms for the 2nd Phase?
+  Also it is taking way longer than expected. First phase is still a bit difficult
+  to execute. Maybe make the big projectile spew attack easier. like have it shoot out less often.
+- WHY DOES HE MOVE IN A ZIGZAG PATTERN IN PHASE 2. WHAT'S THE THOUGHT PROCESS.
+- okay he just cheesed the boss by making a platform on the left side so that
+  he could jump up and shoot the stalactites. and then . basically spammed it
+  until the boss died.
 
 ==================================== Boss ======================================
 

@@ -6,7 +6,8 @@
 #include <data/sprites/game_sprdb.h>
 #include <data/world.h>
 
-#include "map_data.h"
+#include "gfx.h"
+#include "mapc.h"
 
 #define WORLD_SUBPX_SHIFT 4
 #define WORLD_SUBPX_SCALE 16
@@ -212,6 +213,7 @@ typedef struct game {
 
     const world_room_s *room;
     const u8 *room_collision;
+    gfx_map_s gfx_map;
     int room_width;
     int room_height;
 
@@ -314,7 +316,7 @@ void game_load_entity(const entity_load_s *load_data);
 
 static inline int game_get_col(int tx, int ty)
 {
-    return map_collision_get(g_game.room_collision, g_game.room_width, tx, ty);
+    return mapc_collision_get(g_game.room_collision, g_game.room_width, tx, ty);
 }
 
 static inline int game_get_col_clamped(int tx, int ty)
@@ -329,7 +331,7 @@ static inline int game_get_col_clamped(int tx, int ty)
     else if (ty >= g_game.room_height)
         ty = g_game.room_height - 1;
 
-    return map_collision_get(g_game.room_collision, g_game.room_width, tx, ty);
+    return mapc_collision_get(g_game.room_collision, g_game.room_width, tx, ty);
 }
 
 void entity_player_init(entity_s *self);
