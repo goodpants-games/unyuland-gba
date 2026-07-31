@@ -17,6 +17,13 @@
 
 // #define PHYS_PROFILE
 
+// realistically, i doubt using the `static inline` fxmul and fxdiv in ARM code
+// would create invocations of those functions as thumb code. but i mean. they
+// can be turned into macros pretty easily with no drawbacks whatsoever. so why
+// not I guess.
+#define FXMUL(fa,fb) (((fa)*(fb))>>FIX_SHIFT)
+#define FXDIV(fa,fb) (((fa)*FIX_SCALE)/(fb))
+
 #ifdef PHYS_PROFILE
 #define PROFILE_START() profile_start()
 #define PROFILE_END(t) profile.t += profile_stop()
@@ -459,8 +466,13 @@ static void physics_substep_collect_contacts(void)
 {
     PROFILE_START();
 
+    // not a very useful optimization, compared to just checking the dirty
+    // (and perhaps the MOVING flag) for each colent, but whatever.
+    size_t dirty_ent_count = 0;
+    static entity_coldata_s *dirty_ents[MAX_ENTITY_COUNT];
+
     // update spatial partition
-    for (int i = 0; i < col_ent_count; ++i)
+    for (uint i = 0; i < col_ent_count; ++i)
     {
         entity_coldata_s *const col_ent = col_ents[i];
         entity_s *entity = col_ent->ent;
@@ -477,19 +489,24 @@ static void physics_substep_collect_contacts(void)
         }
 
         if (!(entity->flags & ENTITY_FLAG_MOVING))
+        {
             col_ent->dirty = false;
+            continue;
+        }
+
+        dirty_ents[dirty_ent_count++] = col_ent;
     }
 
     col_contact_count = 0;
 
     // collect entity contacts
-    for (int i = 0; i < col_ent_count; ++i)
+    for (uint i = 0; i < dirty_ent_count; ++i)
     {
-        entity_coldata_s *col_ent = col_ents[i];
-        if (!col_ent->dirty)
-            continue;
-        if (!(col_ent->ent->flags & ENTITY_FLAG_MOVING))
-            continue;
+        entity_coldata_s *col_ent = dirty_ents[i];
+        // if (!col_ent->dirty)
+        //     continue;
+        // if (!(col_ent->ent->flags & ENTITY_FLAG_MOVING))
+        //     continue;
 
         aabb_s pgrid_bounds = col_ent->pgrid_bounds;
         for (uint y = pgrid_bounds.top; y <= pgrid_bounds.bottom; ++y)
@@ -517,7 +534,7 @@ static void physics_substep_collect_contacts(void)
     // collect tile contacts
     PROFILE_START();
 
-    for (int i = 0; i < col_ent_count; ++i)
+    for (uint i = 0; i < dirty_ent_count; ++i)
     {
         if (col_contact_count >= MAX_CONTACT_COUNT)
         {
@@ -526,14 +543,14 @@ static void physics_substep_collect_contacts(void)
             goto end;
         }
 
-        entity_coldata_s *const col_ent = col_ents[i];
+        entity_coldata_s *const col_ent = dirty_ents[i];
         entity_s *entity = col_ent->ent;
 
         if (!(entity->flags & ENTITY_FLAG_MOVING)) continue;
 
         // only calculate tile overlaps if this entity moved in the previous
         // iteration. (or, if it's the first iteration.)
-        if (!col_ent->dirty) continue;
+        // if (!col_ent->dirty) continue;
         col_ent->dirty = false;
 
         const FIXED col_w = col_ent->width;
@@ -632,6 +649,235 @@ static void physics_substep_collect_contacts(void)
     }
 }
 
+// turn this into an ARM+IWRAM function to save 0-4% of the CPU!
+static bool physics_substep_resolve_contacts(void)
+{
+    bool break_substep = true;
+
+    // resolve collected contacts
+    for (int i = 0; i < col_contact_count; ++i)
+    {
+        col_contact_s *const contact = col_contacts + i;
+        entity_coldata_s *const col_ent_a = contact->ent_a;
+        entity_coldata_s *const col_ent_b = contact->ent_b;
+        
+        FIXED nx = contact->nx;
+        FIXED ny = contact->ny;
+        FIXED pd = contact->pd;
+
+        entity_s *const ent_a = col_ent_a->ent;
+        entity_s *const ent_b = col_ent_b ? col_ent_b->ent : NULL;
+
+        if ((ent_a->col.flags & COL_FLAG_MONITOR_ONLY) ||
+            (ent_b && ent_b->col.flags & COL_FLAG_MONITOR_ONLY))
+        {
+            continue;
+        }
+
+        // if one of the entities already moved before in the same
+        // iteration, then recalculate the penetration vector. if there is
+        // no more overlap, just skip the contact.
+        if (col_ent_a->dirty && !col_ent_b)
+        {
+            const FIXED tx = contact->tx;
+            const FIXED ty = contact->ty;
+
+            col_overlap_res_s test_overlap =
+                rect_collision(ent_a->pos.x, ent_a->pos.y,
+                                col_ent_a->half_width, col_ent_a->half_height,
+                                tx, ty,
+                                int2fx(WORLD_TILE_SIZE) / 2,
+                                int2fx(WORLD_TILE_SIZE) / 2);
+            
+            if (!test_overlap.overlap) continue;
+            nx = test_overlap.nx;
+            ny = test_overlap.ny;
+            pd = test_overlap.pd;
+        }
+        else if (col_ent_b && (col_ent_a->dirty || col_ent_b->dirty))
+        {
+            col_overlap_res_s test_overlap =
+                rect_collision(ent_a->pos.x, ent_a->pos.y,
+                                col_ent_a->half_width,
+                                col_ent_a->half_height,
+                                ent_b->pos.x, ent_b->pos.y,
+                                col_ent_b->half_width,
+                                col_ent_b->half_height);
+            
+            if (!test_overlap.overlap) continue;
+            nx = test_overlap.nx;
+            ny = test_overlap.ny;
+            pd = test_overlap.pd;
+        }
+
+        // calculate relative velocity of impact
+        FIXED rel_vx, rel_vy;
+        if (ent_b)
+        {
+            rel_vx = ent_a->vel.x - ent_b->vel.x;
+            rel_vy = ent_a->vel.y - ent_b->vel.y;
+        }
+        else
+        {
+            rel_vx = ent_a->vel.x;
+            rel_vy = ent_a->vel.y;
+        }
+
+        // don't process if the objects are moving away from each other.
+        FIXED vdot = FXMUL(nx, rel_vx) + FXMUL(ny, rel_vy);
+        
+        if (vdot < 0) continue;
+
+        uint col_group_a = (uint)ent_a->col.group;
+        uint col_mask_a = (uint)ent_a->col.mask;
+
+        // check collision groups
+        uint col_group_b, col_mask_b;
+        if (ent_b)
+        {
+            col_group_b = (uint)ent_b->col.group;
+            col_mask_b = (uint)ent_b->col.mask;
+        }
+        else
+        {
+            col_group_b = COLGROUP_DEFAULT;
+            col_mask_b = COLGROUP_ALL;
+        }
+
+        if (!(col_group_b & col_mask_a) && !(col_group_a & col_mask_b))
+            continue;
+
+        // check if this is a collision with an anchored body.
+        // a body is anchored if:
+        // 1. it is static (i.e. does not have ENTITY_FLAG_MOVING set)
+        // 2. it has previously collided with an anchored object in the same
+        //    direction.
+        bool anchor_a = false;
+        bool anchor_b = true;
+        if (col_ent_b)
+        {
+            anchor_a = is_body_anchored(col_ent_a, nx, ny);
+            anchor_b = !(ent_b->flags & ENTITY_FLAG_MOVING) ||
+                        is_body_anchored(col_ent_b, -nx, -ny);
+        }
+        
+        if (anchor_a || anchor_b)
+        {
+            // LOG_DBG("%i: anchor collision", subsubstep);
+            // if (anchor_a || ent_b) LOG_DBG("Anchors away!!");
+
+            entity_s *ent;
+            entity_coldata_s *ce;
+
+            // we only want to modify the entity that is not anchored.
+            if (anchor_b)
+            {
+                ent = ent_a;
+                ce = col_ent_a;
+            }
+            else
+            {
+                ent = ent_b;
+                ce = col_ent_b;
+                nx = -nx;
+                ny = -ny;
+            }
+
+            // mark that the entity moved. tile contacts will be
+            // recalculated for this entity on the next iteration.
+            ce->dirty = true;
+
+            FIXED px = FXMUL(nx, pd);
+            FIXED py = FXMUL(ny, pd);
+
+            ent->pos.x = ent->pos.x - px;
+            ent->pos.y = ent->pos.y - py;
+            ent->vel.x = ent->vel.x - FXMUL(nx, vdot);
+            ent->vel.y = ent->vel.y - FXMUL(ny, vdot);
+
+            if (nx != 0) ce->x_anchor = sgn(-nx);
+            if (ny != 0) ce->y_anchor = sgn(-ny);
+
+            if (ny > 0)
+                ent->actor.flags |= ACTOR_FLAG_GROUNDED;
+
+            if (nx != 0)
+                ent->actor.flags |= ACTOR_FLAG_WALL;
+        }
+        else
+        {
+            // LOG_DBG("%i: free collision", subsubstep);
+            
+            // mark that these entity moved. tile contacts will be
+            // recalculated for this entity on the next iteration.
+            col_ent_a->dirty = true;
+            col_ent_b->dirty = true;
+
+            FIXED inv_mass1 = col_ent_a->inv_mass;
+            FIXED inv_mass2 = col_ent_b->inv_mass;
+
+            FIXED total_inv_mass = inv_mass1 + inv_mass2;
+            if (total_inv_mass == 0) continue;
+            FIXED inv_total_inv_mass = FXDIV(FIX_ONE, total_inv_mass);
+
+            // i want head bumps to move the bodies more. i also want it
+            // to work in a chain. this is a kind of hacky solution for
+            // parity with the physics of the original unyuland, since a
+            // puzzle depends on a head-bump chain moving the last entity
+            // far up enough to go over a one-block step.
+            FIXED restitution;
+            if (ny != 0 && (col_ent_a->head_bump || col_ent_b->head_bump))
+            {
+                restitution = TO_FIXED(1.9);
+                col_ent_a->head_bump = true;
+                col_ent_b->head_bump = true;
+            }
+            else
+            {
+                restitution = TO_FIXED(1.2);
+            }
+            
+            FIXED impulse_fac =
+                FXMUL(FXMUL(restitution, vdot), inv_total_inv_mass);
+            FIXED impulse_x = FXMUL(nx, impulse_fac);
+            FIXED impulse_y = FXMUL(ny, impulse_fac);
+
+            ent_a->vel.x -= FXMUL(impulse_x, inv_mass1);
+            ent_a->vel.y -= FXMUL(impulse_y, inv_mass1);
+            ent_b->vel.x += FXMUL(impulse_x, inv_mass2);
+            ent_b->vel.y += FXMUL(impulse_y, inv_mass2);
+
+            // don't perform regular multiplication here. instead, do a
+            // version that rounds up the product. because if the
+            // penetration depth is too small, the product can end up
+            // as zero due to rounding, causing no movement to be done and
+            // thus the collision will never resolve.
+            FIXED move_x = ceil_div(FXMUL(nx, pd) * inv_total_inv_mass, FIX_ONE);
+            FIXED move_y = ceil_div(FXMUL(ny, pd) * inv_total_inv_mass, FIX_ONE);
+
+            ent_a->pos.x -= ceil_div(move_x * inv_mass1, FIX_ONE);
+            ent_a->pos.y -= ceil_div(move_y * inv_mass1, FIX_ONE);
+            ent_b->pos.x += ceil_div(move_x * inv_mass2, FIX_ONE);
+            ent_b->pos.y += ceil_div(move_y * inv_mass2, FIX_ONE);
+
+            if (ny > 0)
+                ent_a->actor.flags |= ACTOR_FLAG_GROUNDED;
+            else if (ny < 0)
+                ent_b->actor.flags |= ACTOR_FLAG_GROUNDED;
+
+            if (nx != 0)
+            {
+                ent_a->actor.flags |= ACTOR_FLAG_WALL;
+                ent_b->actor.flags |= ACTOR_FLAG_WALL;
+            }
+        }
+
+        break_substep = false;
+    }
+
+    return break_substep;
+}
+
 static bool physics_substep(FIXED vel_mult)
 {
     PROFILE_START();
@@ -644,8 +890,8 @@ static bool physics_substep(FIXED vel_mult)
 
         if (entity->flags & ENTITY_FLAG_MOVING)
         {
-            FIXED s_vx = fxmul(entity->vel.x, vel_mult);
-            FIXED s_vy = fxmul(entity->vel.y, vel_mult);
+            FIXED s_vx = FXMUL(entity->vel.x, vel_mult);
+            FIXED s_vy = FXMUL(entity->vel.y, vel_mult);
             entity->pos.x += s_vx;
             entity->pos.y += s_vy;
 
@@ -673,241 +919,8 @@ static bool physics_substep(FIXED vel_mult)
         physics_substep_collect_contacts();
 
         PROFILE_START();
-        bool break_substep = true;
-
-        // resolve collected contacts
-        for (int i = 0; i < col_contact_count; ++i)
-        {
-            col_contact_s *const contact = col_contacts + i;
-            entity_coldata_s *const col_ent_a = contact->ent_a;
-            entity_coldata_s *const col_ent_b = contact->ent_b;
-            
-            FIXED nx = contact->nx;
-            FIXED ny = contact->ny;
-            FIXED pd = contact->pd;
-
-            entity_s *const ent_a = col_ent_a->ent;
-            entity_s *const ent_b = col_ent_b ? col_ent_b->ent : NULL;
-
-            if ((ent_a->col.flags & COL_FLAG_MONITOR_ONLY) ||
-                (ent_b && ent_b->col.flags & COL_FLAG_MONITOR_ONLY))
-            {
-                continue;
-            }
-
-            // if one of the entities already moved before in the same
-            // iteration, then recalculate the penetration vector. if there is
-            // no more overlap, just skip the contact.
-            if (col_ent_a->dirty && !col_ent_b)
-            {
-                const FIXED tx = contact->tx;
-                const FIXED ty = contact->ty;
-
-                col_overlap_res_s test_overlap =
-                    rect_collision(ent_a->pos.x, ent_a->pos.y,
-                                   col_ent_a->half_width, col_ent_a->half_height,
-                                   tx, ty,
-                                   int2fx(WORLD_TILE_SIZE) / 2,
-                                   int2fx(WORLD_TILE_SIZE) / 2);
-                
-                if (!test_overlap.overlap) continue;
-                nx = test_overlap.nx;
-                ny = test_overlap.ny;
-                pd = test_overlap.pd;
-            }
-            else if (col_ent_b && (col_ent_a->dirty || col_ent_b->dirty))
-            {
-                col_overlap_res_s test_overlap =
-                    rect_collision(ent_a->pos.x, ent_a->pos.y,
-                                   col_ent_a->half_width,
-                                   col_ent_a->half_height,
-                                   ent_b->pos.x, ent_b->pos.y,
-                                   col_ent_b->half_width,
-                                   col_ent_b->half_height);
-                
-                if (!test_overlap.overlap) continue;
-                nx = test_overlap.nx;
-                ny = test_overlap.ny;
-                pd = test_overlap.pd;
-            }
-
-            // calculate relative velocity of impact
-            FIXED rel_vx, rel_vy;
-            if (ent_b)
-            {
-                rel_vx = ent_a->vel.x - ent_b->vel.x;
-                rel_vy = ent_a->vel.y - ent_b->vel.y;
-            }
-            else
-            {
-                rel_vx = ent_a->vel.x;
-                rel_vy = ent_a->vel.y;
-            }
-
-            // don't process if the objects are moving away from each other.
-            FIXED vdot = fxmul(nx, rel_vx) +
-                         fxmul(ny, rel_vy);
-            
-            if (vdot < 0) continue;
-
-            uint col_group_a = (uint)ent_a->col.group;
-            uint col_mask_a = (uint)ent_a->col.mask;
-
-            // check collision groups
-            uint col_group_b, col_mask_b;
-            if (ent_b)
-            {
-                col_group_b = (uint)ent_b->col.group;
-                col_mask_b = (uint)ent_b->col.mask;
-            }
-            else
-            {
-                col_group_b = COLGROUP_DEFAULT;
-                col_mask_b = COLGROUP_ALL;
-            }
-
-            if (!(col_group_b & col_mask_a) && !(col_group_a & col_mask_b))
-                continue;
-
-            // check if this is a collision with an anchored body.
-            // a body is anchored if:
-            // 1. it is static (i.e. does not have ENTITY_FLAG_MOVING set)
-            // 2. it has previously collided with an anchored object in the same
-            //    direction.
-            bool anchor_a = false;
-            bool anchor_b = true;
-            if (col_ent_b)
-            {
-                anchor_a = is_body_anchored(col_ent_a, nx, ny);
-                anchor_b = !(ent_b->flags & ENTITY_FLAG_MOVING) ||
-                           is_body_anchored(col_ent_b, -nx, -ny);
-            }
-
-            // if (ent_b)
-            // {
-            //     LOG_DBG("A(%i) vs B(%i)", ent_a - g_game.entities, ent_b - g_game.entities);
-            //     LOG_DBG("%i,%i", nx, ny);
-            // }
-            // else
-            // {
-            //     LOG_DBG("A(%i) vs Tile(%i, %i)", ent_a - g_game.entities, (int) contact->tx / (FIX_ONE * WORLD_TILE_SIZE), (int) contact->ty / (FIX_ONE * WORLD_TILE_SIZE));
-            //     LOG_DBG("%i,%i", nx, ny);
-            // }
-            
-            if (anchor_a || anchor_b)
-            {
-                // LOG_DBG("%i: anchor collision", subsubstep);
-                // if (anchor_a || ent_b) LOG_DBG("Anchors away!!");
-
-                entity_s *ent;
-                entity_coldata_s *ce;
-
-                // we only want to modify the entity that is not anchored.
-                if (anchor_b)
-                {
-                    ent = ent_a;
-                    ce = col_ent_a;
-                }
-                else
-                {
-                    ent = ent_b;
-                    ce = col_ent_b;
-                    nx = -nx;
-                    ny = -ny;
-                }
-
-                // mark that the entity moved. tile contacts will be
-                // recalculated for this entity on the next iteration.
-                ce->dirty = true;
-
-                FIXED px = fxmul(nx, pd);
-                FIXED py = fxmul(ny, pd);
-
-                ent->pos.x = ent->pos.x - px;
-                ent->pos.y = ent->pos.y - py;
-                ent->vel.x = ent->vel.x - fxmul(nx, vdot);
-                ent->vel.y = ent->vel.y - fxmul(ny, vdot);
-
-                if (nx != 0) ce->x_anchor = sgn(-nx);
-                if (ny != 0) ce->y_anchor = sgn(-ny);
-
-                if (ny > 0)
-                    ent->actor.flags |= ACTOR_FLAG_GROUNDED;
-
-                if (nx != 0)
-                    ent->actor.flags |= ACTOR_FLAG_WALL;
-            }
-            else
-            {
-                // LOG_DBG("%i: free collision", subsubstep);
-                
-                // mark that these entity moved. tile contacts will be
-                // recalculated for this entity on the next iteration.
-                col_ent_a->dirty = true;
-                col_ent_b->dirty = true;
-
-                FIXED inv_mass1 = col_ent_a->inv_mass;
-                FIXED inv_mass2 = col_ent_b->inv_mass;
-
-                FIXED total_inv_mass = inv_mass1 + inv_mass2;
-                if (total_inv_mass == 0) continue;
-                FIXED inv_total_inv_mass = fxdiv(FIX_ONE, total_inv_mass);
-
-                // i want head bumps to move the bodies more. i also want it
-                // to work in a chain. this is a kind of hacky solution for
-                // parity with the physics of the original unyuland, since a
-                // puzzle depends on a head-bump chain moving the last entity
-                // far up enough to go over a one-block step.
-                FIXED restitution;
-                if (ny != 0 && (col_ent_a->head_bump || col_ent_b->head_bump))
-                {
-                    restitution = TO_FIXED(1.9);
-                    col_ent_a->head_bump = true;
-                    col_ent_b->head_bump = true;
-                }
-                else
-                {
-                    restitution = TO_FIXED(1.2);
-                }
-                
-                FIXED impulse_fac =
-                    fxmul(fxmul(restitution, vdot), inv_total_inv_mass);
-                FIXED impulse_x = fxmul(nx, impulse_fac);
-                FIXED impulse_y = fxmul(ny, impulse_fac);
-
-                ent_a->vel.x -= fxmul(impulse_x, inv_mass1);
-                ent_a->vel.y -= fxmul(impulse_y, inv_mass1);
-                ent_b->vel.x += fxmul(impulse_x, inv_mass2);
-                ent_b->vel.y += fxmul(impulse_y, inv_mass2);
-
-                // don't perform regular multiplication here. instead, do a
-                // version that rounds up the product. because if the
-                // penetration depth is too small, the product can end up
-                // as zero due to rounding, causing no movement to be done and
-                // thus the collision will never resolve.
-                FIXED move_x = ceil_div(fxmul(nx, pd) * inv_total_inv_mass, FIX_ONE);
-                FIXED move_y = ceil_div(fxmul(ny, pd) * inv_total_inv_mass, FIX_ONE);
-
-                ent_a->pos.x -= ceil_div(move_x * inv_mass1, FIX_ONE);
-                ent_a->pos.y -= ceil_div(move_y * inv_mass1, FIX_ONE);
-                ent_b->pos.x += ceil_div(move_x * inv_mass2, FIX_ONE);
-                ent_b->pos.y += ceil_div(move_y * inv_mass2, FIX_ONE);
-
-                if (ny > 0)
-                    ent_a->actor.flags |= ACTOR_FLAG_GROUNDED;
-                else if (ny < 0)
-                    ent_b->actor.flags |= ACTOR_FLAG_GROUNDED;
-
-                if (nx != 0)
-                {
-                    ent_a->actor.flags |= ACTOR_FLAG_WALL;
-                    ent_b->actor.flags |= ACTOR_FLAG_WALL;
-                }
-            }
-
-            break_substep = false;
-        }
-
+        bool break_substep;
+        break_substep = physics_substep_resolve_contacts();
         PROFILE_END(resolution_t);
 
         // LOG_DBG("iteration %i: %i", subsubstep, resolved_contacts);
@@ -1058,8 +1071,8 @@ static void game_physics_move_projs(FIXED vel_mult)
         proj_pgrid_data_s *pdata = proj_data + i;
         if (!IS_PROJ_ACTIVE(proj) || (proj->flags & PROJ_FLAG_QFREE)) continue;
 
-        proj->px += fxmul(proj->vx, vel_mult);
-        proj->py += fxmul(proj->vy, vel_mult);
+        proj->px += FXMUL(proj->vx, vel_mult);
+        proj->py += FXMUL(proj->vy, vel_mult);
 
         // if projectile touches a wall, Destroy it.
         int tx = proj->px / (WORLD_TILE_SIZE * FIX_SCALE);
@@ -1197,6 +1210,103 @@ static void game_physics_move_projs(FIXED vel_mult)
 //------------------------------------------------------------------------------
 #pragma region public
 
+// turn this into an ARM+IWRAM function to save 1-6% of the CPU!
+static void physics_prologue(FIXED *p_vmult, int *p_substeps)
+{
+    col_contact_count = 0;
+    col_ent_count = 0;
+    int substeps = 0;
+
+    // preprocessing pass:
+    //  - add/remove entities to collision data structures
+    //    (i.e. sweep and prune)
+    //  - reset physics state flags
+    //  - calculate substeps needed for simulation based on fastest-moving
+    //    entity
+    //  - cache inverse mass and half-extents (although caching size-related data
+    //    is probably pointless for performance...)
+    for (int i = 0; i < MAX_ENTITY_COUNT; ++i)
+    {
+        entity_s *entity = g_game.entities + i;
+
+        bool is_col_ent = (entity->flags & ENTITY_FLAG_ENABLED) &&
+                          (entity->flags & ENTITY_FLAG_COLLIDE);
+
+        if (is_col_ent)
+        {
+            if (!col_ent_map[i].ent)
+            {
+                col_ent_map[i].ent = entity;
+                col_ent_added(i);
+            }
+        }
+        else
+        {
+            if (col_ent_map[i].ent)
+            {
+                col_ent_removed(i);
+                col_ent_map[i].ent = NULL;
+            }
+        }
+
+        if (!(entity->flags & ENTITY_FLAG_ENABLED))
+            continue;
+        
+        if (entity->flags & ENTITY_FLAG_ACTOR)
+            entity->actor.flags &= ~(ACTOR_FLAG_GROUNDED | ACTOR_FLAG_WALL);
+        
+        if (!(entity->flags & ENTITY_FLAG_COLLIDE)) continue;
+        
+        entity_coldata_s *col_ent = &col_ent_map[i];
+        col_ent->inv_mass = FXDIV(FIX_ONE * 2, int2fx((int)entity->mass));
+        col_ent->width = int2fx((int) entity->col.w);
+        col_ent->height = int2fx((int) entity->col.h);
+        col_ent->half_width = col_ent->width / 2;
+        col_ent->half_height = col_ent->height / 2;
+
+        int speed = max(abs(entity->vel.x), abs(entity->vel.y));
+        int subst = ceil_div(speed, FIX_ONE * 4);
+        if (subst > substeps)
+            substeps = subst;
+
+        col_ents[col_ent_count++] = col_ent;
+    }
+
+    // find fastest-moving projectile, use for determining how many substeps
+    // the simulation will need
+    for (int i = 0; i < MAX_PROJECTILE_COUNT; ++i)
+    {
+        projectile_s *proj = g_game.projectiles + i;
+        if (!IS_PROJ_ACTIVE(proj)) continue;
+
+        int speed = max(abs(proj->vx), abs(proj->vy));
+        int subst = ceil_div(speed, FIX_ONE * 4);
+        if (subst > substeps)
+            substeps = subst;
+    }
+
+    // cap substeps to 8. but entities usually don't move very fast, so
+    // typically it will be 1 or 2.
+    if (substeps > 8) substeps = 8;
+
+    // round the substep count up to the nearest power of two. this is to make
+    // division exact.
+    --substeps;
+    substeps |= substeps >> 1;
+    substeps |= substeps >> 2;
+    substeps |= substeps >> 4;
+    substeps |= substeps >> 8;
+    substeps |= substeps >> 16;
+    ++substeps;
+
+    FIXED vel_mult = 0;
+    if (substeps != 0)
+        vel_mult = FIX_ONE / substeps;
+
+    *p_vmult = vel_mult;
+    *p_substeps = substeps;
+}
+
 void game_physics_init(void)
 {
     col_ent_count = 0;
@@ -1251,98 +1361,11 @@ void game_physics_update(void)
     profile = (struct phys_profile){0};
     #endif
 
+    FIXED vel_mult;
+    int substeps;
+
     PROFILE_START();
-
-    col_contact_count = 0;
-    col_ent_count = 0;
-    int substeps = 0;
-
-    // preprocessing pass:
-    //  - add/remove entities to collision data structures
-    //    (i.e. sweep and prune)
-    //  - reset physics state flags
-    //  - calculate substeps needed for simulation based on fastest-moving
-    //    entity
-    //  - cache inverse mass and half-extents (although caching size-related data
-    //    is probably pointless for performance...)
-    for (int i = 0; i < MAX_ENTITY_COUNT; ++i)
-    {
-        entity_s *entity = g_game.entities + i;
-
-        bool is_col_ent = (entity->flags & ENTITY_FLAG_ENABLED) &&
-                          (entity->flags & ENTITY_FLAG_COLLIDE);
-
-        if (is_col_ent)
-        {
-            if (!col_ent_map[i].ent)
-            {
-                col_ent_map[i].ent = entity;
-                col_ent_added(i);
-            }
-        }
-        else
-        {
-            if (col_ent_map[i].ent)
-            {
-                col_ent_removed(i);
-                col_ent_map[i].ent = NULL;
-            }
-        }
-
-        if (!(entity->flags & ENTITY_FLAG_ENABLED))
-            continue;
-        
-        if (entity->flags & ENTITY_FLAG_ACTOR)
-            entity->actor.flags &= ~(ACTOR_FLAG_GROUNDED | ACTOR_FLAG_WALL);
-        
-        if (!(entity->flags & ENTITY_FLAG_COLLIDE)) continue;
-        
-        entity_coldata_s *col_ent = &col_ent_map[i];
-        col_ent->inv_mass = fxdiv(FIX_ONE * 2, int2fx((int)entity->mass));
-        col_ent->width = int2fx((int) entity->col.w);
-        col_ent->height = int2fx((int) entity->col.h);
-        col_ent->half_width = col_ent->width / 2;
-        col_ent->half_height = col_ent->height / 2;
-
-        int speed = max(abs(entity->vel.x), abs(entity->vel.y));
-        int subst = ceil_div(speed, FIX_ONE * 4);
-        if (subst > substeps)
-            substeps = subst;
-
-        col_ents[col_ent_count++] = col_ent;
-    }
-
-    // find fastest-moving projectile, use for determining how many substeps
-    // the simulation will need
-    for (int i = 0; i < MAX_PROJECTILE_COUNT; ++i)
-    {
-        projectile_s *proj = g_game.projectiles + i;
-        if (!IS_PROJ_ACTIVE(proj)) continue;
-
-        int speed = max(abs(proj->vx), abs(proj->vy));
-        int subst = ceil_div(speed, FIX_ONE * 4);
-        if (subst > substeps)
-            substeps = subst;
-    }
-
-    // cap substeps to 8. but entities usually don't move very fast, so
-    // typically it will be 1 or 2.
-    if (substeps > 8) substeps = 8;
-
-    // round the substep count up to the nearest power of two. this is to make
-    // division exact.
-    --substeps;
-    substeps |= substeps >> 1;
-    substeps |= substeps >> 2;
-    substeps |= substeps >> 4;
-    substeps |= substeps >> 8;
-    substeps |= substeps >> 16;
-    ++substeps;
-
-    FIXED vel_mult = 0;
-    if (substeps != 0)
-        vel_mult = FIX_ONE / substeps;
-
+    physics_prologue(&vel_mult, &substeps);
     PROFILE_END(start_t);
 
     PROFILE_START();
@@ -1369,6 +1392,7 @@ void game_physics_update(void)
     PROFILE_LOG("e detection time", detection_ent_t);
     PROFILE_LOG("t detection time", detection_tile_t);
     PROFILE_LOG("resolution time", resolution_t);
+    PROFILE_LOG("start time", start_t);
     // PROFILE_LOG("ent move time", move_t)
     // PROFILE_LOG("proj move time", projectiles_t)
     #endif
