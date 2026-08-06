@@ -56,6 +56,15 @@ This is in contrast to sweep and prune, which simply syncs the edge position
 with the left or right edge of the referenced entity, and then does an O(n)
 average-case sort after all the edges have been synced.
 
+
+
+TODO:
+- seemingly, sometimes jumping in room13 after respawning from the bottom-most
+  checkpoint crashes the game. (windows build) idk how to repro though. blitz
+  did it.
+- perhaps Change hint in room13 to allude to being able to push the enemies.
+  instead of the bullets breaking the blocks.
+
 ============================= Playtest Notes ===================================
 BOSS 07/19/26
 - bit hard to hit the stalactites when moving fast.
