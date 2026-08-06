@@ -1,5 +1,9 @@
 #include <stdlib.h>
+#ifdef _WIN32
+#include <malloc.h>
+#else
 #include <alloca.h>
+#endif
 #include <tonc_math.h>
 #include <tonc_types.h>
 #include <log.h>
