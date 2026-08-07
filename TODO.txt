@@ -67,6 +67,10 @@ BOSS 07/20/26
   he could jump up and shoot the stalactites. and then . basically spammed it
   until the boss died.
 
+ROOM13 08/06/26
+- maybe make it so boss doesn't reset distance when you move closer.
+  cus pb thinks it's wait long enough for the boss to advance.
+
 ==================================== Boss ======================================
 
 Upon re-entering the unyu village you started in, it is eerily barren of Unyus
