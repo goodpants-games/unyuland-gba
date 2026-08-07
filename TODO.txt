@@ -36,8 +36,10 @@ room01:
 - maybe make the setpiece more obvious like a "statue" rather than a
   mushroom
 
-b05: player scared to go down Hole.
 player should be able to do a jig when hold down (very important)
+
+b05: add "prelude" where the player gets very softlocked until they are
+forced to destroy a fragile block.
 
 =========================== Spatial Partition ==================================
 
@@ -64,6 +66,10 @@ TODO:
   did it.
 - perhaps Change hint in room13 to allude to being able to push the enemies.
   instead of the bullets breaking the blocks.
+
+- b05: danny died and was sent back to water tank. ice block fell through
+  the fragile block. danny exited the room to the left and the game
+  crashed.
 
 ============================= Playtest Notes ===================================
 BOSS 07/19/26
@@ -92,6 +98,10 @@ BOSS 07/20/26
 - okay he just cheesed the boss by making a platform on the left side so that
   he could jump up and shoot the stalactites. and then . basically spammed it
   until the boss died.
+
+ROOM13 08/06/26
+- maybe make it so boss doesn't reset distance when you move closer.
+  cus pb thinks it's wait long enough for the boss to advance.
 
 ==================================== Boss ======================================
 
