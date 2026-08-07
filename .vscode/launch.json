@@ -4,7 +4,13 @@
             "name": "Launch",
             "type": "lldb",
             "request": "launch",
-            "program": "./unyuland"
+            "program": "./unyuland",
+
+            "windows": {
+                "env": {
+                    "PATH": "C:/msys64/clang64/bin;C:/msys64/usr/local/bin;C:/msys64/usr/bin;C:/msys64/usr/bin;C:/Windows/System32;C:/Windows;"
+                }
+            }
         }
     ]
 }

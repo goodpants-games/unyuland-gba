@@ -1,5 +1,8 @@
 #!/bin/bash
+set -e
+MAKE="${MAKE:-make}"
+
 cd third_party/libxmp
 ./configure --disable-it --disable-shared --enable-static "$@"
 rm -f a.wasm # dummy output configure.sh seems to make...
-make -B
+$MAKE -B
