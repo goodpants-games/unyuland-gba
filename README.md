@@ -1,5 +1,5 @@
 # Unyuland Advance
-A Gameboy Advance port of my game [Unyuland](https://pumkinhead.itch.io/unyuland)
+A GameBoy Advance port of my game [Unyuland](https://pumkinhead.itch.io/unyuland)
 
 ## Building
 Prerequisites:
@@ -10,7 +10,7 @@ Prerequisites:
 - GNU Make
 - Bash
 
-### Gameboy Advance
+### Game Boy Advance
 ```bash
 # this sets up devkitPro env variables. only need to be run once per terminal
 # session, or if these are already set. substitute /opt/devkitpro to the
@@ -36,11 +36,8 @@ Additional prerequisites:
 export PKGCONF=pkgconf
 
 # compile libxmp
-# only needs to be run once (or if you modify libxmp)
-cd third_party/libxmp
-./configure --disable-shared --disable-it --enable-static
-make
-cd ../..
+# only needs to be run once (or if you modify libxmp) (or change platforms)
+./mkxmp
 
 # creates unyuland or unyuland.exe in the project directory.
 # SDL3 dependency will be located using pkg-config. If you are on Windows, you
@@ -55,13 +52,9 @@ Additional prerequisities:
 
 ```bash
 # compile libxmp
-# only needs to be run once (or if you modify libxmp)
-cd third_party/libxmp
-./configure --disable-shared --disable-it --enable-static\
-            CC=emcc CXX=em++ AR=emar
-make
-cd ../..
+# only needs to be run once (or if you modify libxmp) (or change platforms)
+./mkxmp CC=emcc AR=emar RANLIB=emranlib
 
-# creates web/game.js and web/game.html, relative to the project directory.
+# creates web/game.js and web/game.wasm, relative to the project directory.
 ./make web
 ```
