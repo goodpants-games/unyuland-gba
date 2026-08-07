@@ -70,6 +70,8 @@ typedef struct aabb
 }
 aabb_s;
 
+static bool world_invalidated = false;
+
 #pragma endregion declarations
 
 
@@ -364,8 +366,7 @@ static void col_ent_removed(int col_ent_idx)
 
     entity_coldata_s *cent = col_ent_map + col_ent_idx;
 
-    aabb_s aabb = calc_ent_pgrid_bounds(cent->ent);
-    ent_pgrid_remove(cent, &aabb);
+    ent_pgrid_remove(cent, &cent->pgrid_bounds);
 }
 
 // a body is anchored if:
@@ -905,7 +906,12 @@ static bool physics_substep(FIXED vel_mult)
         col_ent->head_bump = entity->col.flags & COL_FLAG_HEAD_BUMP;
         col_ent->x_anchor = 0;
         col_ent->y_anchor = 0;
+
+        if (world_invalidated)
+            col_ent->dirty = true;
     }
+
+    world_invalidated = false;
 
     PROFILE_END(move_t);
     
@@ -1357,6 +1363,11 @@ void game_physics_on_entity_free(entity_s *ent)
     
     col_ent_removed(i);
     col->ent = NULL;
+}
+
+void game_physics_invalidate(void)
+{
+    world_invalidated = true;
 }
 
 void game_physics_update(void)
