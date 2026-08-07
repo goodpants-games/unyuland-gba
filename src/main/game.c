@@ -1416,7 +1416,6 @@ void game_restore_state(void)
     g_game.player_is_dead = false;
 
     gfx_mark_scroll_dirty(GAME_BG_IDX);
-    game_physics_invalidate();
 }
 
 void game_start_dialogue(const char *dialogue)

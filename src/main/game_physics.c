@@ -70,8 +70,6 @@ typedef struct aabb
 }
 aabb_s;
 
-static bool world_invalidated = false;
-
 #pragma endregion declarations
 
 
@@ -906,12 +904,7 @@ static bool physics_substep(FIXED vel_mult)
         col_ent->head_bump = entity->col.flags & COL_FLAG_HEAD_BUMP;
         col_ent->x_anchor = 0;
         col_ent->y_anchor = 0;
-
-        if (world_invalidated)
-            col_ent->dirty = true;
     }
-
-    world_invalidated = false;
 
     PROFILE_END(move_t);
     
@@ -1279,6 +1272,8 @@ static void physics_prologue(FIXED *p_vmult, int *p_substeps)
         if (subst > substeps)
             substeps = subst;
 
+        col_ent->dirty = true;
+
         col_ents[col_ent_count++] = col_ent;
     }
 
@@ -1363,11 +1358,6 @@ void game_physics_on_entity_free(entity_s *ent)
     
     col_ent_removed(i);
     col->ent = NULL;
-}
-
-void game_physics_invalidate(void)
-{
-    world_invalidated = true;
 }
 
 void game_physics_update(void)
