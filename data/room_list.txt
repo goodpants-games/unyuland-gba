@@ -20,6 +20,7 @@ room10
 room11
 room12
 room13
+unyuhome
 testroom1
 # this file defines the order of the room files. 
 # the game references room by index, not name. the first room listed will be the

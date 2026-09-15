@@ -151,8 +151,8 @@
             "fileName": "testroom1.tmx",
             "height": 176,
             "width": 360,
-            "x": -360,
-            "y": -88
+            "x": -480,
+            "y": -264
         },
         {
             "fileName": "room13.tmx",
@@ -160,6 +160,13 @@
             "width": 360,
             "x": 960,
             "y": -880
+        },
+        {
+            "fileName": "unyuhome.tmx",
+            "height": 176,
+            "width": 240,
+            "x": -360,
+            "y": -88
         }
     ],
     "onlyShowAdjacentMaps": false,

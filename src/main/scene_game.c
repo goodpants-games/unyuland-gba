@@ -25,7 +25,7 @@
 #pragma region declarations
 
 #ifdef DEVDEBUG
-#define SPAWN_ROOM_INDEX 0
+#define SPAWN_ROOM_INDEX 22
 #else
 #define SPAWN_ROOM_INDEX 0
 #endif
