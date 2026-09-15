@@ -200,6 +200,17 @@ void game_load_entity(const entity_load_s *load_data)
     {
         entity_boss_init(ent, load_data->x, load_data->y);
     }
+    STR_CASE("halfblock")
+    {
+        entity_halfblock_init(ent, load_data->x, load_data->y);
+    }
+    STR_CASE("house")
+    {
+        ent->pos.x = load_data->x;
+        ent->pos.y = load_data->y - FX(24);
+        ent->sprite.graphic_id = SPRID_GAME_UNYU_HOUSE;
+        ent->sprite.zidx = -20;
+    }
     STR_CASE_FALLBACK
     {
         LOG_DBG("unknown entity type %s", name);

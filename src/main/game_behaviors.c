@@ -1379,6 +1379,33 @@ const behavior_def_s behavior_fragile_block = {
 
 
 //------------------------------------------------------------------------------
+// halfblock
+//------------------------------------------------------------------------------
+#pragma region halfblock
+
+void entity_halfblock_init(entity_s *self, FIXED px, FIXED py)
+{
+    self->flags |= ENTITY_FLAG_COLLIDE;
+    self->pos.x = px + FX(2);
+    self->pos.y = py;
+    self->col.w = 12;
+    self->col.h = 8;
+    self->col.flags |= COL_FLAG_FLOOR_ONLY;
+    self->sprite.graphic_id = SPRID_GAME_HALFBLOCK;
+    self->sprite.palette = GFX_OBJPAL_USER3;
+    self->sprite.zidx = -20;
+}
+
+#pragma endregion
+
+
+
+
+
+
+
+
+//------------------------------------------------------------------------------
 // orb
 //------------------------------------------------------------------------------
 #pragma region orb

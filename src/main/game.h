@@ -348,6 +348,7 @@ void entity_sign_init(entity_s *self, FIXED px, FIXED py, const char *dialogue,
 void entity_water_tank_init(entity_s *self, FIXED px, FIXED py);
 void entity_fragile_block_init(entity_s *self, FIXED px, FIXED py);
 void entity_orb(entity_s *self, FIXED px, FIXED py, bool blue);
+void entity_halfblock_init(entity_s *self, FIXED px, FIXED py);
 void entity_boss_init(entity_s *self, FIXED px, FIXED py);
 void entity_stalactite_init(entity_s *self, FIXED px, FIXED py, int gfx_variant);
 

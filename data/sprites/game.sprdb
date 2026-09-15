@@ -22,6 +22,8 @@
         "ui_icons.ase",
         "button_b.png",
         "down_arrow.png",
-        "map_icons.ase"
+        "map_icons.ase",
+        "halfblock.ase",
+        "unyu_house.ase"
     ]
 }
