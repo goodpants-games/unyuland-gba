@@ -173,10 +173,12 @@ def parse(ifile_path: str, output_file: BinaryIO):
                     if flag_tileset:
                         assert flag_tileset.name == "flags_tileset"
                     
-                    if fid == 1:
-                        cid = 4 # semi-solid
-                    else:
-                        cid = 1 # full solid
+                    if fid == 1: # semi-solid
+                        cid = 4
+                    elif fid == 2: # force air
+                        cid = 0
+                    else: # full solid
+                        cid = 1
 
         assert cid <= 4
         col_data.append(cid)
