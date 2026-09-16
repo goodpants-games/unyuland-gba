@@ -524,7 +524,9 @@ static void physics_substeps_collect_contacts(void)
             {
                 for (int x = min_x; x <= max_x; ++x)
                 {
-                    if (game_get_col_clamped(x, y) != 1)
+                    int col = game_get_col_clamped(x, y);
+
+                    if (col != 1 && col != 4)
                         continue;
 
                     const FIXED tx = x * FIX_ONE * WORLD_TILE_SIZE;
@@ -537,6 +539,7 @@ static void physics_substeps_collect_contacts(void)
                                         int2fx(WORLD_TILE_SIZE) / 2);
                     
                     if (!overlap_res.overlap) continue;
+                    if (col == 4 && overlap_res.ny <= 0) continue;
 
                     col_contacts[col_contact_count] = (col_contact_s)
                     {
