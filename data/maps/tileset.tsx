@@ -52,8 +52,6 @@
  <tile id="68" type="decor"/>
  <tile id="69" type="decor"/>
  <tile id="71" type="decor"/>
- <tile id="72" type="decor"/>
- <tile id="73" type="decor"/>
  <tile id="74" type="decor"/>
  <tile id="75" type="decor"/>
  <tile id="76" type="decor"/>

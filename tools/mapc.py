@@ -9,7 +9,7 @@ import os
 import os.path as path
 import json
 import ioutil
-from typing import BinaryIO, TextIO
+from typing import BinaryIO, TextIO, Self
 
 FLIPPED_HORIZONTALLY_FLAG  = 0x80000000
 FLIPPED_VERTICALLY_FLAG    = 0x40000000
@@ -17,39 +17,77 @@ FLIPPED_DIAGONALLY_FLAG    = 0x20000000
 ROTATED_HEXAGONAL_120_FLAG = 0x10000000
 
 class Tileset:
-    def __init__(self):
+    def __init__(self: Self, name: str, firstgid: int):
+        self.name = name
+        self.firstgid: int = firstgid
         self.data: dict[int, str] = {}
 
-    def register(self, id: int, type: str):
+
+    def set_data(self: Self, id: int, type: str):
         self.data[id] = type
 
-    def get(self, id: int) -> str:
+
+    def get_data(self: Self, id: int) -> str:
         if id in self.data:
             return self.data[id]
         else:
             return None
 
+
+class TilesetCollection:
+    def __init__(self: Self):
+        self.sets: list[Tileset] = []
+
+    # returns: (tileset, local_id). returns (None, -1) on error.
+    def to_local(self: Self, id: int) -> tuple[Tileset, int]:
+        if id == 0:
+            return (None, -1)
+        
+        for i in range(len(self.sets)-1, -1, -1):
+            set = self.sets[i]
+            if id >= set.firstgid:
+                return (set, id - set.firstgid)
+        return (None, -1)
+
+
 def align(x: int, width: int) -> int:
     return (x + width - 1) // width * width
 
-def parse_tileset(tmx_path: str):
-    tsx_path = path.join(path.dirname(tmx_path), 'tileset.tsx')
-    with open(tsx_path, 'r') as file:
-        file_contents = file.read()
 
-    output = Tileset()
-    data = xml.fromstring(file_contents)
-    for tile in data.findall('tile'):
+def parse_tileset(root: xml.Element, firstgid: int) -> Tileset:
+    output = Tileset(root.get('name'), firstgid)
+
+    for tile in root.findall('tile'):
         id = int(tile.get('id'))
-        output.register(id, tile.get('type'))
+        output.set_data(id, tile.get('type'))
 
     return output
 
-def parse(ifile_path: str, output_file: BinaryIO, tileset: Tileset):
+
+def parse_tilesets(tmx_path: str, tmx_data: xml.Element) -> TilesetCollection:
+    output = TilesetCollection()
+
+    for xtileset in tmx_data.findall('tileset'):
+        firstgid = int(xtileset.get('firstgid'))
+
+        tileset_src = xtileset.get('source')
+        if tileset_src is None:
+            tileset = parse_tileset(xtileset, firstgid)
+        else:
+            tsx_path = path.join(path.dirname(tmx_path), tileset_src)
+            with open(tsx_path, 'r') as file:
+                tileset = parse_tileset(xml.fromstring(file.read()), firstgid)
+
+        output.sets.append(tileset)
+    
+    return output
+
+def parse(ifile_path: str, output_file: BinaryIO):
     with open(ifile_path, 'r') as ifile:
         file_contents = ifile.read()
     
     tmx_data = xml.fromstring(file_contents)
+    tilesets = parse_tilesets(ifile_path, tmx_data)
 
     # determine if the room is "outdoors"
     # i.e., it has a property named "outdoors" that is a true boolean value
@@ -60,21 +98,48 @@ def parse(ifile_path: str, output_file: BinaryIO, tileset: Tileset):
             if prop.get('name') == 'outdoors' and prop.get('type') == 'bool':
                 is_outdoors = prop.get('value') == 'true'
 
-    layer = tmx_data.find('layer')
-    if layer is None:
+    # the level is valid only if:
+    #   1. there are two layers, where one's class is "flags", and the other
+    #      has no class.
+    #   2. there is only one layer, with no class.
+    # find normal tile layer and flags layer.
+    flags_layer = None
+    tile_layer = None
+    for l in tmx_data.findall('layer'):
+        if l.get('class') == 'flags':
+            if flags_layer != None:
+                raise Exception("map has multiple flag layers!")
+            flags_layer = l
+        else:
+            if tile_layer != None:
+                raise Exception("map has multiple regular tile layers!")
+            tile_layer = l
+    
+    if tile_layer is None:
         raise Exception("map has no tile layer")
 
-    map_width = int(layer.get('width'))
-    map_height = int(layer.get('height'))
+    map_width = int(tile_layer.get('width'))
+    map_height = int(tile_layer.get('height'))
 
-    data_base64 = layer.find('data')
-    if data_base64 is None:
+    # read data for regular tile layer into tdata
+    tdata_base64 = tile_layer.find('data')
+    if tdata_base64 is None:
         raise Exception("tile layer has no data")
-    
-    if data_base64.get('encoding') != 'base64':
+    if tdata_base64.get('encoding') != 'base64':
         raise Exception("only base64 encoding is supported")
-    
-    data = base64.b64decode(data_base64.text.strip())
+    tdata = base64.b64decode(tdata_base64.text.strip())
+
+    # read data for flags tile layer into fdata. if the layer does not exist,
+    # create a dummy zero-filled array.
+    if flags_layer is not None:
+        fdata_base64 = flags_layer.find('data')
+        if fdata_base64 is None:
+            raise Exception("flags layer has no data")
+        if fdata_base64.get('encoding') != 'base64':
+            raise Exception("only base64 encoding is supported")
+        fdata = base64.b64decode(fdata_base64.text.strip())
+    else:
+        fdata = bytes(map_width * map_height * 4)
 
     room_name = path.splitext(path.basename(ifile_path))[0]
     output_file.write(struct.pack('<HHBxxx', map_width, map_height,
@@ -83,13 +148,19 @@ def parse(ifile_path: str, output_file: BinaryIO, tileset: Tileset):
     # get collision matrix
     col_data: list[int] = []
     for i in range(0, map_width * map_height * 4, 4):
-        tile_int = (data[i] | (data[i+1] << 8) |
-                   (data[i+2] << 16) | (data[i+3] << 24))
-        tid = tile_int & 0x0FFFFFFF
+        # get global ID at regular tilemap
+        tile_int = (tdata[i] | (tdata[i+1] << 8) |
+                   (tdata[i+2] << 16) | (tdata[i+3] << 24))
+        gid = tile_int & 0x0FFFFFFF
+        # get global ID at flags tilemap
+        flag_int = (fdata[i] | (fdata[i+1] << 8) |
+                   (fdata[i+2] << 16) | (fdata[i+3] << 24))
         cid = 3 if is_outdoors else 0
 
-        if tid != 0:
-            type_str = tileset.get(tid - 1)
+        if gid != 0:
+            (tileset, tid) = tilesets.to_local(gid)
+            assert tileset.name == "tileset"
+            type_str = tileset.get_data(tid)
             match type_str:
                 case 'water':
                     cid = 2
@@ -97,8 +168,15 @@ def parse(ifile_path: str, output_file: BinaryIO, tileset: Tileset):
                     cid = 3
                 case 'decor':
                     cid = 0
-                case _:
-                    cid = 1
+                case _: # solid
+                    (flag_tileset, fid) = tilesets.to_local(flag_int)
+                    if flag_tileset:
+                        assert flag_tileset.name == "flags_tileset"
+                    
+                    if fid == 1:
+                        cid = 4 # semi-solid
+                    else:
+                        cid = 1 # full solid
 
         assert cid <= 4
         col_data.append(cid)
@@ -108,52 +186,52 @@ def parse(ifile_path: str, output_file: BinaryIO, tileset: Tileset):
         for x in range(0, map_width):
             i1 = y * map_width + x
             i2 = (y + 1) * map_width + x
-            if (col_data[i1] == 2
-               and col_data[i2] == 0):
+            if (col_data[i1] == 2 and col_data[i2] == 0):
                 col_data[i2] = 2
 
-    # write collision data into a packed byte array. 2 bits per cell.
+    # write collision data into a packed byte array. 4 bits per cell.
     byte_accum: list[int] = []
     col_bytes = bytearray()
     for i in range(0, map_width * map_height):
         cid = col_data[i]
-        byte_accum.append(cid & 0x3)
+        byte_accum.append(cid & 0xF)
 
-        if len(byte_accum) == 4:
-            out_byte = byte_accum[0] | (byte_accum[1] << 2) | (byte_accum[2] << 4) | (byte_accum[3] << 6)
+        if len(byte_accum) == 2:
+            out_byte = byte_accum[0] | (byte_accum[1] << 4)
             col_bytes += struct.pack('<B', out_byte)
             byte_accum.clear()
     
     if len(byte_accum) > 0:
-        while len(byte_accum) < 4:
+        while len(byte_accum) < 2:
             byte_accum.append(0)
 
-        out_byte = byte_accum[0] | (byte_accum[1] << 2) | (byte_accum[2] << 4) | (byte_accum[3] << 6)
+        out_byte = byte_accum[0] | (byte_accum[1] << 4)
         col_bytes += struct.pack('<B', out_byte)
         byte_accum.clear()
     
     # write graphics data
     gfx_data = bytearray()
     for i in range(0, map_width * map_height * 4, 4):
-        tile_int = (data[i] | (data[i+1] << 8) |
-                    (data[i+2] << 16) | (data[i+3] << 24))
+        tile_int = (tdata[i] | (tdata[i+1] << 8) |
+                   (tdata[i+2] << 16) | (tdata[i+3] << 24))
 
         if tile_int == 0:
             out_int = 0
         else:
+            (tileset, tid) = tilesets.to_local(tile_int & 0x00FFFFFF)
+            assert tileset.name == 'tileset'
+
             flip_h = (tile_int & FLIPPED_HORIZONTALLY_FLAG) != 0
             flip_v = (tile_int & FLIPPED_VERTICALLY_FLAG) != 0
-            tid = tile_int & 0x00FFFFFF
 
-            if tid > 255:
-                print(data_base64.text.strip())
-                print(i // 4, tile_int)
-                print((i // 4) % (map_width), i // (4 * map_width))
-                tid = tile_int & 0x0FFFFFFF
-            
+            #if tid > 255:
+            #    print(tdata_base64.text.strip())
+            #    print(i // 4, tile_int)
+            #    print((i // 4) % (map_width), i // (4 * map_width))
+        
             assert tid <= 255
             
-            out_int = tid
+            out_int = tid + 1
             if flip_h:
                 out_int = out_int | (1 << 8)
             if flip_v:
@@ -262,7 +340,7 @@ def main():
 
     s = False
     try:
-        parse(args.input, out_file, parse_tileset(args.input))
+        parse(args.input, out_file)
         s = True
     finally:
         if not s:

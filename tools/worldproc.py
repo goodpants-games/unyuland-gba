@@ -372,15 +372,13 @@ def calc_room_automap_occupancy(room_path: str) -> Array2D:
     (room_width, room_height, _, col_data_offset, _, _) = \
         struct.unpack('<HHBxxxIII', map_data[0:20])
     
-    col_data = bytearray(int_ceil_div(room_width * room_height, 4) * 4)
+    col_data = bytearray(int_ceil_div(room_width * room_height, 2) * 2)
     j = 0
-    for i in range(0, int_ceil_div(room_width * room_height, 4)):
+    for i in range(0, int_ceil_div(room_width * room_height, 2)):
         byte = map_data[col_data_offset + i]
-        col_data[j  ] = byte & 0x3
-        col_data[j+1] = (byte >> 2) & 0x3
-        col_data[j+2] = (byte >> 4) & 0x3
-        col_data[j+3] = (byte >> 6) & 0x3
-        j += 4
+        col_data[j  ] = byte & 0xF
+        col_data[j+1] = (byte >> 4) & 0xF
+        j += 2
     
     room_swidth = int_ceil_div(room_width, ROOM_SCREEN_WIDTH)
     room_sheight = int_ceil_div(room_height, ROOM_SCREEN_HEIGHT)

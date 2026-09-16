@@ -26,7 +26,7 @@ static inline const u8* mapc_collision_data(const mapc_header_s *header)
 
 static inline uint mapc_collision_data_size(const mapc_header_s *header)
 {
-    return CEIL_DIV((uint)header->width * (uint)header->height, 4);
+    return CEIL_DIV((uint)header->width * (uint)header->height, 2);
 }
 
 static inline const u16* mapc_graphics_data(const mapc_header_s *header)
@@ -42,8 +42,9 @@ static inline const u8* mapc_entity_data(const mapc_header_s *header)
 
 static inline int mapc_collision_get(const u8 *data, uint pitch, uint x, uint y)
 {
-    uint i = y * pitch + x;
-    int cell = (data[i >> 2] >> ((i & 0x3) << 1)) & 0x3;
+    const uint i = y * pitch + x;
+    int cell = (data[i/2] >> ((i&1) * 4)) & 0xF;
+    // int cell = (data[i/2] >> ((i & 0x3) << 1)) & 0x3;
     // int cell = (data[i / 4] >> ((i % 4) * 2)) & 0x3;
     return cell;
 }
