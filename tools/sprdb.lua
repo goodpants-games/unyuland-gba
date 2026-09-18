@@ -37,7 +37,7 @@ struct gfx_obj {
 --]]
 
 local OUTPUT_WIDTH = 128
-local OUTPUT_HEIGHT = 64
+local OUTPUT_HEIGHT = 128
 
 local ATTR0_SQUARE  = 0
 local ATTR0_WIDE    = 0x4000
