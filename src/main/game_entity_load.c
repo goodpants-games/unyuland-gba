@@ -206,9 +206,13 @@ void game_load_entity(const entity_load_s *load_data)
     }
     STR_CASE("house")
     {
+        int variant;
+        get_property_int(load_data, "variant", &variant);
+
         ent->pos.x = load_data->x;
         ent->pos.y = load_data->y - FX(24);
         ent->sprite.graphic_id = SPRID_GAME_UNYU_HOUSE;
+        ent->sprite.frame = variant;
         ent->sprite.zidx = -20;
     }
     STR_CASE_FALLBACK
