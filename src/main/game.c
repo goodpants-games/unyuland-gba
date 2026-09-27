@@ -880,6 +880,8 @@ static void sort_render_list(void)
     }
 }
 
+// calculates draw position of object. returns true if the object should be
+// culled.
 static inline bool renderer_cam_calc(int obj_x, int obj_y, int cam_x,
                                      int cam_y, int *draw_x,
                                      int *draw_y)
@@ -889,8 +891,8 @@ static inline bool renderer_cam_calc(int obj_x, int obj_y, int cam_x,
 
     // frustum culling. needed so sprites don't wrap around the screen.
     // and also obviously the performance benefit.
-    return (*draw_x < -32 ||
-            *draw_y < -32 ||
+    return (*draw_x < -64 ||
+            *draw_y < -64 ||
             *draw_x > SCREEN_WIDTH + 32 ||
             *draw_y > SCREEN_HEIGHT + 32);
 }
