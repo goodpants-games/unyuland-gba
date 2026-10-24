@@ -260,7 +260,7 @@ local SPRITE_SIZES = {
 }
 
 local function objdef(a0, a1, char, ox, oy, fox, foy)
-    return string.pack("<!4 I2 I2 I2 i1 i1 i1 i1", a0, a1, char & 0x1FF, ox, oy,
+    return string.pack("<!4 I2 I2 I2 i1 i1 i1 i1", a0, a1, char & 0x3FF, ox, oy,
                        fox, foy)
 end
 
