@@ -2395,3 +2395,66 @@ static const behavior_def_s behavior_boss = {
 };
 
 #pragma endregion boss
+
+
+
+
+
+
+
+
+
+//------------------------------------------------------------------------------
+// npcs
+//------------------------------------------------------------------------------
+#pragma region npcs
+
+const behavior_def_s behavior_npc;
+
+typedef struct npc_data
+{
+    const char *dialogue;
+}
+npc_data_s;
+EDATA_SIZE_CHECK(npc_data_s);
+
+void entity_npc_init(entity_s *self, FIXED px, FIXED py, const char *id)
+{
+    self->flags |= ENTITY_FLAG_COLLIDE | ENTITY_FLAG_MOVING | ENTITY_FLAG_ACTOR;
+    self->pos.x = px;
+    self->pos.y = py;
+    self->sprite.graphic_id = SPRID_GAME_RED_UNYU_WALK;
+    self->sprite.flags = SPRITE_FLAG_PLAYING;
+    self->col.w = 6;
+    self->col.h = 8;
+    self->col.group = COLGROUP_ACTOR;
+    self->col.mask = COLGROUP_DEFAULT | COLGROUP_PLR_PLAT;
+    self->actor.flags |= ACTOR_FLAG_CAN_MOVE;
+    self->sprite.ox = -1;
+    self->sprite.oy = -1;
+
+    self->behavior = &behavior_npc;
+    npc_data_s *data = (npc_data_s *)self->userdata;
+    data->dialogue = dlg_get_chat_by_name("unyu_dialogue_1");
+}
+
+static void entity_npc_interact(entity_s *self, entity_s *source)
+{
+    npc_data_s *data = (npc_data_s *)self->userdata;
+
+    LOG_DBG("npc interact!");
+    game_start_dialogue(data->dialogue);
+}
+
+static void entity_npc_update(entity_s *self)
+{
+    // self->actor.jump_velocity = FX(2.0);
+    // self->actor.jump_trigger = 1;
+}
+
+const behavior_def_s behavior_npc = {
+    .interact = entity_npc_interact,
+    .update = entity_npc_update,
+};
+
+#pragma endregion npcs

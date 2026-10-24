@@ -233,6 +233,17 @@
         ]
     },
     {
+        "id": "unyu_dialogue_1",
+        "pages": [
+            "Hey, friend... -sniff-",
+            "No, I'm not crying! -sniff- I'm just having a little leak... -sniff-",
+            "Okay fine I am crying! I don't want you to go away! -sniff-",
+            "I know it's only to collect the orbs, but... -sniff- it's pretty scary in those caves... What if...",
+            "No, let's not think about that. Well, I'm sorry for bothering you. You have very important things to do.",
+            "Please be careful!"
+        ]
+    },
+    {
         "id": "intro",
         "cols": 17,
         "rows": 6,

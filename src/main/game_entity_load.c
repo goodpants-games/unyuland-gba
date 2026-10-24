@@ -232,6 +232,17 @@ void game_load_entity(const entity_load_s *load_data)
         ent->sprite.frame = variant;
         ent->sprite.zidx = -20;
     }
+    STR_CASE("npc")
+    {
+        const char *id;
+        if (!get_property_string(load_data, "id", &id))
+        {
+            LOG_ERR("could not create 'npc' entity");
+            goto error;
+        }
+
+        entity_npc_init(ent, load_data->x, load_data->y, id);
+    }
     STR_CASE_FALLBACK
     {
         LOG_DBG("unknown entity type %s", name);
