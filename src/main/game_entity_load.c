@@ -235,13 +235,20 @@ void game_load_entity(const entity_load_s *load_data)
     STR_CASE("npc")
     {
         const char *id;
+        int face;
+
         if (!get_property_string(load_data, "id", &id))
         {
-            LOG_ERR("could not create 'npc' entity");
+            LOG_ERR("npc entity missing 'id' string property");
+            goto error;
+        }
+        if (!get_property_int(load_data, "face", &face))
+        {
+            LOG_ERR("npc entity missing 'face' int property");
             goto error;
         }
 
-        entity_npc_init(ent, load_data->x, load_data->y, id);
+        entity_npc_init(ent, load_data->x, load_data->y, id, face);
     }
     STR_CASE_FALLBACK
     {

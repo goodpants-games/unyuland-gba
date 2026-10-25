@@ -2409,45 +2409,161 @@ static const behavior_def_s behavior_boss = {
 //------------------------------------------------------------------------------
 #pragma region npcs
 
-const behavior_def_s behavior_npc;
+enum
+{
+    NPC_BEHAVIOR_NONE,
+    NPC_BEHAVIOR_PACE,
+};
+
+typedef struct npc_descriptor
+{
+    const char *id;
+    const char *dialogue_id;
+
+    u8 behavior; // NPC_BEHAVIOR_*
+
+    u8 col_w;
+    u8 col_h;
+    s8 spr_ox;
+    s8 spr_oy;
+
+    u8 anim_idle;
+    u8 anim_walk;
+}
+npc_descriptor_s;
 
 typedef struct npc_data
 {
-    const char *dialogue;
+    const npc_descriptor_s *desc;
+
+    // neg: increment until zero, in which case movement starts
+    // pos: decrement until zero, in which case movement ends
+    s16 pace_timer;
 }
 npc_data_s;
 EDATA_SIZE_CHECK(npc_data_s);
 
-void entity_npc_init(entity_s *self, FIXED px, FIXED py, const char *id)
+const behavior_def_s behavior_npc;
+static const npc_descriptor_s npc_descriptors[] = {
+    {
+        .id = "red_unyu",
+        .dialogue_id = "unyu_dialogue_1",
+        .behavior = NPC_BEHAVIOR_PACE,
+        .col_w = 6,
+        .col_h = 8,
+        .spr_ox = -1,
+        .spr_oy = -1,
+        .anim_idle = SPRID_GAME_RED_UNYU_IDLE,
+        .anim_walk = SPRID_GAME_RED_UNYU_WALK,
+    },
+};
+
+void entity_npc_init(entity_s *self, FIXED px, FIXED py, const char *id, int face)
 {
+    // find descriptor by name
+    const npc_descriptor_s *desc = npc_descriptors;
+    for (uint i = sizeof(npc_descriptors)/sizeof(*npc_descriptors); i != 0; --i)
+    {
+        if (!strcmp(desc->id, id))
+            goto found_descriptor;
+        ++desc;
+    }
+    LOG_ERR("could not find npc descriptor for '%s'", id);
+    return;
+
+    // using goto really just for less indentation :p
+found_descriptor:;
     self->flags |= ENTITY_FLAG_COLLIDE | ENTITY_FLAG_MOVING | ENTITY_FLAG_ACTOR;
-    self->pos.x = px;
-    self->pos.y = py;
-    self->sprite.graphic_id = SPRID_GAME_RED_UNYU_WALK;
-    self->sprite.flags = SPRITE_FLAG_PLAYING;
-    self->col.w = 6;
-    self->col.h = 8;
+    self->pos.x = (px*2 + 8 - desc->col_w) / 2;
+    self->pos.y = (py*2 + 8 - desc->col_h) / 2;
+    self->sprite.graphic_id = desc->anim_idle;
+    self->col.w = desc->col_w;
+    self->col.h = desc->col_h;
     self->col.group = COLGROUP_ACTOR;
     self->col.mask = COLGROUP_DEFAULT | COLGROUP_PLR_PLAT;
     self->actor.flags |= ACTOR_FLAG_CAN_MOVE;
-    self->sprite.ox = -1;
-    self->sprite.oy = -1;
+    self->actor.move_speed = FX(0.25);
+    self->actor.move_accel = FX(1.0 / 16.0);
+    self->sprite.ox = desc->spr_ox;
+    self->sprite.oy = desc->spr_oy;
+    self->sprite.graphic_id = desc->anim_idle;
+    self->sprite.flags |= SPRITE_FLAG_PLAYING;
 
     self->behavior = &behavior_npc;
     npc_data_s *data = (npc_data_s *)self->userdata;
-    data->dialogue = dlg_get_chat_by_name("unyu_dialogue_1");
+    data->desc = desc;
+
+    if (desc->behavior == NPC_BEHAVIOR_PACE)
+        data->pace_timer = 1;
+
+    if (face >= 0)
+    {
+        self->actor.face_dir = 1;
+    }
+    else
+    {
+        self->actor.face_dir = -1;
+        self->sprite.flags |= SPRITE_FLAG_FLIP_X;
+    }
 }
 
 static void entity_npc_interact(entity_s *self, entity_s *source)
 {
     npc_data_s *data = (npc_data_s *)self->userdata;
+    const npc_descriptor_s *desc = data->desc;
 
     LOG_DBG("npc interact!");
-    game_start_dialogue(data->dialogue);
+    const char *chat = dlg_get_chat_by_name(desc->dialogue_id);
+    if (!chat)
+    {
+        LOG_ERR("chat '%s' not found!", desc->dialogue_id);
+        return;
+    }
+
+    game_start_dialogue(chat);
 }
 
 static void entity_npc_update(entity_s *self)
 {
+    npc_data_s *data = (npc_data_s *)self->userdata;
+    const npc_descriptor_s *desc = data->desc;
+
+    if (desc->behavior == NPC_BEHAVIOR_PACE)
+    {
+        self->actor.move_x = 0;
+
+        if (data->pace_timer > 0)
+        {
+            if (--data->pace_timer == 0)
+            {
+                data->pace_timer = -qran_range(120, 240);
+                self->sprite.graphic_id = desc->anim_idle;
+                self->sprite.frame = 0;
+                self->sprite.accum = 0;
+            }
+            else
+            {
+                self->actor.move_x = self->actor.face_dir;
+            }
+        }
+        else
+        {
+            if (++data->pace_timer == 0)
+            {
+                self->actor.face_dir = -self->actor.face_dir;
+                data->pace_timer = 40;
+
+                self->sprite.graphic_id = desc->anim_walk;
+                self->sprite.flags |= SPRITE_FLAG_PLAYING;
+                self->sprite.frame = 0;
+                self->sprite.accum = 0;
+            }            
+        }
+
+        self->sprite.flags &= ~SPRITE_FLAG_FLIP_X;
+        if (self->actor.face_dir < 0)
+            self->sprite.flags |= SPRITE_FLAG_FLIP_X;
+    }
     // self->actor.jump_velocity = FX(2.0);
     // self->actor.jump_trigger = 1;
 }

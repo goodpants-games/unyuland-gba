@@ -151,7 +151,7 @@
             "fileName": "testroom1.tmx",
             "height": 176,
             "width": 360,
-            "x": -480,
+            "x": -360,
             "y": -264
         },
         {
@@ -165,7 +165,7 @@
             "fileName": "unyuhome.tmx",
             "height": 176,
             "width": 480,
-            "x": -600,
+            "x": -480,
             "y": -88
         }
     ],
