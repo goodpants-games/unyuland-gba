@@ -306,7 +306,7 @@ endif
 # Aseprite with the sprdb.lua script. The image file should then compiled with
 # grit.
 #---------------------------------------------------------------------------------
-%_sprdb.bin %_sprdb.png %_sprdb.grit %_sprdb.h: %.sprdb
+%_sprdb.bin %_sprdb.png %_sprdb.grit %_sprdb.h: %.sprdb $(TOPLEVEL)/tools/sprdb.lua
 #---------------------------------------------------------------------------------
 	@echo $(notdir $<)
 	@mkdir -p $(dir $@)
