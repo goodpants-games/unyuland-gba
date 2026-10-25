@@ -308,7 +308,7 @@ local function create_objs(out, frame, src_w, src_h)
                 size = 1
             end
 
-            local fox = src_w - sw * 8 - ox
+            local fox = src_w - size * 8 - ox
             local foy = src_h - 8 - oy
             local obj = objdef(a0, a1, frame.idx + char_ofs,
                                ox,  oy,
