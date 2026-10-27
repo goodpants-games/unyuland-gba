@@ -298,12 +298,12 @@ def parse(ifile_path: str, output_file: BinaryIO):
 
                         case 'int':
                             odata.append(1)
-                            odata += struct.pack('<I', int(prop.get('value')))
+                            odata += struct.pack('<i', int(prop.get('value')))
 
                         case 'float':
                             odata.append(2)
                             fx_val = int(float(prop.get('value')) * 256)
-                            odata += struct.pack('<I', fx_val)                        
+                            odata += struct.pack('<i', fx_val)                        
 
                         case t:
                             raise Exception("unknown property type " + t)
