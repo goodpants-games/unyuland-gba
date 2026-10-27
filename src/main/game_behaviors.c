@@ -2468,12 +2468,13 @@ static const npc_descriptor_s npc_descriptors[] = {
     {
         .id = "grape_unyu",
         .dialogue_id = "unyu_dialogue_3",
-        .behavior = NPC_BEHAVIOR_NONE,
+        .behavior = NPC_BEHAVIOR_PACE,
         .col_w = 6,
         .col_h = 8,
         .spr_ox = -1,
         .spr_oy = 0,
         .anim_idle = SPRID_GAME_GRAPE_UNYU_IDLE,
+        .anim_walk = SPRID_GAME_GRAPE_UNYU_IDLE,
     },
     {
         .id = "pink_unyu",
@@ -2485,6 +2486,16 @@ static const npc_descriptor_s npc_descriptors[] = {
         .spr_oy = 0,
         .anim_idle = SPRID_GAME_PINK_UNYU_IDLE,
     },
+    {
+        .id = "elder_unyu1",
+        .dialogue_id = "unyu_dialogue_elder1",
+        .behavior = NPC_BEHAVIOR_NONE,
+        .col_w = 7,
+        .col_h = 8,
+        .spr_ox = -1,
+        .spr_oy = 0,
+        .anim_idle = SPRID_GAME_ELDER_UNYU_IDLE,
+    }
 };
 
 void entity_npc_init(entity_s *self, FIXED px, FIXED py, const char *id, int face)

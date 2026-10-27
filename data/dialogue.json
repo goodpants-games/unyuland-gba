@@ -238,7 +238,7 @@
             "Hey, friend... -sniff-",
             "No, I'm not crying! -sniff- I'm just having a little leak... -sniff-",
             "Okay fine I am crying! I don't want you to go away! -sniff-",
-            "I know it's only to collect the orbs, but... -sniff- it's pretty scary in those caves... What if you...",
+            "I know it's only to scavenge for the orbs, but... -sniff- it's pretty scary in those caves... What if you...",
             "No, let's not think about that. Well, I'm sorry for bothering you. You have very important things to do.",
             "Please be careful!"
         ]
@@ -277,9 +277,25 @@
             "I miss the sound of the cool breeze wading through the leaves of the trees and the blades of the grass.",
             "I miss going out into the woods with my friends. I miss exploring the creeks, observing the little bugs.",
             "I miss getting into water fights with my friends...",
-            "...What was that? We got here just last week? Of course I know that!",
-            "Can't a person reminisce without being judged?",
+            "...What was that? We got here just last week? O-Of course I knew that!",
+            "-sigh- It didn't feel like a week ago...",
             "Oh, I hope this winter passes quickly... Well, good luck on the expedition!"
+        ]
+    },
+    {
+        "id": "unyu_dialogue_elder1",
+        "pages": [
+            "Good afternoon, young one. I'm old!",
+            "This is not a deltarune reference. I independently came up with that line.",
+            "This dialogue is obviously a TODO.",
+            "In the wall I bore a tunnel to the entry room, because I did not program the door properly yet.",
+            "Have Fun! -pkhead"
+        ]
+    },
+    {
+        "id": "unyu_dialogue_mango",
+        "pages": [
+            "Li'l gup"
         ]
     },
     {
