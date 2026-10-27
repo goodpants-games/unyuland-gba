@@ -238,9 +238,48 @@
             "Hey, friend... -sniff-",
             "No, I'm not crying! -sniff- I'm just having a little leak... -sniff-",
             "Okay fine I am crying! I don't want you to go away! -sniff-",
-            "I know it's only to collect the orbs, but... -sniff- it's pretty scary in those caves... What if...",
+            "I know it's only to collect the orbs, but... -sniff- it's pretty scary in those caves... What if you...",
             "No, let's not think about that. Well, I'm sorry for bothering you. You have very important things to do.",
             "Please be careful!"
+        ]
+    },
+    {
+        "id": "unyu_dialogue_2",
+        "pages": [
+            "Is it just me, or does it seem that I'm the only one who likes the winter better?",
+            "I know, it's cold. Very cold. But summer is too hot! I'd rather be too cold than be too hot.",
+            "And I like the quietness of the winter better. I like living in these smaller towns.",
+            "I hate migration, too. Why not just stay in the mountains?",
+            "...I also wonder where all those fire orbs come from. If we stayed in the mountains, maybe we could see?"
+        ]
+    },
+    {
+        "id": "unyu_dialogue_3",
+        "pages": [
+            "Oh! You're one of the people on the expedition, right?",
+            "If you don't mind, may I ask for a favor?",
+            "Can you bring three fire orbs for me?",
+            "...Come on, surely you can find some extra ones, right?",
+            "I know everyone needs them, but I get colder easier than everyone else.",
+            "Even in the summer I get cold! Whatever's apparently a \"chill day\" to everyone else, I'm shivering!",
+            "...Slightly.",
+            "Surely you can be accomdating? Please?",
+            "...No? Whatever, fine. Just leave me to freeze to death.",
+            "...",
+            "Okay, I'm sorry. I guess I'll be fine with just one..."
+        ]
+    },
+    {
+        "id": "unyu_dialogue_4",
+        "pages": [
+            "-sigh- I miss summer. I miss it so much.",
+            "I miss the warmth of the sun beaming on my face. I miss the chirping and chattering the of the birds.",
+            "I miss the sound of the cool breeze wading through the leaves of the trees and the blades of the grass.",
+            "I miss going out into the woods with my friends. I miss exploring the creeks, observing the little bugs.",
+            "I miss getting into water fights with my friends...",
+            "...What was that? We got here just last week? Of course I know that!",
+            "Can't a person reminisce without being judged?",
+            "Oh, I hope this winter passes quickly... Well, good luck on the expedition!"
         ]
     },
     {
