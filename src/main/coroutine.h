@@ -26,12 +26,19 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
     static_assert(sizeof(struct _vars) <= sizeof(coro_state->vars), \
                   "too many coroutine variables"); \
     switch (coro_state->suspend_point) { case 0:;
-#define CORO_YIELD(RESULT) \
-    *coro_status = CORO_STATUS_YIELD; \
-    coro_state->suspend_point = __LINE__; return RESULT; case __LINE__:;
-#define CORO_END(RESULT) \
-    coro_state->suspend_point = -1; \
-    return RESULT; }
+#define CORO_YIELD_EXPLICIT(RESULT, ID) \
+    do { \
+        *coro_status = CORO_STATUS_YIELD; \
+        coro_state->suspend_point = ID; return RESULT; case ID:; \
+    } while (0);
+#define CORO_YIELD(RESULT) CORO_YIELD_EXPLICIT(RESULT, (__COUNTER__+1))
+#define CORO_RETURN(RESULT) \
+    do { \
+        coro_state->suspend_point = -1; \
+        return RESULT; \
+    } while (0);
+#define CORO_END \
+    coro_state->suspend_point = -1; }
 #define CORO_FUNC(NAME, ...) \
     NAME(coro_status_e *coro_status, coro_state_s *coro_state, ##__VA_ARGS__)
 

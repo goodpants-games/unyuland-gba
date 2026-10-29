@@ -20,6 +20,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include "room_scripts.h"
 #include "game.h"
+#include "dialogue.h"
 #include "math_util.h"
 
 #pragma GCC diagnostic ignored "-Wreturn-type"
@@ -28,20 +29,43 @@ void CORO_FUNC(room_script_test)
 {
     CORO_BEGIN(v, {
         entity_s *player;
+        entity_s *npc;
+        int i;
     })
-
-    v->player = &g_game.entities[0];
-
     LOG_DBG("room script activated");
 
+    v->player = &g_game.entities[0];
+    // wait until player is at x >= 43
     for (;;)
     {
         if (v->player->pos.x >= FX(43 * 8))
             break;
         CORO_YIELD()
     }
-
     LOG_DBG("player reached it.");
+    // create npc
+    v->npc = entity_alloc();
+    if (!v->npc) CORO_RETURN();
+    v->npc->pos.x = FX(46 * 8);
+    v->npc->pos.y = FX(18 * 8);
+    v->npc->sprite.graphic_id = SPRID_GAME_MANGO_UNYU_IDLE;
+    CORO_YIELD();
+    // show dialogue
+    const char *dlg = dlg_get_chat_by_name("unyu_dialogue_mango");
+    if (!dlg)
+    {
+        LOG_ERR("could not find dialogue!");
+        CORO_RETURN();
+    }
+    game_start_dialogue(dlg);
+    CORO_YIELD();
+    // after dialogue ends, the npc floats to the heavens and disappears...
+    for (v->i = 0; v->i < 120; ++v->i)
+    {
+        v->npc->pos.y -= FX(1);
+        CORO_YIELD();
+    }
+    entity_free(v->npc);
 
-    CORO_END()
+    CORO_END
 }
