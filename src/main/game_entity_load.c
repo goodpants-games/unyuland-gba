@@ -144,6 +144,20 @@ void game_load_entity(const entity_load_s *load_data)
     if (!ent)
         return;
 
+    // load tag, truncated to first four characters.
+    // (4 chars = 1 u32)
+    const char *tag_str;
+    if (get_property_string(load_data, "tag", &tag_str))
+    {        
+        ent->tag = 0;
+        char *buf = (char *)(&ent->tag) + 4;
+        for (int i = 0; i < 4; ++i)
+        {
+            if (!tag_str[i]) break;
+            *(--buf) = tag_str[i];
+        }
+    }
+
     STR_CASE_START(name)
     STR_CASE("crawler")
     {
