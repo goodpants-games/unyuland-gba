@@ -20,11 +20,14 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include <stdint.h>
 
-#define CORO_BEGIN(VARS, ...) \
+#define CORO_BEGINV(VARS, ...) \
     *coro_status = CORO_STATUS_DONE; \
     struct _vars __VA_ARGS__ *VARS = (void *)coro_state->vars; \
     static_assert(sizeof(struct _vars) <= sizeof(coro_state->vars), \
                   "too many coroutine variables"); \
+    switch (coro_state->suspend_point) { case 0:;
+#define CORO_BEGIN \
+    *coro_status = CORO_STATUS_DONE; \
     switch (coro_state->suspend_point) { case 0:;
 #define CORO_YIELD_EXPLICIT(RESULT, ID) \
     do { \

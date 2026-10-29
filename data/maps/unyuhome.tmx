@@ -2,7 +2,7 @@
 <map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="60" height="22" tilewidth="8" tileheight="8" infinite="0" nextlayerid="4" nextobjectid="21">
  <properties>
   <property name="music" value="village"/>
-  <property name="script" value="test"/>
+  <property name="script" value="unyuhome"/>
  </properties>
  <tileset firstgid="1" source="tileset.tsx"/>
  <tileset firstgid="129" source="flags_tileset.tsx"/>
@@ -18,7 +18,11 @@
  </layer>
  <objectgroup id="2" name="Objects">
   <object id="1" name="player" type="entity" x="205" y="96" width="8" height="8"/>
-  <object id="2" name="home" type="entity" x="440" y="160" width="8" height="8"/>
+  <object id="2" name="home" type="entity" x="440" y="160" width="8" height="8">
+   <properties>
+    <property name="tag" value="door"/>
+   </properties>
+  </object>
   <object id="7" name="house" type="entity" x="185" y="144" width="8" height="8">
    <properties>
     <property name="variant" type="int" value="0"/>

@@ -1164,23 +1164,6 @@ const behavior_def_s behavior_spring = {
 // home
 //------------------------------------------------------------------------------
 #pragma region home
-static const behavior_def_s behavior_home;
-
-static void home_interact(entity_s *self, entity_s *source)
-{
-    game_transition_to_room(&world_rooms[0]);
-    /*
-    if (g_game.collected_rorbs >= GAME_REQUIRED_RORBS)
-    {
-        scenemgr_change(&scene_desc_end, 0);
-    }
-    else
-    {
-        const char *dlg = dlg_get_chat_by_name("home_unfinished");
-        game_start_dialogue(dlg);
-    }
-    */
-}
 
 void entity_home_init(entity_s *self, FIXED px, FIXED py)
 {
@@ -1194,12 +1177,7 @@ void entity_home_init(entity_s *self, FIXED px, FIXED py)
     self->sprite.ox = -4;
     self->sprite.oy = -16;
     self->sprite.zidx = -20;
-    self->behavior = &behavior_home;
 }
-
-static const behavior_def_s behavior_home = {
-    .interact = home_interact
-};
 
 #pragma endregion home
 

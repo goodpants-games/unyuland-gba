@@ -21,5 +21,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include "coroutine.h"
 
 void CORO_FUNC(room_script_test);
+void CORO_FUNC(room_script_unyuhome);
+void CORO_FUNC(room_script_b01);
 
 #endif

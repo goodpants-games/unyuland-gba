@@ -1159,6 +1159,8 @@ static void change_room(const world_room_s *new_room)
     bool enable_bg = new_room->map->bg_id == 1;
     gfx_ctl.bg[2].enabled = enable_bg;
     gfx_ctl.bg[3].enabled = enable_bg;
+
+    update_room_script();
 }
 
 static void room_transition_inactive_update(entity_s *player)
