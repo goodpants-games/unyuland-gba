@@ -158,9 +158,9 @@
     {
         "id": "sign_b05_hint",
         "pages": [
-            "Did you know? There's a breakable red block on the ceiling to the left!",
+            "Did you know? There's a breakable block on the ceiling to the left!",
             "Oh, well, you probably already saw that coming in. It's pretty obvious.",
-            "Oh! Did you know? There's an enemy below this platform!",
+            "Oh! Did you know? There's an enemy below the platform to the right!",
             "It holds up the ice block, and...",
             "Nevermind, I don't think I have any useful information. Sorry.",
             "Well, if you get truly stuck, you can reset the room by leaving and re-entering it.",
