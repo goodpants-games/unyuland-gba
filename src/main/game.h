@@ -272,6 +272,9 @@ typedef struct game {
 
     u8 cur_music;
     bool did_jingle_finish;
+
+    void CORO_FUNC((*room_script));
+    coro_state_s room_script_state;
 } game_s;
 
 typedef enum entity_load_prop_type

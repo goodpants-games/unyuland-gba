@@ -589,6 +589,17 @@ static void update_camera(entity_s *player)
     }
 }
 
+static void update_room_script(void)
+{
+    if (!g_game.room_script)
+        return;
+
+    coro_status_e coro_status;
+    g_game.room_script(&coro_status, &g_game.room_script_state);
+    if (coro_status == CORO_STATUS_DONE)
+        g_game.room_script = NULL;
+}
+
 void game_init(void)
 {
     g_game = (game_s)
@@ -665,6 +676,8 @@ void game_update(void)
     update_entities();
     update_projectiles();
     game_physics_update();
+    update_camera(player);
+    update_room_script();
     update_animation();
 
     if (g_game.queue_restore)
@@ -673,7 +686,6 @@ void game_update(void)
         game_restore_state();
     }
 
-    update_camera(player);
 
     const FIXED x_min = int2fx(SCREEN_WIDTH / 4);
     const FIXED y_min = int2fx(SCREEN_HEIGHT / 4);
@@ -833,6 +845,10 @@ void game_load_room(const world_room_s *room)
         g_game.cur_music = room->music;
         mplay_start(g_game.cur_music, true);
     }
+
+    // activate room script (if exists)
+    g_game.room_script = room->script;
+    g_game.room_script_state = (coro_state_s){};
 }
 
 void game_send_global_message(const char *id, void *data)

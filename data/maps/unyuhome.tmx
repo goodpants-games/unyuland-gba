@@ -2,6 +2,7 @@
 <map version="1.10" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="60" height="22" tilewidth="8" tileheight="8" infinite="0" nextlayerid="4" nextobjectid="21">
  <properties>
   <property name="music" value="village"/>
+  <property name="script" value="test"/>
  </properties>
  <tileset firstgid="1" source="tileset.tsx"/>
  <tileset firstgid="129" source="flags_tileset.tsx"/>

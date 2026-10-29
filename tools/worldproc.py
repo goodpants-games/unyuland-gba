@@ -55,6 +55,7 @@ class RoomData:
         self.w = w
         self.h = h
         self.music = "caves"
+        self.script = ""
 
 class Array2D:
     def __init__(self: typing.Self, w: int, h: int, data: list):
@@ -95,28 +96,34 @@ def abort_errors():
     #     raise RuntimeError("multiple errors occurred: " + err_text)
 
 
-def get_room_music(world_path: str, room_name: str) -> str:
+def get_room_metadata(world_path: str, room_name: str) -> tuple[str, str]:
     room_path: str = path.join(path.dirname(world_path), room_name)
     
     with open(room_path, 'r') as ifile:
         tmx_data = xml.fromstring(ifile.read())
     
     room_music = "caves"
+    room_script = ""
+
     room_props = tmx_data.find('properties')
     if room_props is not None:
         for prop in room_props.findall('property'):
             if prop.get('name') == 'music':
                 room_music = prop.get('value')
+            elif prop.get('name') == 'script':
+                room_script = prop.get('value')
     
     # check that the music file exists
     mod_exts = {"mod", "s3m", "xm", "it"}
     music_dir = path.abspath(path.join(world_path, '../../music'))
     for ext in mod_exts:
         if path.exists(path.join(music_dir, f'{room_music}.{ext}')):
-            return room_music    
+            return (room_music, room_script)
     
     g_errors.append(
         RuntimeError(f"music file named '{room_music}' does not exist"))
+
+    return (None, room_script)
 
     
 
@@ -135,11 +142,12 @@ def worldproc(world_path: str, room_list: list[str],
     rooms: dict[str, RoomData] = {}
     for map_json in world_data['maps']:
         name, _ = path.splitext(map_json['fileName'])
-        mus = get_room_music(world_path, map_json['fileName'])
+        (mus, script) = get_room_metadata(world_path, map_json['fileName'])
 
         room_data = RoomData(name, map_json['x'], map_json['y'],
                              map_json['width'], map_json['height'])
         room_data.music = mus
+        room_data.script = script
         rooms[name] = room_data
     
     # get bounding box of world
@@ -241,6 +249,7 @@ def generate_c_source(rooms: list[str], room_data: dict[str, RoomData],
 #define WORLD_H
 #include <tonc_types.h>
 #include <mapc.h>
+#include <coroutine.h>
 
 #define WORLD_MATRIX_GRID_WIDTH 15
 #define WORLD_MATRIX_GRID_HEIGHT 11
@@ -253,6 +262,7 @@ typedef struct world_room
     u8 x, y;
     u8 music;
     const mapc_header_s *map;
+    void CORO_FUNC((*const script));
 }}
 world_room_s;
 
@@ -263,6 +273,7 @@ extern const u8 world_matrix[WORLD_MATRIX_HEIGHT][WORLD_MATRIX_WIDTH];
     
     with open(fc_path, 'w') as fc:
         fc.write("#include <data/music.h>\n")
+        fc.write("#include <room_scripts.h>\n")
         fc.write("#include \"world.h\"\n")
         fc.write("\n")
 
@@ -284,7 +295,12 @@ const world_room_s world_rooms[WORLD_ROOM_COUNT] = {{""")
             fc.write(f".music = MOD_{room_music}, ")
             fc.write(".map = (const mapc_header_s *)")
             fc.write(name)
-            fc.write("_map },")
+            fc.write("_map, .script = ")
+            if data.script:
+                fc.write("room_script_" + data.script)
+            else:
+                fc.write("NULL")
+            fc.write(" },")
         
         fc.write("\n};\n\n")
 
