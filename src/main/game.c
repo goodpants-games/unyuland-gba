@@ -1083,6 +1083,22 @@ void game_play_jingle(int module_idx)
     mplay_set_event_handler(mplay_event_handler);
 }
 
+bool game_transition_to_room(const world_room_s *room)
+{
+    if (g_game.room_trans.phase != 0)
+        return false;
+
+    g_game.room_trans = (room_trans_state_s)
+    {
+        .phase = 1,
+        .ticks = 0,
+        .dir = DIR4_NULL,
+        .new_room = room,
+    };
+
+    return true;
+}
+
 static void change_room(const world_room_s *new_room)
 {
     // if an orb was collected, commit the change
@@ -1264,11 +1280,18 @@ static bool room_transition_phase1_update(entity_s *player)
         player_mx = player->actor.face_dir;
         break;
 
-    default: LOG_ERR("unreachable switch statement wtf???");
+    default:
+        LOG_ERR("unreachable switch statement wtf???");
+    case DIR4_NULL:
+        game_reset_player_pos();
+        player->vel.x = 0;
+        player->vel.y = 0;
+        goto skip_player_pos_set;
     }
 
     player->pos.x = cx - colw / 2;
     player->pos.y = cy - colh / 2;
+skip_player_pos_set:;
 
     g_game.room_trans = (room_trans_state_s)
     {

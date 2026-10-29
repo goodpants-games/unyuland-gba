@@ -101,7 +101,8 @@ typedef enum dir4
     DIR4_RIGHT,
     DIR4_UP,
     DIR4_LEFT,
-    DIR4_DOWN
+    DIR4_DOWN,
+    DIR4_NULL = -1,
 } dir4_e;
 
 // typedef enum entity_msgid
@@ -318,6 +319,9 @@ void game_init(void);
 void game_deinit(void);
 void game_update(void);
 void game_load_room(const world_room_s *room);
+// if a transition was already active, returns false and does nothing.
+// otherwise, returns true and begins the transition.
+bool game_transition_to_room(const world_room_s *room);
 void game_reset_player_pos(void);
 void game_send_global_message(const char *id, void *data);
 void game_render(void);

@@ -26,6 +26,7 @@
 - Make L fire and R shoot platform
   (Maybe also make a setting which toggles control modes)
 - Show locations of collected orbs on map
+- change appearance of checkpoint to make it look less like a Human Water Cooler
 
 - pc port: add frame time display
 

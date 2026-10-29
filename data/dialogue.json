@@ -283,19 +283,21 @@
         ]
     },
     {
-        "id": "unyu_dialogue_elder1",
-        "pages": [
-            "Good afternoon, young one. I'm old!",
-            "This is not a deltarune reference. I independently came up with that line.",
-            "This dialogue is obviously a TODO.",
-            "In the wall I bore a tunnel to the entry room, because I did not program the door properly yet.",
-            "Have Fun! -pkhead"
-        ]
-    },
-    {
         "id": "unyu_dialogue_mango",
         "pages": [
             "Li'l gup"
+        ]
+    },
+    {
+        "id": "unyu_dialogue_elder1",
+        "pages": [
+            "Good afternoon, young one.",
+            "You're one of the three on the expedition, right? You're late...",
+            "...Oh, you just wanted to say your farewells? That sounds bit morbid, doesn't it?",
+            "I've trained you all well enough for you to survive well in the caves. I'm sure you'll be fine!",
+            "And it's unlikely that we're all just going to magically disappear once you're away!",
+            "Well, your tardiness doesn't really matter. You can take as much time as you want. Just, not too much time.",
+            "If you're ready, just go through the door behind me. Good luck!"
         ]
     },
     {

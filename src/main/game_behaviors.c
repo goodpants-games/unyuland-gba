@@ -21,6 +21,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <assert.h>
 #include <modplay.h>
 #include <data/music.h>
+#include <data/world.h>
 #include <log.h>
 #include <stdlib.h>
 #include <string.h>
@@ -29,8 +30,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include "game.h"
 #include "math_util.h"
 #include "scenes.h"
-#include "sound.h"
 #include "printf.h"
+#include "sound.h"
 #include "gfx.h"
 
 #define DEFAULT_DAMP TO_FIXED(0.88)
@@ -1167,6 +1168,8 @@ static const behavior_def_s behavior_home;
 
 static void home_interact(entity_s *self, entity_s *source)
 {
+    game_transition_to_room(&world_rooms[0]);
+    /*
     if (g_game.collected_rorbs >= GAME_REQUIRED_RORBS)
     {
         scenemgr_change(&scene_desc_end, 0);
@@ -1176,6 +1179,7 @@ static void home_interact(entity_s *self, entity_s *source)
         const char *dlg = dlg_get_chat_by_name("home_unfinished");
         game_start_dialogue(dlg);
     }
+    */
 }
 
 void entity_home_init(entity_s *self, FIXED px, FIXED py)
