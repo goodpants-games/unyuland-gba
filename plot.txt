@@ -7,28 +7,35 @@ on the edge of the village is the Unyu-Door, with Unyus standing around it. Game
 won't let you get close to it; instead you have to talk to an Unyu asking you if
 you are ready to start your expedition.
 
-Starting the expedition will play a cutscene where Unyus are wishing good luck
-on Unyus going through the door. You come in last during the cutscene.
+==================================== Start Cutscene ============================
 
-Fade to black, show Objective screen.
+A group of three Unyus are standing around in a corridor-ish thing. the player
+Unyu walks into frame.
+
+They walk towards the right, stopping before four passageways in the background.
+One at a time, each walks into their respective entrance, looking back and
+jumping to say Good-Bye before fading into the background. You are the last one
+to leave.
+
+Show objective screen.
 
 ==================================== Boss ======================================
 
 Upon re-entering the unyu village you started in, it is eerily barren of Unyus
 and there is also black goop and destruction everywhere.
 
-Then you find a survivor Unyu and a Tall Figure talking to each other. Tall
-Figure notices you and is like "Oh Thank The Gods, Another Unyu is Alive!!"
-"Er, sorry to inform you but a giant monster came here and destroyed everything
-and ate everyone. It's very sad and tragic." (todo: better writing).
-"unfortunately you Unyus seem to have taken residence near their territory."
-tall figure then explains that it is possible to save everyone if you managed to
-kill the monster. their tribe has killed one of them before and recall that any
-recently eaten creature was still alive once its body was dissolved in water.
-"hm. actually. I suppose I have a plan. There's this pond of water somewhere
-nearby. I could set up a trap and if we could just lure the monster over there
-then we can save everybody!! Im gonna need your help though Blabla okay follow
-me!"
+Then you find a survivor Unyu (it is your red droplet friend) and a Tall Figure
+talking to each other. Tall Figure notices you and is like "Oh Thank The Gods,
+Another Unyu is Alive!!" "Er, sorry to inform you but a giant monster came here
+and destroyed everything and ate everyone. It's very sad and tragic." (todo:
+better writing). "unfortunately you Unyus seem to have taken residence near
+their territory." tall figure then explains that it is possible to save everyone
+if you managed to kill the monster. their tribe has killed one of them before
+and recall that any recently eaten creature was still alive once its body was
+dissolved in water. "hm. actually. I suppose I have a plan. There's this pond of
+water somewhere nearby. I could set up a trap and if we could just lure the
+monster over there then we can save everybody!! Im gonna need your help though
+Blabla okay follow me!"
 
 Unyu then follows him. Then there is this somewhat small tunnel you need to swim
 through to progress. SignGuy: "No, this isn't the one. It's further upward."
